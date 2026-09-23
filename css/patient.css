@@ -407,13 +407,13 @@
 
 .patient-info-form-card {
   background: #ffffff;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
-  padding: 22px;
-  box-shadow: var(--shadow-sm);
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  padding: 32px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
 }
 
 .payment-methods-selector {
@@ -468,23 +468,26 @@
 
 /* Resumen Financiero Transparente (Página 3) */
 .order-summary-card {
-  background: #ffffff;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
-  padding: 22px;
-  box-shadow: var(--shadow-sm);
+  background: #f8fafc;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  padding: 32px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
   height: fit-content;
+  position: sticky;
+  top: 100px;
 }
 
 .order-summary-title {
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   font-weight: 800;
-  color: var(--dark-navy);
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-light);
+  color: #0f172a;
+  padding-bottom: 16px;
+  border-bottom: 2px dashed #cbd5e1;
+  margin-bottom: 8px;
 }
 
 .summary-row {
@@ -568,12 +571,17 @@
 }
 
 .ticket-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   padding: 24px;
   background: linear-gradient(135deg, #0284c7, #0ea5e9);
   color: #ffffff;
+  text-align: center;
+}
+
+.ticket-header-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .ticket-code-label {
@@ -595,19 +603,35 @@
 }
 
 .ticket-code-group {
-  text-align: left;
+  text-align: center;
+  margin-top: 16px;
+}
+
+.ticket-body-layout {
+  display: flex;
+  flex-direction: row;
+  background: #ffffff;
+}
+
+.ticket-side-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px;
+  border-right: 2px dashed #e2e8f0;
+  background: #f8fafc;
+  min-width: 180px;
 }
 
 .qr-code-display-box {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 24px;
+  padding: 16px;
   background: #ffffff;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  margin: 24px 24px 10px 24px;
 }
 
 .ticket-details-grid {
@@ -615,8 +639,8 @@
   grid-template-columns: 1fr 1fr;
   gap: 16px;
   text-align: left;
-  background: #ffffff;
-  padding: 16px 24px 24px 24px;
+  padding: 24px;
+  flex: 1;
 }
 
 .ticket-detail-item {

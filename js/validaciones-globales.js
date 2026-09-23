@@ -56,7 +56,7 @@ export const sanitizarNombre = (nombre) => {
 };
 
 /**
- * Bloqueadores físicos de teclado
+ * Bloqueadores físicos de teclado usando keydown
  */
 const bloquearLetras = (e) => {
   if (e.type === 'paste') {
@@ -69,15 +69,18 @@ const bloquearLetras = (e) => {
     return;
   }
   
-  if (e.type === 'keypress') {
-    // Si la tecla presionada no es un número y no es tecla de control, bloquéala
-    if (!/^\d$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
-      e.preventDefault();
+  if (e.type === 'keydown') {
+    // Permitir teclas de navegación, control, borrar, etc.
+    if (
+      e.key.length > 1 || 
+      e.ctrlKey || 
+      e.metaKey || 
+      e.altKey
+    ) {
+      return;
     }
-  }
-
-  if (e.type === 'beforeinput' && e.data) {
-    if (/\D/.test(e.data)) {
+    // Si la tecla no es un dígito, bloquear
+    if (!/^\d$/.test(e.key)) {
       e.preventDefault();
     }
   }
@@ -94,14 +97,18 @@ const bloquearNumerosYSimb = (e) => {
     return;
   }
   
-  if (e.type === 'keypress') {
-    if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
-      e.preventDefault();
+  if (e.type === 'keydown') {
+    // Permitir teclas de navegación, control, borrar, etc.
+    if (
+      e.key.length > 1 || 
+      e.ctrlKey || 
+      e.metaKey || 
+      e.altKey
+    ) {
+      return;
     }
-  }
-
-  if (e.type === 'beforeinput' && e.data) {
-    if (/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/.test(e.data)) {
+    // Si la tecla no es una letra o espacio, bloquear
+    if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]$/.test(e.key)) {
       e.preventDefault();
     }
   }
@@ -121,8 +128,7 @@ export const aplicarMascaraInputs = () => {
     if (input) {
       input.setAttribute('maxlength', '10');
       input.setAttribute('inputmode', 'numeric');
-      input.addEventListener('keypress', bloquearLetras);
-      input.addEventListener('beforeinput', bloquearLetras);
+      input.addEventListener('keydown', bloquearLetras);
       input.addEventListener('paste', bloquearLetras);
       input.addEventListener('input', function() {
         this.value = this.value.replace(/\D/g, '').substring(0, 10);
@@ -139,8 +145,7 @@ export const aplicarMascaraInputs = () => {
     if (input) {
       input.setAttribute('maxlength', '10');
       input.setAttribute('inputmode', 'numeric');
-      input.addEventListener('keypress', bloquearLetras);
-      input.addEventListener('beforeinput', bloquearLetras);
+      input.addEventListener('keydown', bloquearLetras);
       input.addEventListener('paste', bloquearLetras);
       input.addEventListener('input', function() {
         this.value = this.value.replace(/\D/g, '').substring(0, 10);
@@ -157,8 +162,7 @@ export const aplicarMascaraInputs = () => {
   nameInputs.forEach(input => {
     if (input) {
       input.setAttribute('maxlength', '70');
-      input.addEventListener('keypress', bloquearNumerosYSimb);
-      input.addEventListener('beforeinput', bloquearNumerosYSimb);
+      input.addEventListener('keydown', bloquearNumerosYSimb);
       input.addEventListener('paste', bloquearNumerosYSimb);
       input.addEventListener('input', function() {
         this.value = sanitizarNombre(this.value);

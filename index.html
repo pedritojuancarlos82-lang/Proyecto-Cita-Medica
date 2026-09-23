@@ -858,48 +858,54 @@
                   <span>✓</span> ¡Cita Médica Reservada Exitosamente!
                 </div>
 
-                <!-- Tarjeta Imprimible del Ticket -->
+                <!-- Tarjeta Imprimible del Ticket Rediseñada -->
                 <div class="ticket-card-printable" id="printable-ticket-element" style="overflow-wrap: break-word; word-break: break-word;">
+                  
                   <div class="ticket-header">
-                    <div>
-                      <h3 style="font-size: 1.15rem; color: var(--dark-navy); font-weight: 800;">TICKET OFICIAL DE CITA</h3>
-                      <p style="font-size: 0.74rem; color: var(--text-muted);">Servicio de Medicina General - Dr. Carlos Campoverde</p>
-                    </div>
-                    <div class="ticket-code-group">
-                      <div class="ticket-code-label">Código de Cita</div>
-                      <div class="ticket-code-value" id="ticket-code-display">#MED-84920</div>
+                    <div class="ticket-header-content">
+                      <h3 style="font-size: 1.25rem; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 4px;">MONTEPIEDRA SALUD</h3>
+                      <p style="font-size: 0.8rem; opacity: 0.9;">Pase de Abordaje Médico • Ticket Oficial</p>
                     </div>
                   </div>
-
-                  <!-- Código QR Dinámico -->
-                  <div class="qr-code-display-box" id="ticket-qr-container">
-                    <!-- Código SVG inyectado desde qr-generator.js -->
-                  </div>
-
-                  <div class="ticket-details-grid">
-                    <div class="ticket-detail-item">
-                      <div class="label">Paciente</div>
-                      <div class="value" id="ticket-patient-name">Carlos Mendoza Moreira</div>
+                  
+                  <div class="ticket-body-layout">
+                    <!-- Columna Izquierda: QR y Código -->
+                    <div class="ticket-side-panel">
+                      <div class="qr-code-display-box" id="ticket-qr-container">
+                        <!-- Código SVG inyectado desde qr-generator.js -->
+                      </div>
+                      <div class="ticket-code-group">
+                        <div class="ticket-code-label">Código Único</div>
+                        <div class="ticket-code-value" id="ticket-code-display">#MED-84920</div>
+                      </div>
                     </div>
-                    <div class="ticket-detail-item">
-                      <div class="label">Cédula de Identidad</div>
-                      <div class="value" id="ticket-patient-id">0987654321</div>
-                    </div>
-                    <div class="ticket-detail-item">
-                      <div class="label">Sede / Consultorio</div>
-                      <div class="value" id="ticket-clinic-display">Clínica Ceibos (Consultorio 2)</div>
-                    </div>
-                    <div class="ticket-detail-item">
-                      <div class="label">Fecha y Hora Asignada</div>
-                      <div class="value" id="ticket-datetime-display">2026-09-19 - 10:30</div>
-                    </div>
-                    <div class="ticket-detail-item">
-                      <div class="label">Método de Pago</div>
-                      <div class="value" id="ticket-method-display">Efectivo</div>
-                    </div>
-                    <div class="ticket-detail-item">
-                      <div class="label">Total a Abonar</div>
-                      <div class="value" id="ticket-total-display" style="color: var(--primary-blue); font-size: 1.05rem;">$20.00</div>
+                    
+                    <!-- Columna Derecha: Detalles -->
+                    <div class="ticket-details-grid">
+                      <div class="ticket-detail-item">
+                        <div class="label">Paciente</div>
+                        <div class="value" id="ticket-patient-name">Carlos Mendoza Moreira</div>
+                      </div>
+                      <div class="ticket-detail-item">
+                        <div class="label">Cédula de Identidad</div>
+                        <div class="value" id="ticket-patient-id">0987654321</div>
+                      </div>
+                      <div class="ticket-detail-item">
+                        <div class="label">Servicio Médico</div>
+                        <div class="value" id="ticket-clinic-display">Medicina General - Clínica Ceibos</div>
+                      </div>
+                      <div class="ticket-detail-item">
+                        <div class="label">Fecha y Hora</div>
+                        <div class="value" id="ticket-datetime-display">2026-09-19 - 10:30</div>
+                      </div>
+                      <div class="ticket-detail-item">
+                        <div class="label">Método de Pago</div>
+                        <div class="value" id="ticket-method-display">Efectivo</div>
+                      </div>
+                      <div class="ticket-detail-item total-price-badge">
+                        <div class="label">Total a Pagar</div>
+                        <div class="value" id="ticket-total-display">$20.00</div>
+                      </div>
                     </div>
                   </div>
 
