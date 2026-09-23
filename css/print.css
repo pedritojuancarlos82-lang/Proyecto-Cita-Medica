@@ -1,0 +1,90 @@
+/* ==========================================================================
+   Estilos de Impresión y Generación de PDF
+   Para Recetas Médicas Oficiales y Comprobantes con Código QR
+   ========================================================================== */
+
+@media print {
+  /* Ocultar elementos de navegación y herramientas del sistema */
+  .app-navbar,
+  .patient-portal-header,
+  .doctor-top-bar,
+  .doctor-desktop-nav,
+  .doctor-bottom-nav,
+  .doctor-emergency-fab,
+  .accountant-header,
+  .accountant-action-tools,
+  .wizard-stepper-container,
+  .wizard-actions-bar,
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger,
+  .modal-close-btn,
+  .toast-container {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt;
+  }
+
+  .app-main-layout {
+    padding: 0 !important;
+    background: #ffffff !important;
+    min-height: auto !important;
+  }
+
+  /* Tarjeta de Ticket Imprimible */
+  .ticket-card-printable {
+    box-shadow: none !important;
+    border: 1px solid #000000 !important;
+    margin: 0 auto;
+    page-break-inside: avoid;
+    width: 100% !important;
+    max-width: 600px !important;
+  }
+
+  .qr-code-display-box svg {
+    width: 160px !important;
+    height: 160px !important;
+  }
+
+  /* Receta Médica Oficial para Impresión */
+  .official-rx-printable {
+    display: block !important;
+    border: 2px solid #0f172a;
+    padding: 24px;
+    border-radius: 8px;
+    margin: 20px auto;
+    max-width: 700px;
+    background: #ffffff;
+    page-break-inside: avoid;
+  }
+
+  .official-rx-printable .rx-header {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 2px solid #0f172a;
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+  }
+
+  .official-rx-printable .rx-seal {
+    text-align: right;
+    font-size: 9pt;
+    color: #334155;
+  }
+
+  .official-rx-printable .rx-body {
+    margin-bottom: 24px;
+  }
+
+  .official-rx-printable .rx-footer {
+    border-top: 1px dashed #64748b;
+    padding-top: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+}

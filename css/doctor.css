@@ -1,0 +1,825 @@
+/* ==========================================================================
+   Flujo 2: Portal Médico (Mobile-First / Xiaomi Redmi Note 390x844px)
+   Página 4 del documento
+   ========================================================================== */
+
+.doctor-portal-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 56px);
+  background: #f8fafc;
+  position: relative;
+}
+
+/* Barra de Navegación de Pestañas para Pantallas Medianas y Grandes (Tablet / Desktop) */
+.doctor-desktop-nav {
+  display: none; /* Oculto en móvil por defecto, visible en >= 768px */
+  background: #ffffff;
+  border-bottom: 1px solid var(--border-light);
+  padding: 8px 24px;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  position: sticky;
+  top: 56px;
+  z-index: 40;
+}
+
+.doctor-desktop-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.doctor-desktop-tab-btn {
+  background: transparent;
+  border: none;
+  padding: 8px 16px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: var(--transition-fast);
+}
+
+.doctor-desktop-tab-btn:hover {
+  background: #f1f5f9;
+  color: var(--dark-navy);
+}
+
+.doctor-desktop-tab-btn.active {
+  background: var(--primary-blue-light);
+  color: var(--primary-blue);
+  box-shadow: 0 1px 3px rgba(2, 132, 199, 0.15);
+}
+
+.btn-emergency-desktop {
+  background: linear-gradient(135deg, var(--red-emergency), #dc2626);
+  color: #ffffff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 3px 10px rgba(239, 68, 68, 0.3);
+  transition: all var(--transition-fast);
+}
+
+.btn-emergency-desktop:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+/* Barra Superior Móvil Ergonómica */
+.doctor-top-bar {
+  background: var(--dark-navy);
+  color: #ffffff;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+  z-index: 50;
+  position: sticky;
+  top: 0;
+}
+
+.doctor-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.doctor-profile-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.doctor-avatar-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--primary-blue);
+}
+
+.doctor-info-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.doctor-name-title {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.1;
+}
+
+.doctor-code-sub {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  letter-spacing: 0.03em;
+}
+
+.doctor-date-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  padding: 6px 12px;
+  font-size: 0.82rem;
+}
+
+.date-nav-arrow {
+  background: transparent;
+  border: none;
+  color: #cbd5e1;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 2px 8px;
+}
+
+.date-display-label {
+  font-weight: 700;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.active-clinic-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  border: 1px solid rgba(165, 180, 252, 0.3);
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+/* Área de Contenido Responsiva */
+.doctor-tab-content {
+  flex: 1;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px 16px 90px 16px; /* Espacio inferior para Bottom Bar y FAB en móvil */
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* PESTAÑA 1: Cronograma Diario & Rutas (Timeline Vertical) */
+.timeline-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+}
+
+.timeline-card {
+  background: #ffffff;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
+  padding: 14px 16px;
+  display: flex;
+  gap: 14px;
+  transition: var(--transition-fast);
+  position: relative;
+  overflow: hidden;
+}
+
+.timeline-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--primary-blue);
+}
+
+.timeline-card.ceibos::before { background: var(--indigo-ceibos); }
+.timeline-card.alborada::before { background: var(--emerald-green); }
+.timeline-card.mapasingue::before { background: var(--primary-blue); }
+.timeline-card.hospital::before { background: var(--amber-transit); }
+.timeline-card.en_guardia {
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+.timeline-card.en_guardia::before { background: var(--red-emergency); }
+
+.timeline-time-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 54px;
+  text-align: center;
+}
+
+.timeline-time-text {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--dark-navy);
+}
+
+.timeline-duration-badge {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.timeline-body-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.timeline-patient-name {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--dark-navy);
+  line-height: 1.2;
+}
+
+.timeline-patient-reason {
+  font-size: 0.8rem;
+  color: var(--dark-navy-muted);
+  line-height: 1.3;
+}
+
+.timeline-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
+.timeline-consultorio {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* Tarjeta de Advertencia de Traslado Protegido en Ámbar (Página 4) */
+.travel-warning-card {
+  background: #fffbeb;
+  border: 1.5px dashed var(--amber-transit);
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--shadow-sm);
+  animation: pulseGlow 3s infinite ease-in-out;
+}
+
+.travel-icon-box {
+  width: 38px;
+  height: 38px;
+  background: #fef3c7;
+  color: var(--amber-transit-dark);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.travel-text-content {
+  flex: 1;
+}
+
+.travel-title {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #92400e;
+}
+
+.travel-subtitle {
+  font-size: 0.72rem;
+  color: #b45309;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { border-color: #f59e0b; }
+  50% { border-color: #d97706; box-shadow: 0 0 10px rgba(245, 158, 11, 0.2); }
+}
+
+/* Banner de Alerta Activa de Guardia de Emergencia */
+.emergency-active-banner {
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  color: #ffffff;
+  padding: 12px 16px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
+}
+
+.emergency-banner-text h4 {
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.emergency-banner-text p {
+  font-size: 0.74rem;
+  opacity: 0.9;
+}
+
+/* Botón Flotante Persistente de Guardia (FAB) (Página 4) */
+.doctor-emergency-fab {
+  position: absolute;
+  bottom: 74px; /* Justo arriba de la barra de navegación táctil */
+  right: 18px;
+  background: linear-gradient(135deg, var(--red-emergency), #dc2626);
+  color: #ffffff;
+  border: none;
+  padding: 12px 18px;
+  border-radius: var(--radius-full);
+  font-size: 0.84rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.45);
+  z-index: 90;
+  transition: all var(--transition-normal);
+  letter-spacing: 0.02em;
+}
+
+.doctor-emergency-fab:hover {
+  transform: translateY(-2px) scale(1.03);
+  filter: brightness(1.1);
+}
+
+.fab-pulse-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: inherit;
+  opacity: 0.4;
+  animation: pulseFab 2s infinite ease-out;
+  pointer-events: none;
+}
+
+@keyframes pulseFab {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.25); opacity: 0; }
+}
+
+/* PESTAÑA 2: Fichas Clínicas Rápidas */
+.search-bar-sticky {
+  position: sticky;
+  top: 0;
+  background: #f1f5f9;
+  padding-bottom: 8px;
+  z-index: 20;
+}
+
+.clinical-records-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.patient-record-card {
+  background: #ffffff;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-light);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.patient-record-card:hover {
+  border-color: var(--primary-blue);
+  box-shadow: var(--shadow-md);
+}
+
+.patient-record-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.record-name {
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: var(--dark-navy);
+}
+
+.record-ci {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.allergy-alert-tag {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.past-diagnosis-snippet {
+  font-size: 0.78rem;
+  color: var(--dark-navy-muted);
+  margin-top: 6px;
+  background: #f8fafc;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+}
+
+/* PESTAÑA 3: Emisión de Recetas Digitales */
+.prescription-form-card {
+  background: #ffffff;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-light);
+  padding: 18px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rx-med-item-row {
+  background: #f8fafc;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+}
+
+/* PESTAÑA 4: Registro Ultrarrápido de Gastos en 2 Toques (Página 4) */
+.quick-expenses-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.quick-expense-presets-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--dark-navy);
+}
+
+.expense-preset-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.btn-expense-preset {
+  background: #ffffff;
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 14px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-expense-preset:hover {
+  border-color: var(--primary-blue);
+  background: #f0f9ff;
+  transform: translateY(-2px);
+}
+
+.preset-icon { font-size: 1.4rem; }
+.preset-name { font-size: 0.74rem; font-weight: 700; color: var(--dark-navy); }
+.preset-price { font-size: 0.95rem; font-weight: 800; color: var(--primary-blue); }
+
+.expense-log-history {
+  background: #ffffff;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-light);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.expense-log-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.82rem;
+}
+
+.expense-log-item:last-child {
+  border-bottom: none;
+}
+
+/* ==========================================================================
+   Menú Móvil Principal del Doctor - Adaptación Ergonómica para Celular (390x844px)
+   ========================================================================== */
+
+.doctor-mobile-nav-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #ffffff;
+  border-radius: var(--radius-xl);
+  padding: 12px 14px;
+  margin: 12px 12px 6px 12px;
+  border: 1px solid var(--border-light);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+}
+
+.doctor-mobile-profile-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.doctor-mobile-profile-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.doctor-mobile-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--primary-blue);
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.2);
+}
+
+.doctor-mobile-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.doctor-mobile-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: var(--dark-navy);
+}
+
+.doctor-mobile-clinic-tag {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.bullet-sep {
+  color: #cbd5e1;
+}
+
+.btn-mobile-emergency-trigger {
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  color: #b91c1c;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  padding: 5px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.btn-mobile-emergency-trigger:hover,
+.btn-mobile-emergency-trigger:active {
+  background: #fca5a5;
+  transform: scale(0.97);
+}
+
+/* Grid de 4 Pestañas Segmentadas en Celular */
+.doctor-mobile-tab-pills {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: var(--radius-lg);
+}
+
+.doc-mobile-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 8px 2px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.doc-mobile-pill .pill-icon {
+  font-size: 1.15rem;
+  transition: transform 0.2s ease;
+}
+
+.doc-mobile-pill:hover {
+  color: var(--dark-navy);
+}
+
+.doc-mobile-pill.active {
+  background: #ffffff;
+  color: var(--primary-blue);
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.15), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.doc-mobile-pill.active .pill-icon {
+  transform: scale(1.12);
+}
+
+.doc-mobile-pill.active .pill-text {
+  font-weight: 800;
+}
+
+/* Barra de Navegación Inferior Móvil (Bottom Bar de 4 Iconos) */
+.doctor-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(226, 232, 240, 0.85);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  align-items: center;
+  box-shadow: 0 -4px 20px rgba(15, 23, 42, 0.08);
+  z-index: 80;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.bottom-nav-item {
+  background: transparent;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.68rem;
+  font-weight: 700;
+  height: 100%;
+  transition: var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bottom-nav-item .nav-icon {
+  font-size: 1.2rem;
+  transition: transform 0.2s ease;
+}
+
+.bottom-nav-item.active {
+  color: var(--primary-blue);
+  font-weight: 800;
+}
+
+.bottom-nav-item.active .nav-icon {
+  transform: translateY(-2px) scale(1.1);
+}
+
+/* ==========================================================================
+   Adaptación Responsiva por Breakpoints (Tablet & Desktop)
+   ========================================================================== */
+
+@media (min-width: 769px) {
+  .doctor-mobile-nav-container {
+    display: none !important;
+  }
+  .doctor-bottom-nav {
+    display: none !important;
+  }
+  .doctor-emergency-fab {
+    display: none !important;
+  }
+  .doctor-desktop-nav {
+    display: flex;
+  }
+  .doctor-tab-content {
+    padding: 24px 24px 48px 24px;
+  }
+  .doctor-top-bar {
+    padding: 12px 24px;
+  }
+  .clinical-records-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+  .prescription-form-card {
+    max-width: 820px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 24px;
+  }
+  .quick-expenses-grid {
+    max-width: 820px;
+    margin: 0 auto;
+    width: 100%;
+  }
+  .expense-preset-buttons {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .doctor-top-bar {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 32px;
+  }
+  .doctor-desktop-nav {
+    padding: 10px 32px;
+  }
+  .doctor-tab-content {
+    padding: 28px 32px 56px 32px;
+  }
+  .clinical-records-list {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .doctor-portal-wrapper {
+    padding-bottom: 70px;
+  }
+  .doctor-tab-content {
+    padding: 8px 12px 85px 12px;
+  }
+  .doctor-emergency-fab {
+    position: fixed;
+    bottom: 74px;
+    right: 14px;
+    z-index: 90;
+    padding: 9px 14px;
+    font-size: 0.74rem;
+  }
+  .btn-emergency-desktop {
+    display: none !important;
+  }
+  .timeline-card {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+}

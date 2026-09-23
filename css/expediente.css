@@ -1,0 +1,240 @@
+/* css/expediente.css - Estilos Mobile-First para Expediente y Consulta Rápida */
+.expediente-section {
+  padding: 2rem 1rem;
+  background-color: #f1f5f9;
+  min-height: 100vh;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.expediente-container {
+  max-width: 768px;
+  margin: 0 auto;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.expediente-header {
+  background: #0f172a;
+  color: #ffffff;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.expediente-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.expediente-form-body {
+  padding: 1.5rem;
+}
+
+/* Grupos de Formulario */
+.form-section {
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+.form-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.form-section h3 {
+  color: #334155;
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.form-control {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+  background-color: #f8fafc;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #3b82f6;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+select.form-control {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1em;
+}
+
+textarea.form-control {
+  min-height: 100px;
+  resize: vertical;
+}
+
+/* Alertas Médicas */
+.alerta-medica {
+  background-color: #fef2f2;
+  border-left: 4px solid #ef4444;
+  padding: 1rem;
+  border-radius: 0 6px 6px 0;
+  margin-top: 1rem;
+}
+
+.alerta-medica label {
+  color: #991b1b;
+  font-weight: 600;
+}
+.alerta-medica .form-control {
+  border-color: #fca5a5;
+  background-color: #ffffff;
+}
+
+/* Grid para campos múltiples */
+.grid-2-cols {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+/* Botones */
+.btn-primary {
+  display: inline-block;
+  width: 100%;
+  background-color: #2563eb;
+  color: #ffffff;
+  border: none;
+  padding: 1rem;
+  border-radius: 6px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+  text-align: center;
+}
+
+.btn-primary:hover {
+  background-color: #1d4ed8;
+}
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+/* Historial de Consultas */
+.historial-container {
+  max-width: 768px;
+  margin: 2rem auto 0;
+  padding: 1.5rem;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.historial-container h3 {
+  margin-top: 0;
+  color: #0f172a;
+}
+
+.consulta-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background-color: #f8fafc;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.consulta-card:last-child {
+  margin-bottom: 0;
+}
+.consulta-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.consulta-header {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid #cbd5e1;
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.consulta-motivo {
+  color: #2563eb;
+  font-weight: 600;
+  font-size: 1.1rem;
+  margin: 0.5rem 0;
+}
+
+.consulta-detalle {
+  font-size: 0.95rem;
+  color: #334155;
+  line-height: 1.5;
+}
+
+.signos-vitales-pill {
+  display: inline-block;
+  background-color: #e2e8f0;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  margin-right: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Responsive Tablet y Desktop */
+@media (min-width: 640px) {
+  .grid-2-cols {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Estilos para Validaciones de Errores */
+.input-error {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
+  background-color: #fef2f2 !important;
+}
+.error-feedback {
+  color: #dc2626;
+  font-size: 0.85rem;
+  margin-top: 0.3rem;
+  display: none;
+  font-weight: 500;
+  animation: fadeIn 0.2s ease-in;
+}
+.error-feedback.visible {
+  display: block;
+}
+@keyframes fadeIn { 
+  from { opacity: 0; transform: translateY(-3px); } 
+  to { opacity: 1; transform: translateY(0); } 
+}

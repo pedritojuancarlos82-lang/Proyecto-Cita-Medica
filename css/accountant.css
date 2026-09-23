@@ -1,0 +1,358 @@
+/* ==========================================================================
+   Flujo 3: Panel Administrativo de la Contadora (Página 5 del documento)
+   Conciliaciones de los Viernes, Retenciones y Preparación Tributaria SRI
+   ========================================================================== */
+
+.accountant-portal-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background: var(--bg-app);
+}
+
+/* Cabecera del Panel Contable */
+.accountant-header {
+  background: #ffffff;
+  border-bottom: 1px solid var(--border-light);
+  padding: 18px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 60;
+}
+
+.accountant-title-group h2 {
+  font-size: 1.28rem;
+  font-weight: 800;
+  color: var(--dark-navy);
+}
+
+.accountant-title-group p {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.accountant-action-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Fila de Métricas KPI (4 Tarjetas Principales) (Página 5) */
+.kpi-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  padding: 24px 32px 0 32px;
+}
+
+.kpi-card {
+  background: #ffffff;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-light);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+}
+
+.kpi-card.gross::before { background: var(--primary-blue); }
+.kpi-card.retentions::before { background: var(--indigo-ceibos); }
+.kpi-card.expenses::before { background: var(--amber-transit); }
+.kpi-card.net::before { background: var(--emerald-green); }
+
+.kpi-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.kpi-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.kpi-icon-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+}
+
+.kpi-card.gross .kpi-icon-badge { background: var(--primary-blue-light); color: var(--primary-blue); }
+.kpi-card.retentions .kpi-icon-badge { background: var(--indigo-ceibos-light); color: var(--indigo-ceibos); }
+.kpi-card.expenses .kpi-icon-badge { background: var(--amber-transit-light); color: var(--amber-transit-dark); }
+.kpi-card.net .kpi-icon-badge { background: var(--emerald-green-light); color: var(--emerald-green-dark); }
+
+.kpi-amount {
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: var(--dark-navy);
+  letter-spacing: -0.02em;
+}
+
+.kpi-subtext {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* Disposición de Módulos Contables */
+.accountant-dashboard-body {
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.accountant-split-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 24px;
+}
+
+/* Módulo 1: Liquidación de los Viernes (Tabla de Corte de Caja) */
+.accounting-card {
+  background: #ffffff;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.accounting-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 14px;
+}
+
+.card-heading-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--dark-navy);
+}
+
+.card-heading-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* Tabla de Cierre Semanal */
+.settlement-table-wrapper {
+  overflow-x: auto;
+}
+
+.settlement-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+  text-align: left;
+}
+
+.settlement-table th {
+  background: #f8fafc;
+  color: var(--dark-navy);
+  font-weight: 700;
+  padding: 12px 14px;
+  border-bottom: 2px solid var(--border-light);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.settlement-table td {
+  padding: 14px;
+  border-bottom: 1px solid var(--border-light);
+  color: var(--dark-navy-muted);
+}
+
+.settlement-table tr:hover td {
+  background: #f8fafc;
+}
+
+.badge-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.badge-status-pill.liquidado {
+  background: var(--emerald-green-light);
+  color: var(--emerald-green-dark);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-status-pill.pendiente {
+  background: var(--amber-transit-light);
+  color: var(--amber-transit-dark);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge-status-pill.sueldo-fijo {
+  background: var(--indigo-ceibos-light);
+  color: var(--indigo-ceibos-dark);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+/* Barra de Rentabilidad Comparativa por Sede (Página 5) */
+.clinic-profitability-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.profitability-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.profitability-header-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.progress-bar-track {
+  height: 10px;
+  background: #f1f5f9;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Clasificador Contable de Egresos */
+.expense-category-chips {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.expense-cat-box {
+  background: #f8fafc;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.expense-cat-name {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.expense-cat-amount {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--dark-navy);
+}
+
+/* Modal y Vista Previa del Informe Tributario SRI */
+.sri-report-modal-content {
+  background: #ffffff;
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-family: 'Inter', monospace, sans-serif;
+}
+
+.sri-header {
+  border-bottom: 2px solid var(--dark-navy);
+  padding-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+@media (max-width: 1024px) {
+  .kpi-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    padding: 16px 20px 0 20px;
+  }
+  .accountant-split-grid {
+    grid-template-columns: 1fr;
+  }
+  .accountant-dashboard-body {
+    padding: 16px 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .accountant-header {
+    padding: 14px 16px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .accountant-action-tools {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .accountant-action-tools button {
+    flex: 1;
+    font-size: 0.78rem;
+    padding: 8px 10px;
+    justify-content: center;
+  }
+  .kpi-metrics-grid {
+    padding: 14px 16px 0 16px;
+    gap: 12px;
+  }
+  .accountant-dashboard-body {
+    padding: 14px 16px;
+  }
+}
+
+@media (max-width: 540px) {
+  .kpi-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+  .expense-category-chips {
+    grid-template-columns: 1fr;
+  }
+}

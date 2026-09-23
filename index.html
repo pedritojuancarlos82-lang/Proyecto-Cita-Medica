@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Montepiedra Salud | Red de Consultorios y Atención Médica Integral</title>
+  <meta name="description" content="Centro Médico Montepiedra: Red integral de atención médica general y preventiva en Guayaquil. Agenda tu cita en 4 sencillos pasos, recibe tu pase con código QR y obtén recetas médicas oficiales.">
+
+  <!-- Hojas de Estilo del Sistema de Diseño -->
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/landing.css">
+  <link rel="stylesheet" href="css/patient.css">
+  <link rel="stylesheet" href="css/doctor.css">
+  <link rel="stylesheet" href="css/accountant.css">
+  <link rel="stylesheet" href="css/print.css">
+</head>
+<body>
+
+  <!-- Barra Superior Institucional Dinámica y Contextual -->
+  <header class="app-navbar" id="main-app-navbar">
+    <div class="navbar-brand-group" id="navbar-brand-home" title="Centro Médico Montepiedra - Volver a la página principal">
+      <div class="brand-icon-box">🩺</div>
+      <div style="display: flex; flex-direction: column;">
+        <span class="brand-title-text">Montepiedra Salud</span>
+        <span class="brand-subtitle-text" id="navbar-brand-subtitle">Centro Médico & Red Asistencial</span>
+      </div>
+    </div>
+
+    <!-- ZONA CENTRAL DINÁMICA: Cambia según la vista/página activa -->
+    <!-- 1. Menú para Vista Principal (Landing Page) -->
+    <nav class="navbar-menu-view" id="nav-menu-landing">
+      <a href="#inicio" class="nav-menu-link">Inicio</a>
+      <a href="#como-funciona" class="nav-menu-link">Cómo Funciona</a>
+      <a href="#sobre-nosotros" class="nav-menu-link">Sobre Nosotros</a>
+      <a href="#sedes-consultorios" class="nav-menu-link">Sedes</a>
+      <a href="#dudas-frecuentes" class="nav-menu-link">Dudas (FAQ)</a>
+    </nav>
+
+    <!-- 2. Menú para Vista Paciente (Portal de Citas y Pasos) -->
+    <nav class="navbar-menu-view" id="nav-menu-patient" style="display: none;">
+      <button type="button" class="nav-step-btn active" id="nav-btn-pat-step1" data-step="1">
+        <span>🏢 1. Sedes</span>
+      </button>
+      <button type="button" class="nav-step-btn" id="nav-btn-pat-step2" data-step="2">
+        <span>⏰ 2. Horarios</span>
+      </button>
+      <button type="button" class="nav-step-btn" id="nav-btn-pat-step3" data-step="3">
+        <span>📋 3. Datos y Pago</span>
+      </button>
+      <button type="button" class="nav-step-btn" id="nav-btn-pat-step4" data-step="4">
+        <span>🎫 4. Mi Ticket QR</span>
+      </button>
+    </nav>
+
+    <!-- 3. Menú para Vista Médico (Portal Dr. Carlos Campoverde) -->
+    <nav class="navbar-menu-view" id="nav-menu-doctor" style="display: none;">
+      <button type="button" class="nav-tab-btn active" data-tab="agenda" id="nav-btn-doc-agenda">
+        <span>📅 Agenda & Rutas</span>
+      </button>
+      <button type="button" class="nav-tab-btn" data-tab="fichas" id="nav-btn-doc-fichas">
+        <span>📁 Fichas Clínicas</span>
+      </button>
+      <button type="button" class="nav-tab-btn" data-tab="recetas" id="nav-btn-doc-recetas">
+        <span>💊 Recetas Digitales</span>
+      </button>
+      <button type="button" class="nav-tab-btn" data-tab="gastos" id="nav-btn-doc-gastos">
+        <span>💰 Gastos en Ruta</span>
+      </button>
+    </nav>
+
+    <!-- 4. Menú para Vista Contadora (Portal Lcda. Morales) -->
+    <nav class="navbar-menu-view" id="nav-menu-accountant" style="display: none;">
+      <button type="button" class="nav-tab-btn active" data-target="kpis" id="nav-btn-acc-kpis">
+        <span>📊 Resumen KPIs</span>
+      </button>
+      <button type="button" class="nav-tab-btn" data-target="settlement" id="nav-btn-acc-settlement">
+        <span>📅 Liquidación Viernes</span>
+      </button>
+      <button type="button" class="nav-tab-btn" data-target="profitability" id="nav-btn-acc-profitability">
+        <span>🏢 Rentabilidad Sedes</span>
+      </button>
+      <button type="button" class="nav-tab-btn" data-target="taxreport" id="nav-btn-acc-taxreport">
+        <span>📑 Informe SRI</span>
+      </button>
+    </nav>
+
+    <!-- ZONA DERECHA DE ACCIONES DINÁMICAS -->
+    <!-- 1. Acciones para Landing -->
+    <div class="navbar-actions-view" id="nav-actions-landing">
+      <a href="#portal-acceso" class="btn-navbar-outline" id="btn-navbar-login-landing">
+        <span>🔐 Acceso Intranet</span>
+      </a>
+      <button type="button" class="btn-navbar-booking" id="btn-navbar-book-now">
+        <span>📅 Agendar Cita</span>
+      </button>
+    </div>
+
+    <!-- 2. Acciones para Paciente -->
+    <div class="navbar-actions-view" id="nav-actions-patient" style="display: none;">
+      <button type="button" class="btn-navbar-back" id="btn-nav-patient-back">
+        <span>← Volver al Inicio</span>
+      </button>
+      <div class="navbar-user-card" id="patient-logged-card" style="display: none;">
+        <img src="" alt="Avatar" class="navbar-avatar" id="pat-navbar-avatar" />
+        <div class="navbar-user-info">
+          <span class="navbar-user-name" id="pat-navbar-name">Paciente</span>
+          <span class="brand-badge badge-alborada">PACIENTE</span>
+        </div>
+        <button type="button" class="btn-logout" id="btn-patient-logout" title="Cerrar sesión">Salir ✕</button>
+      </div>
+      <a href="#portal-acceso" class="btn-navbar-outline" id="btn-nav-patient-open-login" style="display: none;">
+        <span>🔐 Iniciar Sesión</span>
+      </a>
+    </div>
+
+    <!-- 3. Acciones para Doctor -->
+    <div class="navbar-actions-view" id="nav-actions-doctor" style="display: none;">
+      <button type="button" class="btn-navbar-emergency" id="btn-nav-doctor-guard-btn">
+        <span>🚨 Convocatoria Guardia</span>
+      </button>
+      <div class="navbar-user-card">
+        <img src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80" alt="Dr. Carlos Campoverde" class="navbar-avatar" />
+        <div class="navbar-user-info">
+          <span class="navbar-user-name">Dr. Campoverde</span>
+          <span class="brand-badge badge-ceibos">MÉDICO</span>
+        </div>
+        <button type="button" class="btn-logout" id="btn-doctor-logout" title="Cerrar sesión">Salir ✕</button>
+      </div>
+    </div>
+
+    <!-- 4. Acciones para Contadora -->
+    <div class="navbar-actions-view" id="nav-actions-accountant" style="display: none;">
+      <button type="button" class="btn-navbar-sri" id="btn-nav-accountant-sri-btn">
+        <span>📑 Formulario SRI 102</span>
+      </button>
+      <div class="navbar-user-card">
+        <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80" alt="Lcda. Morales" class="navbar-avatar" />
+        <div class="navbar-user-info">
+          <span class="navbar-user-name">Lcda. Morales</span>
+          <span class="brand-badge badge-mapasingue">AUDITORA</span>
+        </div>
+        <button type="button" class="btn-logout" id="btn-accountant-logout" title="Cerrar sesión">Salir ✕</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Contenedor Principal Responsivo de la Aplicación -->
+  <main class="app-main-layout" id="main-app-layout">
+    <div class="app-screen-content" id="main-screen-content">
+
+        <!-- ================================================================
+             VISTA 0: LANDING PAGE INSTITUCIONAL Y PORTAL WEB OFICIAL
+             ================================================================ -->
+        <section id="view-landing" class="landing-wrapper">
+
+          <!-- 1. HERO INSTITUCIONAL PRINCIPAL -->
+          <div class="hero-landing-section" id="inicio">
+            <div class="hero-inner-container">
+              <div class="hero-main-content">
+                <div class="hero-pill-badge">
+                  <span class="hero-pulse-dot"></span>
+                  <span>Red Médica Oficial en Guayaquil • 4 Sedes Activas</span>
+                </div>
+                <h1 class="hero-headline">
+                  Atención Médica Integral, Humana y con <span>Agendamiento Inmediato</span>
+                </h1>
+                <p class="hero-description">
+                  En Montepiedra Salud garantizamos atención médica general y preventiva de primer nivel para ti y tu familia en Guayaquil. Agenda tu turno en línea en menos de 2 minutos, recibe tu ticket digital con código QR para ingreso preferencial en recepción y accede a recetas oficiales con firma y código MSP.
+                </p>
+
+                <div class="hero-cta-group">
+                  <button type="button" class="btn-hero-primary" id="btn-hero-booking">
+                    <span>📅 Agendar Mi Turno Ahora</span> →
+                  </button>
+                  <a href="#sedes-consultorios" class="btn-hero-secondary">
+                    <span>🏥 Conocer Nuestras 4 Sedes</span>
+                  </a>
+                  <a href="#portal-acceso" class="btn-hero-outline">
+                    <span>🔐 Portal de Profesionales</span>
+                  </a>
+                </div>
+              </div>
+
+              <!-- Tira de Confianza y Estadísticas -->
+              <div class="hero-stats-strip">
+                <div class="stat-item">
+                  <span class="stat-number">+15,000</span>
+                  <span class="stat-label">Pacientes Atendidos</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-number">4 Sedes</span>
+                  <span class="stat-label">En Puntos Estratégicos</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-number">100%</span>
+                  <span class="stat-label">Recetas Homologadas MSP</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-number">0 min</span>
+                  <span class="stat-label">Espera en Recepción con QR</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. SECCIÓN: ¿CÓMO FUNCIONA? -->
+          <div class="content-section" id="como-funciona">
+            <div class="section-inner">
+              <div class="section-header-centered">
+                <span class="section-tag">Paso a Paso</span>
+                <h2 class="section-title">¿Cómo funciona el servicio de Montepiedra Salud?</h2>
+                <p class="section-desc">
+                  Diseñado para que recibas atención médica de primer nivel en 4 sencillos pasos, sin papeleos ni largas filas de espera.
+                </p>
+              </div>
+
+              <div class="how-it-works-grid">
+                <div class="how-step-card">
+                  <span class="step-card-number">01</span>
+                  <div class="step-card-icon-box">🏥</div>
+                  <h3 class="step-card-title">Elige tu Sede</h3>
+                  <p class="step-card-desc">
+                    Selecciona el consultorio más cercano a tu ubicación: Ceibos Plaza, Mapasingue Oeste, Alborada Etapa 8 o el Hospital Público Ceibos.
+                  </p>
+                </div>
+
+                <div class="how-step-card">
+                  <span class="step-card-number">02</span>
+                  <div class="step-card-icon-box">⏰</div>
+                  <h3 class="step-card-title">Selecciona Horario</h3>
+                  <p class="step-card-desc">
+                    Visualiza la disponibilidad de horarios en tiempo real del médico, con itinerancia protegida sin cruces de agenda.
+                  </p>
+                </div>
+
+                <div class="how-step-card">
+                  <span class="step-card-number">03</span>
+                  <div class="step-card-icon-box">📝</div>
+                  <h3 class="step-card-title">Ingresa tus Datos</h3>
+                  <p class="step-card-desc">
+                    Solo requerimos tu cédula, nombre y teléfono para confirmar tu turno. Sin contraseñas complejas ni registros largos.
+                  </p>
+                </div>
+
+                <div class="how-step-card">
+                  <span class="step-card-number">04</span>
+                  <div class="step-card-icon-box">📱</div>
+                  <h3 class="step-card-title">Obtén tu Pase QR</h3>
+                  <p class="step-card-desc">
+                    Recibe tu ticket inmediato en pantalla con código QR. Preséntalo desde tu teléfono o impreso para ingreso prioritario en recepción.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. SECCIÓN: SOBRE NOSOTROS -->
+          <div class="content-section alt-bg" id="sobre-nosotros">
+            <div class="section-inner">
+              <div class="section-header-centered">
+                <span class="section-tag">Nuestra Trayectoria</span>
+                <h2 class="section-title">Sobre Montepiedra Salud: Calidez Humana y Vocación Médica</h2>
+                <p class="section-desc">
+                  Una red médica comprometida con la salud preventiva, la accesibilidad y el bienestar de las familias guayaquileñas.
+                </p>
+              </div>
+
+              <div class="about-split-grid">
+                <div class="about-text-column">
+                  <p class="about-paragraph">
+                    <strong>Montepiedra Salud</strong> nació con el firme propósito de garantizar una medicina general accesible, digna y oportuna en Guayaquil. Entendemos que la salud no puede esperar y que el tiempo de cada paciente es invaluable; por ello articulamos una red de consultorios estratégicamente ubicados y conectados en tiempo real.
+                  </p>
+                  
+                  <div class="about-mission-box">
+                    <strong>Nuestra Misión:</strong> Brindar atención médica primaria de excelencia con calidez humana, diagnósticos certeros y tratamientos homologados.
+                    <br><br>
+                    <strong>Nuestra Visión:</strong> Consolidarnos como la red de medicina familiar y ambulatoria de mayor confianza y satisfacción en el Ecuador.
+                  </div>
+
+                  <p class="about-paragraph">
+                    Nuestro modelo integra itinerancia médica coordinada, garantizando que el profesional de salud cumpla puntualmente con cada cita programada en consultorios privados y servicios hospitalarios.
+                  </p>
+                </div>
+
+                <!-- Tarjeta del Director Médico & Valores -->
+                <div class="doctor-highlight-card">
+                  <div class="doctor-highlight-header">
+                    <img src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=200&auto=format&fit=crop&q=80" alt="Dr. Carlos Campoverde" class="doctor-highlight-avatar" />
+                    <div class="doctor-highlight-info">
+                      <h4>Dr. Carlos Campoverde</h4>
+                      <p>Director Médico Titular • Registro MSP-84729</p>
+                      <p style="color: #38bdf8; font-size: 0.76rem; font-weight: 700; margin-top: 4px;">Medicina General y Familiar</p>
+                    </div>
+                  </div>
+
+                  <div class="doctor-values-grid">
+                    <div class="value-pill">
+                      <span>🛡️</span>
+                      <span>Registro Oficial MSP</span>
+                    </div>
+                    <div class="value-pill">
+                      <span>⏱️</span>
+                      <span>Puntualidad en Rutas</span>
+                    </div>
+                    <div class="value-pill">
+                      <span>💙</span>
+                      <span>Tarifas Solidarias</span>
+                    </div>
+                    <div class="value-pill">
+                      <span>🔒</span>
+                      <span>Fichas Confidenciales</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. SECCIÓN: NUESTRAS SEDES Y CONSULTORIOS -->
+          <div class="content-section" id="sedes-consultorios">
+            <div class="section-inner">
+              <div class="section-header-centered">
+                <span class="section-tag">Puntos de Atención</span>
+                <h2 class="section-title">Nuestras 4 Sedes en Guayaquil</h2>
+                <p class="section-desc">
+                  Ubicaciones estratégicas equipadas para tu confort y diagnóstico integral. Elige la sede más conveniente:
+                </p>
+              </div>
+
+              <div class="featured-clinics-grid">
+                <!-- Sede 1: Ceibos -->
+                <div class="featured-clinic-card">
+                  <img src="https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=600&auto=format&fit=crop&q=80" alt="Clínica Ceibos" class="featured-clinic-img" />
+                  <div class="featured-clinic-body">
+                    <div class="featured-clinic-header">
+                      <h3 class="featured-clinic-title">Clínica Ceibos</h3>
+                      <span class="badge-sede badge-ceibos">Consultorio 2</span>
+                    </div>
+                    <p class="featured-clinic-address">
+                      📍 Av. del Bombero, Edificio Ceibos Plaza, Piso 3
+                    </p>
+                    <p style="font-size: 0.78rem; color: #64748b;">
+                      Atención privada de medicina general, parqueo vigilado y ascensor.
+                    </p>
+                    <div class="featured-clinic-footer">
+                      <div class="featured-clinic-price">
+                        $20.00 <small>Consulta General</small>
+                      </div>
+                      <button type="button" class="btn-clinic-book btn-book-clinic-direct" data-clinic="ceibos">
+                        Reservar Aquí →
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Sede 2: Mapasingue -->
+                <div class="featured-clinic-card">
+                  <img src="https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=600&auto=format&fit=crop&q=80" alt="Consultorio Mapasingue" class="featured-clinic-img" />
+                  <div class="featured-clinic-body">
+                    <div class="featured-clinic-header">
+                      <h3 class="featured-clinic-title">Consultorio Mapasingue</h3>
+                      <span class="badge-sede badge-mapasingue">Cons. 1A</span>
+                    </div>
+                    <p class="featured-clinic-address">
+                      📍 Av. Primera y Calle 3ra, Mapasingue Oeste
+                    </p>
+                    <p style="font-size: 0.78rem; color: #64748b;">
+                      Fácil acceso en transporte urbano, control de hipertensión y diabetes.
+                    </p>
+                    <div class="featured-clinic-footer">
+                      <div class="featured-clinic-price">
+                        $20.00 <small>Consulta General</small>
+                      </div>
+                      <button type="button" class="btn-clinic-book btn-book-clinic-direct" data-clinic="mapasingue">
+                        Reservar Aquí →
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Sede 3: Alborada -->
+                <div class="featured-clinic-card">
+                  <img src="https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=600&auto=format&fit=crop&q=80" alt="Consultorio Alborada" class="featured-clinic-img" />
+                  <div class="featured-clinic-body">
+                    <div class="featured-clinic-header">
+                      <h3 class="featured-clinic-title">Consultorio Alborada</h3>
+                      <span class="badge-sede badge-alborada">Cons. 4</span>
+                    </div>
+                    <p class="featured-clinic-address">
+                      📍 Av. Rodolfo Baquerizo Nazur, Alborada Etapa 8
+                    </p>
+                    <p style="font-size: 0.78rem; color: #64748b;">
+                      Tarifa comunitaria subsidiada para familias y adultos mayores.
+                    </p>
+                    <div class="featured-clinic-footer">
+                      <div class="featured-clinic-price" style="color: var(--emerald-green-dark);">
+                        $10.00 <small>Tarifa Social</small>
+                      </div>
+                      <button type="button" class="btn-clinic-book btn-book-clinic-direct" data-clinic="alborada">
+                        Reservar Aquí →
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Sede 4: Hospital Público -->
+                <div class="featured-clinic-card">
+                  <img src="https://images.unsplash.com/photo-1516549655169-df83a0774514?w=600&auto=format&fit=crop&q=80" alt="Hospital Público Ceibos" class="featured-clinic-img" />
+                  <div class="featured-clinic-body">
+                    <div class="featured-clinic-header">
+                      <h3 class="featured-clinic-title">Hospital Público Ceibos</h3>
+                      <span class="badge-sede badge-hospital">Triaje / Guardia</span>
+                    </div>
+                    <p class="featured-clinic-address">
+                      📍 Vía a la Costa km 6.5, Hospital General
+                    </p>
+                    <p style="font-size: 0.78rem; color: #64748b;">
+                      Atención médica pública, guardia y triaje para casos prioritarios.
+                    </p>
+                    <div class="featured-clinic-footer">
+                      <div class="featured-clinic-price" style="color: var(--amber-transit-dark);">
+                        $0.00 <small>Servicio Gratuito</small>
+                      </div>
+                      <button type="button" class="btn-clinic-book btn-book-clinic-direct" data-clinic="hospital">
+                        Ver Turnos →
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. SECCIÓN: PREGUNTAS FRECUENTES (DUDAS) -->
+          <div class="content-section alt-bg" id="dudas-frecuentes">
+            <div class="section-inner">
+              <div class="section-header-centered">
+                <span class="section-tag">Centro de Respuestas</span>
+                <h2 class="section-title">Preguntas Frecuentes (Dudas)</h2>
+                <p class="section-desc">
+                  Resolvemos las preguntas más habituales sobre nuestro sistema de reservas, recetas y atención médica:
+                </p>
+              </div>
+
+              <div class="faq-accordion-container">
+                <!-- FAQ 1 -->
+                <div class="faq-item active">
+                  <button type="button" class="faq-question-btn">
+                    <span>¿Necesito crear una cuenta con contraseña para agendar una cita?</span>
+                    <span class="faq-chevron">▼</span>
+                  </button>
+                  <div class="faq-answer-content">
+                    No. En Montepiedra Salud eliminamos las barreras de registro. Puedes agendar tu consulta médica directamente ingresando tu número de cédula, nombre completo y teléfono móvil. El proceso toma menos de 2 minutos y tu turno queda confirmado de inmediato.
+                  </div>
+                </div>
+
+                <!-- FAQ 2 -->
+                <div class="faq-item">
+                  <button type="button" class="faq-question-btn">
+                    <span>¿Cómo funciona el código QR del ticket de atención?</span>
+                    <span class="faq-chevron">▼</span>
+                  </button>
+                  <div class="faq-answer-content">
+                    Al finalizar tu reserva, el sistema genera automáticamente un ticket digital con un código QR único que contiene los detalles de tu consulta. Al llegar al consultorio, el personal de recepción escanea el código desde la pantalla de tu móvil (o impreso) para darte paso prioritario sin necesidad de hacer filas ni llenar formularios en papel.
+                  </div>
+                </div>
+
+                <!-- FAQ 3 -->
+                <div class="faq-item">
+                  <button type="button" class="faq-question-btn">
+                    <span>¿Qué ocurre si tengo una urgencia o emergencia vital imprevista?</span>
+                    <span class="faq-chevron">▼</span>
+                  </button>
+                  <div class="faq-answer-content">
+                    Las citas en consultorio son para consultas programadas de medicina general y preventiva. Si experimentas síntomas de riesgo vital inmediato (dolor en el pecho severo, asfixia, sangrado profuso o traumatismos graves), no debes esperar un turno ambulatorio: debes dirigirte de inmediato a la sala de emergencias del Hospital Público Ceibos o llamar al 911.
+                  </div>
+                </div>
+
+                <!-- FAQ 4 -->
+                <div class="faq-item">
+                  <button type="button" class="faq-question-btn">
+                    <span>¿Las recetas médicas emitidas son válidas en cualquier farmacia?</span>
+                    <span class="faq-chevron">▼</span>
+                  </button>
+                  <div class="faq-answer-content">
+                    Sí. Las recetas generadas por el Dr. Carlos Campoverde incluyen su código de registro profesional avalado por el Ministerio de Salud Pública (MSP-REG-84729), diagnóstico formal con clasificación internacional CIE-10, posología exacta e indicaciones completas. Son aceptadas en todas las farmacias del país.
+                  </div>
+                </div>
+
+                <!-- FAQ 5 -->
+                <div class="faq-item">
+                  <button type="button" class="faq-question-btn">
+                    <span>¿Qué formas de pago están disponibles para las consultas?</span>
+                    <span class="faq-chevron">▼</span>
+                  </button>
+                  <div class="faq-answer-content">
+                    En nuestros consultorios privados aceptamos pagos en efectivo en la recepción y tarjetas de crédito o débito (con desglose transparente del recargo del 9.75% por procesamiento bancario). En el Hospital Público de Ceibos la atención es 100% gratuita por normativa del MSP.
+                  </div>
+                </div>
+
+                <!-- FAQ 6 -->
+                <div class="faq-item">
+                  <button type="button" class="faq-question-btn">
+                    <span>¿Puedo cancelar o reagendar mi turno si tengo un contratiempo?</span>
+                    <span class="faq-chevron">▼</span>
+                  </button>
+                  <div class="faq-answer-content">
+                    Sí, puedes solicitar el cambio de fecha u horario comunicándote con nuestros canales de atención o presentando tu código de cita en recepción. En caso de que el médico deba acudir a una guardia hospitalaria imprevista, el sistema te notificará y te asistirá para reagendar en la primera fecha disponible sin coste alguno.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 6. SECCIÓN: PORTAL DE ACCESO Y GESTIÓN INSTITUCIONAL -->
+          <div class="content-section" id="portal-acceso">
+            <div class="section-inner">
+              <div class="section-header-centered">
+                <span class="section-tag">Intranet y Gestión</span>
+                <h2 class="section-title">Portal de Acceso a la Plataforma</h2>
+                <p class="section-desc">
+                  Ingreso para pacientes, médicos titulares y personal administrativo de Montepiedra Salud:
+                </p>
+              </div>
+
+              <div class="portal-access-grid">
+                <!-- Tarjeta de Login Unificado -->
+                <div class="login-card-container">
+                  <div class="login-card-header">
+                    <h3 class="login-card-title">Ingreso de Usuarios</h3>
+                    <p class="login-card-subtitle">Selecciona tu perfil profesional o de atención para ingresar</p>
+                  </div>
+
+                  <!-- Selector de Perfil Segmentado (Pill Switcher) -->
+                  <div class="role-segmented-pill" id="login-role-switcher">
+                    <button type="button" class="role-tab-btn active" data-role="doctor">
+                      <span class="tab-icon">👨‍⚕️</span>
+                      <span>Médico Titular</span>
+                    </button>
+                    <button type="button" class="role-tab-btn" data-role="paciente">
+                      <span class="tab-icon">🧑‍💼</span>
+                      <span>Paciente</span>
+                    </button>
+                    <button type="button" class="role-tab-btn" data-role="contador">
+                      <span class="tab-icon">📊</span>
+                      <span>Contadora</span>
+                    </button>
+                  </div>
+
+                  <!-- Formulario de Inicio de Sesión -->
+                  <form class="login-form" id="unified-login-form">
+                    <div class="form-group">
+                      <label class="form-label" for="login-username">Correo Electrónico o Cédula de Identidad</label>
+                      <div class="input-with-icon">
+                        <input type="text" class="form-input" id="login-username" placeholder="Cedula o Usuario" required />
+                      </div>
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label" for="login-password">Clave de Acceso</label>
+                      <div class="input-with-icon">
+                        <input type="password" class="form-input" id="login-password" placeholder="Ingresa tu clave de acceso" required />
+                        <button type="button" class="password-toggle-btn" id="btn-toggle-password" title="Mostrar contraseña (hacer visible)" aria-label="Mostrar u ocultar contraseña">
+                          <svg class="eye-svg eye-slashed" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path>
+                            <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"></path>
+                            <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path>
+                            <line x1="2" y1="2" x2="22" y2="22"></line>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="form-options-row">
+                      <label class="remember-checkbox-label">
+                        <input type="checkbox" id="login-remember" checked />
+                        <span>Recordar sesión en este equipo</span>
+                      </label>
+                      <a href="#" class="forgot-password-link" onclick="alert('Instrucciones de recuperación enviadas a su correo institucional.'); return false;">¿Olvidó su clave?</a>
+                    </div>
+
+                    <button type="submit" class="btn-primary btn-login-submit">
+                      <span>Ingresar a la Plataforma</span> →
+                    </button>
+                  </form>
+
+                  <!-- Insignias de Confianza -->
+                  <div class="trust-badges-container">
+                    <div class="trust-badge-ssl">
+                      <span>🔒</span> Cifrado SSL 256-bit y segregación de roles de grado hospitalario
+                    </div>
+                    <div class="trust-disclaimer-emergency">
+                      * En caso de riesgo vital inmediato, acuda a la sala de emergencias del Hospital Público Ceibos.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 7. FOOTER INSTITUCIONAL -->
+          <footer class="site-footer">
+            <div class="footer-inner">
+              <div class="footer-top-grid">
+                <!-- Columna 1: Brand -->
+                <div class="footer-col">
+                  <div class="footer-brand">
+                    <span style="font-size: 1.4rem;">🩺</span>
+                    <span>Montepiedra Salud</span>
+                  </div>
+                  <p class="footer-desc">
+                    Centro Médico y Red de Consultorios en Guayaquil. Atención médica primaria, familiar y preventiva con agendamiento digital, turnos QR y recetas oficiales homologadas por el Ministerio de Salud Pública.
+                  </p>
+                  <div class="footer-emergency-alert">
+                    🚨 <strong>Emergencias 24h:</strong> Línea 911 o Sala de Choque del Hospital Público Ceibos.
+                  </div>
+                </div>
+
+                <!-- Columna 2: Sedes y Horarios -->
+                <div class="footer-col">
+                  <h4 class="footer-col-title">Sedes y Horarios</h4>
+                  <ul class="footer-links-list">
+                    <li><strong>Clínica Ceibos:</strong> Lun-Vie 08:00 - 18:00</li>
+                    <li><strong>Mapasingue Oeste:</strong> Lun-Vie 09:00 - 17:00</li>
+                    <li><strong>Alborada Etapa 8:</strong> Lun-Sáb 08:30 - 14:00</li>
+                    <li><strong>Hospital Ceibos:</strong> Guardia 24 Horas</li>
+                  </ul>
+                </div>
+
+                <!-- Columna 3: Navegación Rápida -->
+                <div class="footer-col">
+                  <h4 class="footer-col-title">Enlaces Directos</h4>
+                  <ul class="footer-links-list">
+                    <li><a href="#inicio">Inicio</a></li>
+                    <li><a href="#como-funciona">¿Cómo Funciona?</a></li>
+                    <li><a href="#sobre-nosotros">Sobre Nosotros</a></li>
+                    <li><a href="#sedes-consultorios">Nuestras 4 Sedes</a></li>
+                    <li><a href="#dudas-frecuentes">Preguntas Frecuentes</a></li>
+                    <li><a href="#portal-acceso">Portal de Acceso</a></li>
+                  </ul>
+                </div>
+
+                <!-- Columna 4: Certificaciones y Contacto -->
+                <div class="footer-col">
+                  <h4 class="footer-col-title">Contacto Oficial</h4>
+                  <ul class="footer-links-list">
+                    <li>📞 <strong>Central Telefónica:</strong> (04) 285-9000</li>
+                    <li>📱 <strong>WhatsApp Citas:</strong> +593 98 765 4321</li>
+                    <li>✉️ <strong>Correo:</strong> atencion@montepiedrasalud.ec</li>
+                    <li>🏛️ <strong>Registro MSP:</strong> MSP-REG-84729</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="footer-bottom-row">
+                <span>© 2026 Montepiedra Salud. Todos los derechos reservados. Desarrollado para atención médica integral.</span>
+                <span>Guayaquil, Ecuador • Cumplimiento Normativo MSP & SRI</span>
+              </div>
+            </div>
+          </footer>
+
+        </section>
+
+        <!-- ================================================================
+             VISTA 1: PORTAL DE CITAS DEL PACIENTE (Página 3 - Flujo 4 Pasos)
+             ================================================================ -->
+        <section id="view-patient" class="patient-portal-wrapper" style="display: none;">
+          <!-- Cabecera -->
+          <div class="patient-portal-header">
+            <div class="patient-header-left">
+              <span style="font-size: 1.6rem;">📅</span>
+              <div class="patient-header-title">
+                <h2>Reserva de Cita - Medicina General</h2>
+                <p>Agendamiento ágil multisede sin registro engorroso</p>
+              </div>
+            </div>
+            <button type="button" class="btn-secondary btn-patient-exit" id="btn-patient-exit-inline">
+              ← Volver al Inicio
+            </button>
+          </div>
+
+          <!-- Stepper de Progreso (4 Pasos) -->
+          <div class="wizard-stepper-container">
+            <div class="wizard-stepper">
+              <div class="step-item active" data-step="1">
+                <div class="step-circle">1</div>
+                <span class="step-label">Elección de Sede</span>
+              </div>
+              <div class="step-item" data-step="2">
+                <div class="step-circle">2</div>
+                <span class="step-label">Fecha y Hora</span>
+              </div>
+              <div class="step-item" data-step="3">
+                <div class="step-circle">3</div>
+                <span class="step-label">Datos y Pago</span>
+              </div>
+              <div class="step-item" data-step="4">
+                <div class="step-circle">4</div>
+                <span class="step-label">Ticket y QR</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Contenido de los Pasos -->
+          <div class="wizard-step-content">
+            <!-- Aclaratoria de Medicina General -->
+            <div class="general-medicine-notice">
+              <span style="font-size: 1.2rem;">ℹ️</span>
+              <span><strong>Aviso de Especialidad:</strong> La atención médica provista en todas las sedes corresponde exclusivamente a <strong>Medicina General y Consulta Primaria</strong> para evitar confusiones de especialidad.</span>
+            </div>
+
+            <!-- PASO 1: Elección de Sede -->
+            <div class="wizard-step-pane" data-step="1">
+              <div class="step-section-header">
+                <h3 class="step-section-title">Paso 1: Selecciona la Sede de tu Preferencia</h3>
+                <p class="step-section-desc">Elige entre nuestras clínicas privadas y centros con tarifas fijas transparentes.</p>
+              </div>
+              <div class="clinic-cards-grid" id="clinics-cards-container">
+                <!-- Se llena dinámicamente desde patient.js -->
+              </div>
+            </div>
+
+            <!-- PASO 2: Fecha y Hora -->
+            <div class="wizard-step-pane" data-step="2" style="display: none;">
+              <div class="step-section-header">
+                <h3 class="step-section-title">Paso 2: Selecciona Fecha y Horario Disponible</h3>
+                <p class="step-section-desc">Los horarios reservan bloques de 30 a 45 minutos. Los traslados en carretera están protegidos automáticamente.</p>
+              </div>
+
+              <div class="datetime-picker-layout">
+                <!-- Calendario Mensual -->
+                <div class="calendar-card">
+                  <div class="calendar-nav-header">
+                    <span class="calendar-current-month">Septiembre 2026</span>
+                    <span class="badge-sede badge-ceibos">Días Hábiles</span>
+                  </div>
+                  <div class="calendar-grid-days">
+                    <div class="calendar-day-name">D</div>
+                    <div class="calendar-day-name">L</div>
+                    <div class="calendar-day-name">M</div>
+                    <div class="calendar-day-name">X</div>
+                    <div class="calendar-day-name">J</div>
+                    <div class="calendar-day-name">V</div>
+                    <div class="calendar-day-name">S</div>
+                  </div>
+                  <div class="calendar-grid-days" id="calendar-days-grid" style="margin-top: 6px;">
+                    <!-- Se llena desde patient.js -->
+                  </div>
+                </div>
+
+                <!-- Rejilla de Horas -->
+                <div class="time-slots-card">
+                  <div class="time-slots-subtitle">Horarios Disponibles para Consulta:</div>
+                  <div class="slots-pill-grid" id="time-slots-grid">
+                    <!-- Se llena desde patient.js -->
+                  </div>
+                  <div class="travel-warning-slot-notice" id="travel-buffer-notice">
+                    <!-- Advertencia de buffer -->
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- PASO 3: Datos del Paciente y Método de Pago -->
+            <div class="wizard-step-pane" data-step="3" style="display: none;">
+              <div class="step-section-header">
+                <h3 class="step-section-title">Paso 3: Datos Personales y Método de Pago</h3>
+                <p class="step-section-desc">Desglose transparente del recargo bancario del 9.75% por tarjeta antes de finalizar.</p>
+              </div>
+
+              <div class="patient-checkout-grid">
+                <!-- Formulario -->
+                <div class="patient-info-form-card">
+                  <h4 style="font-size: 0.98rem; font-weight: 800; color: var(--dark-navy);">Datos del Paciente</h4>
+                  <div class="form-group">
+                    <label class="form-label" for="pat-input-id">Cédula de Identidad *</label>
+                    <input type="text" class="form-input" id="pat-input-id" placeholder="Ej: 0987654321" required maxlength="10" inputmode="numeric" />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="pat-input-name">Nombre y Apellido Completo *</label>
+                    <input type="text" class="form-input" id="pat-input-name" placeholder="Ej: Carlos Mendoza Moreira" required maxlength="70" />
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="form-group">
+                      <label class="form-label" for="pat-input-phone">Teléfono / Celular *</label>
+                      <input type="tel" class="form-input" id="pat-input-phone" placeholder="Ej: 0987654321" required />
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" for="pat-input-email">Correo Electrónico *</label>
+                      <input type="email" class="form-input" id="pat-input-email" placeholder="Ej: paciente@gmail.com" required />
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="pat-input-reason">Motivo Principal de la Consulta</label>
+                    <input type="text" class="form-input" id="pat-input-reason" placeholder="ej. Chequeo de rutina, malestar gripal, dolor de espalda..." />
+                  </div>
+
+                  <h4 style="font-size: 0.98rem; font-weight: 800; color: var(--dark-navy); margin-top: 10px;">Selecciona tu Método de Pago</h4>
+                  <div class="payment-methods-selector">
+                    <label class="payment-method-option selected" data-method="efectivo">
+                      <input type="radio" name="payment_method" value="efectivo" checked />
+                      <div class="method-details">
+                        <span class="method-title">💵 Efectivo o Transferencia Bancaria Directa</span>
+                        <span class="method-subtitle">Pago en caja de recepción al llegar. Sin recargo adicional.</span>
+                      </div>
+                    </label>
+
+                    <label class="payment-method-option" data-method="tarjeta">
+                      <input type="radio" name="payment_method" value="tarjeta" />
+                      <div class="method-details">
+                        <span class="method-title">💳 Tarjeta de Crédito / Débito en Recepción</span>
+                        <span class="method-subtitle">Aplica recargo bancario legal del <strong>+9.75%</strong> por procesamiento digital.</span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- Resumen Financiero Transparente (Página 3) -->
+                <div class="order-summary-card">
+                  <h4 class="order-summary-title">Resumen Transparente de Reserva</h4>
+                  <div class="summary-row">
+                    <span>Sede Médica:</span>
+                    <strong id="sum-clinic-name" style="color: var(--dark-navy);">Clínica Ceibos</strong>
+                  </div>
+                  <div class="summary-row">
+                    <span>Fecha y Hora:</span>
+                    <span id="sum-date-time">19 Septiembre - 10:30</span>
+                  </div>
+                  <div class="summary-row">
+                    <span>Especialidad:</span>
+                    <span>Medicina General</span>
+                  </div>
+                  <div class="summary-row bold">
+                    <span>Tarifa Base de Consulta:</span>
+                    <span id="sum-base-fee">$20.00</span>
+                  </div>
+                  <div class="summary-row" id="sum-card-fee-row" style="display: none; color: #b45309;">
+                    <span>
+                      Recargo Bancario Tarjeta <span class="transparent-fee-badge">+9.75%</span>:
+                    </span>
+                    <strong id="sum-card-fee-amount">+$1.95</strong>
+                  </div>
+                  <div class="summary-row total-due">
+                    <span>Total a Pagar en Recepción:</span>
+                    <span class="amount" id="sum-total-due">$20.00</span>
+                  </div>
+                  <p style="font-size: 0.74rem; color: var(--text-subtle); line-height: 1.3;">
+                    El comprobante digital con código QR oficial se emitirá al confirmar. No requiere pagos por adelantado en la web.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- PASO 4: Ticket y Confirmación (Página 3) -->
+            <div class="wizard-step-pane" data-step="4" style="display: none;">
+              <div class="confirmation-container">
+                <div class="confirmation-success-badge">
+                  <span>✓</span> ¡Cita Médica Reservada Exitosamente!
+                </div>
+
+                <!-- Tarjeta Imprimible del Ticket -->
+                <div class="ticket-card-printable" id="printable-ticket-element" style="overflow-wrap: break-word; word-break: break-word;">
+                  <div class="ticket-header">
+                    <div>
+                      <h3 style="font-size: 1.15rem; color: var(--dark-navy); font-weight: 800;">TICKET OFICIAL DE CITA</h3>
+                      <p style="font-size: 0.74rem; color: var(--text-muted);">Servicio de Medicina General - Dr. Carlos Campoverde</p>
+                    </div>
+                    <div class="ticket-code-group">
+                      <div class="ticket-code-label">Código de Cita</div>
+                      <div class="ticket-code-value" id="ticket-code-display">#MED-84920</div>
+                    </div>
+                  </div>
+
+                  <!-- Código QR Dinámico -->
+                  <div class="qr-code-display-box" id="ticket-qr-container">
+                    <!-- Código SVG inyectado desde qr-generator.js -->
+                  </div>
+
+                  <div class="ticket-details-grid">
+                    <div class="ticket-detail-item">
+                      <div class="label">Paciente</div>
+                      <div class="value" id="ticket-patient-name">Carlos Mendoza Moreira</div>
+                    </div>
+                    <div class="ticket-detail-item">
+                      <div class="label">Cédula de Identidad</div>
+                      <div class="value" id="ticket-patient-id">0987654321</div>
+                    </div>
+                    <div class="ticket-detail-item">
+                      <div class="label">Sede / Consultorio</div>
+                      <div class="value" id="ticket-clinic-display">Clínica Ceibos (Consultorio 2)</div>
+                    </div>
+                    <div class="ticket-detail-item">
+                      <div class="label">Fecha y Hora Asignada</div>
+                      <div class="value" id="ticket-datetime-display">2026-09-19 - 10:30</div>
+                    </div>
+                    <div class="ticket-detail-item">
+                      <div class="label">Método de Pago</div>
+                      <div class="value" id="ticket-method-display">Efectivo</div>
+                    </div>
+                    <div class="ticket-detail-item">
+                      <div class="label">Total a Abonar</div>
+                      <div class="value" id="ticket-total-display" style="color: var(--primary-blue); font-size: 1.05rem;">$20.00</div>
+                    </div>
+                  </div>
+
+                  <p style="font-size: 0.76rem; color: var(--text-muted); line-height: 1.3;">
+                    📧 Hemos enviado la confirmación oficial con copia al correo del paciente y a la agenda del doctor. Se activará una alerta 24h antes de su turno.
+                  </p>
+
+                  <div class="ticket-actions-group">
+                    <button type="button" class="btn-primary" id="btn-print-ticket">
+                      🖨️ Descargar Comprobante PDF / Imprimir
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Botones de Navegación del Wizard -->
+            <div class="wizard-actions-bar">
+              <button type="button" class="btn-secondary" id="wizard-btn-prev" style="visibility: hidden;">
+                ← Paso Anterior
+              </button>
+              <button type="button" class="btn-primary" id="wizard-btn-next">
+                Continuar Siguiente Paso →
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================================================================
+             VISTA 2: PORTAL MÉDICO (MOBILE-FIRST / REDMI NOTE 390x844px)
+             Página 4 del documento
+             ================================================================ -->
+        <section id="view-doctor" class="doctor-portal-wrapper" style="display: none;">
+          <!-- Barra de Navegación Móvil Principal del Doctor (Adaptada y Organizada para Celular 390px) -->
+          <div class="doctor-mobile-nav-container">
+            <!-- Fila de Perfil y Guardia en Móvil -->
+            <div class="doctor-mobile-profile-bar">
+              <div class="doctor-mobile-profile-info">
+                <img src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80" alt="Dr. Carlos Campoverde" class="doctor-mobile-avatar" />
+                <div class="doctor-mobile-meta">
+                  <div class="doctor-mobile-name">
+                    <span>Dr. Carlos Campoverde</span>
+                    <span class="brand-badge badge-ceibos">MÉDICO</span>
+                  </div>
+                  <div class="doctor-mobile-clinic-tag">
+                    <span>📍 Ceibos (Cons. 2)</span>
+                    <span class="bullet-sep">•</span>
+                    <span>5 Citas Hoy</span>
+                  </div>
+                </div>
+              </div>
+              <button type="button" class="btn-mobile-emergency-trigger" id="btn-mobile-quick-guard" title="Gestionar Convocatoria de Guardia">
+                <span>🚨 Guardia</span>
+              </button>
+            </div>
+
+            <!-- Menú Principal Segmentado en Celular (4 Pestañas Táctiles Ergonómicas) -->
+            <nav class="doctor-mobile-tab-pills" id="doctor-mobile-pills" aria-label="Menú principal del doctor">
+              <button type="button" class="doc-mobile-pill active" data-tab="agenda" id="pill-doc-agenda">
+                <span class="pill-icon">📅</span>
+                <span class="pill-text">Agenda</span>
+              </button>
+              <button type="button" class="doc-mobile-pill" data-tab="fichas" id="pill-doc-fichas">
+                <span class="pill-icon">📁</span>
+                <span class="pill-text">Fichas</span>
+              </button>
+              <button type="button" class="doc-mobile-pill" data-tab="recetas" id="pill-doc-recetas">
+                <span class="pill-icon">💊</span>
+                <span class="pill-text">Recetas</span>
+              </button>
+              <button type="button" class="doc-mobile-pill" data-tab="gastos" id="pill-doc-gastos">
+                <span class="pill-icon">💰</span>
+                <span class="pill-text">Gastos</span>
+              </button>
+            </nav>
+          </div>
+
+          <!-- Banner Alerta de Guardia Activa -->
+          <div class="emergency-active-banner" id="doctor-emergency-active-banner" style="display: none;">
+            <div class="emergency-banner-text">
+              <h4>🚨 Guardia Hospitalaria Activa</h4>
+              <p>Convocatoria en Hospital Ceibos. Las citas privadas han sido resguardadas.</p>
+            </div>
+            <button type="button" class="btn-secondary" style="font-size: 0.72rem; padding: 4px 8px;" onclick="document.getElementById('emergency-guard-modal').classList.add('active')">
+              Ver Gestión
+            </button>
+          </div>
+
+          <!-- Contenido de las Pestañas Móviles -->
+          <div class="doctor-tab-content">
+            <!-- PESTAÑA 1: Agenda (Timeline de Pacientes y Rutas Protegidas) -->
+            <div class="doctor-pane-view" data-pane="agenda" style="display: flex; flex-direction: column; gap: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 0.88rem; font-weight: 800; color: var(--dark-navy);">📅 Sábado, 19 Septiembre 2026</span>
+                  <span class="active-clinic-pill" style="font-size: 0.72rem; padding: 3px 10px;">📍 Ceibos - Cons. 2</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 0.78rem; font-weight: 700; color: #64748b;">RUTAS PROGRAMADAS</span>
+                  <span class="badge-sede badge-ceibos">5 Citas</span>
+                </div>
+              </div>
+              <div class="timeline-container" id="doctor-timeline-list">
+                <!-- Se llena desde doctor.js -->
+              </div>
+            </div>
+
+            <!-- PESTAÑA 2: Fichas Clínicas Rápidas -->
+            <div class="doctor-pane-view" data-pane="fichas" style="display: none; flex-direction: column; gap: 12px;">
+              <div class="search-bar-sticky">
+                <input type="text" class="form-input" id="search-patient-records" placeholder="🔍 Buscar paciente por cédula o apellido..." />
+              </div>
+              <div class="clinical-records-list" id="medical-records-list">
+                <!-- Se llena desde doctor.js -->
+              </div>
+            </div>
+
+            <!-- PESTAÑA 3: Emisión de Recetas Digitales -->
+            <div class="doctor-pane-view" data-pane="recetas" style="display: none; flex-direction: column; gap: 12px;">
+              <div class="prescription-form-card">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <h4 style="font-size: 1rem; font-weight: 800; color: var(--dark-navy);">Nueva Receta Digital</h4>
+                  <span class="badge-sede badge-mapasingue">MSP-REG-84729</span>
+                </div>
+                <form id="doctor-prescription-form" style="display: flex; flex-direction: column; gap: 12px;">
+                  <div class="form-group">
+                    <label class="form-label">Seleccionar Paciente</label>
+                    <select class="form-input" id="rx-select-patient" required></select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Diagnóstico Clínico (CIE-10)</label>
+                    <input type="text" class="form-input" id="rx-diagnosis-input" placeholder="ej. Faringoamigdalitis Aguda, HTA Primaria" value="Faringitis Aguda Estreptocócica (J02.0)" required />
+                  </div>
+
+                  <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                      <label class="form-label">Medicamentos y Posología</label>
+                      <button type="button" class="btn-ghost-sm" id="btn-add-rx-drug">+ Agregar Fármaco</button>
+                    </div>
+                    <div id="rx-drug-items-list" style="display: flex; flex-direction: column; gap: 8px;">
+                      <div class="rx-med-item-row">
+                        <input type="text" class="form-input rx-drug-name" placeholder="Medicamento" value="Amoxicilina + Ácido Clavulánico 875/125mg" required />
+                        <input type="text" class="form-input rx-drug-dose" placeholder="Dosis" value="1 tableta cada 12 horas por 7 días vía oral" required />
+                      </div>
+                      <div class="rx-med-item-row">
+                        <input type="text" class="form-input rx-drug-name" placeholder="Medicamento" value="Ibuprofeno 400mg" required />
+                        <input type="text" class="form-input rx-drug-dose" placeholder="Dosis" value="1 tableta cada 8 horas si hay dolor o fiebre" required />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">Indicaciones y Cuidados</label>
+                    <textarea class="form-input" id="rx-indications-input" rows="2" placeholder="Reposo relativo, hidratación abundante, control en 5 días si persiste fiebre.">Reposo relativo por 48 horas. Hidratación abundante. Control en consultorio si no hay mejoría.</textarea>
+                  </div>
+
+                  <button type="submit" class="btn-primary" style="margin-top: 6px;">
+                    📝 Generar Receta Oficial PDF
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            <!-- PESTAÑA 4: Registro Ultrarrápido de Gastos en 2 Toques (Página 4) -->
+            <div class="doctor-pane-view" data-pane="gastos" style="display: none; flex-direction: column; gap: 14px;">
+              <div class="quick-expenses-grid">
+                <div class="quick-expense-presets-label">⚡ REGISTRO RÁPIDO EN 2 TOQUES (PRESETS):</div>
+                <div class="expense-preset-buttons">
+                  <button type="button" class="btn-expense-preset" id="btn-preset-taxi">
+                    <span class="preset-icon">🚕</span>
+                    <span class="preset-name">Taxi Ruta</span>
+                    <span class="preset-price">$4.00</span>
+                  </button>
+                  <button type="button" class="btn-expense-preset" id="btn-preset-gas">
+                    <span class="preset-icon">⛽</span>
+                    <span class="preset-name">Gasolina</span>
+                    <span class="preset-price">$15.00</span>
+                  </button>
+                  <button type="button" class="btn-expense-preset" id="btn-preset-hospital">
+                    <span class="preset-icon">🏥</span>
+                    <span class="preset-name">Insumos Hosp.</span>
+                    <span class="preset-price">$12.00</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Registro Manual de Otros Gastos -->
+              <div class="prescription-form-card">
+                <h5 style="font-size: 0.88rem; font-weight: 700; color: var(--dark-navy);">Otro Gasto Operativo</h5>
+                <form id="custom-expense-form" style="display: flex; flex-direction: column; gap: 10px;">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="number" step="0.5" class="form-input" id="custom-exp-amount" placeholder="Monto ($)" required />
+                    <select class="form-input" id="custom-exp-cat">
+                      <option value="Transporte">Transporte</option>
+                      <option value="Suministros Hospital">Suministros Hospital</option>
+                      <option value="Mantenimiento">Mantenimiento</option>
+                      <option value="Activos">Activos</option>
+                    </select>
+                  </div>
+                  <input type="text" class="form-input" id="custom-exp-desc" placeholder="Concepto (ej. Peajes Vía a la Costa)" required />
+                  <button type="submit" class="btn-secondary" style="padding: 8px;">+ Guardar para Contadora</button>
+                </form>
+              </div>
+
+              <!-- Historial Reciente de Gastos -->
+              <div class="expense-log-history">
+                <span style="font-size: 0.78rem; font-weight: 700; color: #475569;">GASTOS REGISTRADOS HOY:</span>
+                <div id="doctor-expenses-history-list"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Botón Flotante Rojo de Guardia de Emergencia (Página 4) -->
+          <button type="button" class="doctor-emergency-fab" id="btn-emergency-guard-fab" title="Activar guardia imprevista y reagendar citas asistidas">
+            <span class="fab-pulse-ring"></span>
+            <span>🚨 Cubrir Guardia</span>
+          </button>
+
+          <!-- Barra de Navegación Inferior Móvil (Bottom Bar de 4 Iconos) -->
+          <nav class="doctor-bottom-nav">
+            <button type="button" class="bottom-nav-item active" data-tab="agenda">
+              <span class="nav-icon">📅</span>
+              <span>Agenda</span>
+            </button>
+            <button type="button" class="bottom-nav-item" data-tab="fichas">
+              <span class="nav-icon">📁</span>
+              <span>Fichas</span>
+            </button>
+            <button type="button" class="bottom-nav-item" data-tab="recetas">
+              <span class="nav-icon">💊</span>
+              <span>Recetas</span>
+            </button>
+            <button type="button" class="bottom-nav-item" data-tab="gastos">
+              <span class="nav-icon">💰</span>
+              <span>Gastos</span>
+            </button>
+          </nav>
+        </section>
+
+        <!-- ================================================================
+             VISTA 3: PANEL ADMINISTRATIVO DE LA CONTADORA (Página 5)
+             ================================================================ -->
+        <section id="view-accountant" class="accountant-portal-wrapper" style="display: none;">
+          <!-- Cabecera -->
+          <div class="accountant-header">
+            <div class="accountant-title-group">
+              <h2>Panel Administrativo & Conciliación Fiscal</h2>
+              <p>Auditoría de liquidaciones de los viernes, porcentajes por clínica y preparación para declaración SRI</p>
+            </div>
+            <div class="accountant-action-tools">
+              <button type="button" class="btn-secondary" id="btn-download-csv">
+                📊 Descargar CSV / Excel
+              </button>
+              <button type="button" class="btn-primary" id="btn-export-tax-report">
+                📄 Exportar Informe Tributario SRI
+              </button>
+            </div>
+          </div>
+
+          <!-- Fila de Métricas KPI (4 tarjetas) (Página 5) -->
+          <div class="kpi-metrics-grid">
+            <!-- KPI 1: Ingresos Brutos -->
+            <div class="kpi-card gross">
+              <div class="kpi-label-row">
+                <span class="kpi-label">Ingresos Brutos Facturados</span>
+                <span class="kpi-icon-badge">💵</span>
+              </div>
+              <div class="kpi-amount" id="kpi-gross-revenue">$80.00</div>
+              <div class="kpi-subtext">Citas atendidas en consultorios privados</div>
+            </div>
+
+            <!-- KPI 2: Retenciones por Clínicas -->
+            <div class="kpi-card retentions">
+              <div class="kpi-label-row">
+                <span class="kpi-label">Retenciones por Sedes</span>
+                <span class="kpi-icon-badge">📉</span>
+              </div>
+              <div class="kpi-amount" id="kpi-retentions-total" style="color: #6366f1;">-$12.00</div>
+              <div class="kpi-subtext">Mapasingue (5%), Ceibos (25%), Alborada (10%)</div>
+            </div>
+
+            <!-- KPI 3: Gastos Operativos Acumulados -->
+            <div class="kpi-card expenses">
+              <div class="kpi-label-row">
+                <span class="kpi-label">Gastos Operativos en Ruta</span>
+                <span class="kpi-icon-badge">⛽</span>
+              </div>
+              <div class="kpi-amount" id="kpi-expenses-total" style="color: #f59e0b;">-$74.50</div>
+              <div class="kpi-subtext">Transporte, taxis e insumos asumidos en hospital</div>
+            </div>
+
+            <!-- KPI 4: Ingreso Neto Real -->
+            <div class="kpi-card net">
+              <div class="kpi-label-row">
+                <span class="kpi-label">Ingreso Neto Real del Doctor</span>
+                <span class="kpi-icon-badge">💰</span>
+              </div>
+              <div class="kpi-amount" id="kpi-net-income" style="color: #10b981;">$1,193.50</div>
+              <div class="kpi-subtext">(Bruto - Retenciones) + Sueldo Hospital - Gastos</div>
+            </div>
+          </div>
+
+          <!-- Cuerpo del Dashboard Contable -->
+          <div class="accountant-dashboard-body">
+            <div class="accountant-split-grid">
+              <!-- MÓDULO 1: Liquidación de los Viernes (Tabla de Corte de Caja) -->
+              <div class="accounting-card">
+                <div class="accounting-card-header">
+                  <div>
+                    <h3 class="card-heading-title">Liquidación de los Viernes (Corte Automático)</h3>
+                    <p class="card-heading-desc">Agrupación por clínica, cálculo de comisiones retenidas y neto a pagar al médico</p>
+                  </div>
+                  <span class="badge-sede badge-alborada">Cierre de Semana Activo</span>
+                </div>
+
+                <div class="settlement-table-wrapper">
+                  <table class="settlement-table">
+                    <thead>
+                      <tr>
+                        <th>Sede / Consultorio</th>
+                        <th>Pacientes</th>
+                        <th>Facturado</th>
+                        <th>Retención Clínica</th>
+                        <th>Neto a Transferir</th>
+                        <th>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody id="friday-settlement-table-body">
+                      <!-- Se llena desde accountant.js -->
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style="background: #f8fafc; border-radius: 8px; padding: 12px; font-size: 0.78rem; color: #64748b;">
+                  💡 <strong>Tip de Auditoría:</strong> Puedes hacer clic sobre las etiquetas de estado (<em>Liquidado / Pendiente</em>) para conmutar la confirmación de transferencia interbancaria semanal.
+                </div>
+              </div>
+
+              <!-- MÓDULO 2: Rentabilidad Real por Sede y Clasificador de Egresos -->
+              <div style="display: flex; flex-direction: column; gap: 24px;">
+                <!-- Rentabilidad Comparativa -->
+                <div class="accounting-card">
+                  <div class="accounting-card-header">
+                    <div>
+                      <h4 class="card-heading-title">Rentabilidad Real por Sede</h4>
+                      <p class="card-heading-desc">Margen neto generado por cada consultorio</p>
+                    </div>
+                  </div>
+                  <div class="clinic-profitability-list" id="clinic-profitability-container">
+                    <!-- Se llena desde accountant.js -->
+                  </div>
+                </div>
+
+                <!-- Clasificador Contable de Egresos -->
+                <div class="accounting-card">
+                  <div class="accounting-card-header">
+                    <div>
+                      <h4 class="card-heading-title">Clasificador Contable de Egresos</h4>
+                      <p class="card-heading-desc">Gastos catalogados para deducción tributaria SRI</p>
+                    </div>
+                  </div>
+                  <div class="expense-category-chips" id="expense-categories-grid">
+                    <!-- Se llena desde accountant.js -->
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+  </main>
+
+  <!-- ================================================================
+       MODALES DEL SISTEMA
+       ================================================================ -->
+
+  <!-- Modal 1: Botón de Guardia y Emergencia Médica (Página 4) -->
+  <div class="modal-overlay" id="emergency-guard-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.3rem;">🚨</span>
+          <h3 class="modal-title" style="color: #991b1b;">Convocatoria de Guardia Hospitalaria</h3>
+        </div>
+        <button type="button" class="modal-close-btn" id="btn-close-emergency-modal">✕</button>
+      </div>
+      <p style="font-size: 0.82rem; color: #475569; margin-bottom: 14px; line-height: 1.4;">
+        Se ha activado la guardia imprevista en el Hospital Público Ceibos. El siguiente asistente permite notificar y reagendar automáticamente a los pacientes con citas coincidentes el día de hoy:
+      </p>
+
+      <div id="emergency-affected-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 340px; overflow-y: auto;">
+        <!-- Inyectado desde doctor.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Detalle de Ficha Clínica del Paciente (Página 4) -->
+  <div class="modal-overlay" id="patient-detail-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Ficha Clínica y Antecedentes</h3>
+        <button type="button" class="modal-close-btn" id="btn-close-patient-detail">✕</button>
+      </div>
+      <div id="patient-detail-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Modal 3: Receta Médica Oficial Emitida (Página 4) -->
+  <div class="modal-overlay" id="prescription-success-modal">
+    <div class="modal-card" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Receta Médica Digital Emitida</h3>
+        <button type="button" class="modal-close-btn" id="btn-close-prescription-modal">✕</button>
+      </div>
+      <div id="prescription-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Modal 4: Informe Tributario SRI Formal (Página 5) -->
+  <div class="modal-overlay" id="tax-report-modal">
+    <div class="modal-card" style="max-width: 680px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Informe Tributario de Liquidación SRI</h3>
+        <button type="button" class="modal-close-btn" id="btn-close-tax-modal">✕</button>
+      </div>
+      <div id="tax-report-modal-body"></div>
+      <div style="display: flex; gap: 10px; margin-top: 16px;">
+        <button type="button" class="btn-primary" style="flex: 1;" onclick="window.print()">🖨️ Imprimir Formulario SRI</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Raíz de Notificaciones Toast -->
+  <div class="toast-container" id="toast-notifications-root"></div>
+
+  <!-- Script Principal de la Aplicación (Compatible con file:/// y http://) -->
+  <script src="js/app.bundle.js"></script>
+</body>
+</html>
