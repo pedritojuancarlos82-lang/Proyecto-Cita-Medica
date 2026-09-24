@@ -66,6 +66,10 @@
       <button type="button" class="nav-tab-btn" data-tab="gastos" id="nav-btn-doc-gastos">
         <span>💰 Gastos en Ruta</span>
       </button>
+      <button type="button" class="nav-tab-btn" data-tab="ingresos" id="nav-btn-doc-ingresos">
+        <span>💸 Ingresos</span>
+      </button>
+
     </nav>
 
     <!-- 4. Menú para Vista Contadora (Portal Lcda. Morales) -->
@@ -709,19 +713,12 @@
               <span><strong>Aviso de Especialidad:</strong> La atención médica provista en todas las sedes corresponde exclusivamente a <strong>Medicina General y Consulta Primaria</strong> para evitar confusiones de especialidad.</span>
             </div>
 
-            <!-- PASO 1: Elección de Servicio y Sede -->
+            <!-- PASO 1: Elección de Sede -->
             <div class="wizard-step-pane" data-step="1">
               <div class="step-section-header">
-                <h3 class="step-section-title">Paso 1: Selecciona el Tipo de Consulta y la Sede</h3>
-                <p class="step-section-desc">Primero elige el servicio médico requerido, y luego la sede de tu preferencia.</p>
+                <h3 class="step-section-title">Paso 1: Selecciona la Sede de tu Preferencia</h3>
+                <p class="step-section-desc">Elige entre nuestras clínicas privadas y centros con tarifas fijas transparentes.</p>
               </div>
-              
-              <h4 style="font-size: 1.1rem; color: var(--dark-navy); margin-bottom: 12px;">1. Tipo de Consulta</h4>
-              <div class="consultation-cards-grid" id="consultation-cards-container">
-                <!-- Se llena dinámicamente con los servicios -->
-              </div>
-
-              <h4 style="font-size: 1.1rem; color: var(--dark-navy); margin-bottom: 12px;">2. Sede de Atención</h4>
               <div class="clinic-cards-grid" id="clinics-cards-container">
                 <!-- Se llena dinámicamente desde patient.js -->
               </div>
@@ -739,7 +736,7 @@
                 <div class="calendar-card">
                   <div class="calendar-nav-header">
                     <span class="calendar-current-month">Septiembre 2026</span>
-                    <span style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 99px; font-size: 0.75rem; font-weight: 700;">Días Hábiles</span>
+                    <span class="badge-sede badge-ceibos">Días Hábiles</span>
                   </div>
                   <div class="calendar-grid-days">
                     <div class="calendar-day-name">D</div>
@@ -781,16 +778,16 @@
                   <h4 style="font-size: 0.98rem; font-weight: 800; color: var(--dark-navy);">Datos del Paciente</h4>
                   <div class="form-group">
                     <label class="form-label" for="pat-input-id">Cédula de Identidad *</label>
-                    <input type="text" class="form-input" id="pat-input-id" placeholder="Ej: 0987654321" required maxlength="10" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '');" />
+                    <input type="text" class="form-input" id="pat-input-id" placeholder="Ej: 0987654321" required />
                   </div>
                   <div class="form-group">
                     <label class="form-label" for="pat-input-name">Nombre y Apellido Completo *</label>
-                    <input type="text" class="form-input" id="pat-input-name" placeholder="Ej: Carlos Mendoza Moreira" required maxlength="70" />
+                    <input type="text" class="form-input" id="pat-input-name" placeholder="Ej: Carlos Mendoza Moreira" required />
                   </div>
                   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div class="form-group">
                       <label class="form-label" for="pat-input-phone">Teléfono / Celular *</label>
-                      <input type="tel" class="form-input" id="pat-input-phone" placeholder="Ej: 0987654321" required oninput="this.value = this.value.replace(/[^0-9]/g, '');" />
+                      <input type="tel" class="form-input" id="pat-input-phone" placeholder="Ej: 0987654321" required />
                     </div>
                     <div class="form-group">
                       <label class="form-label" for="pat-input-email">Correo Electrónico *</label>
@@ -807,22 +804,16 @@
                     <label class="payment-method-option selected" data-method="efectivo">
                       <input type="radio" name="payment_method" value="efectivo" checked />
                       <div class="method-details">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                          <span class="method-title" style="margin: 0;">💵 Efectivo o Transferencia</span>
-                          <span style="background: #fef3c7; color: #b45309; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 4px;">Sin recargo (+0%)</span>
-                        </div>
-                        <span class="method-subtitle">Pago en caja de recepción al llegar.</span>
+                        <span class="method-title">💵 Efectivo o Transferencia Bancaria Directa</span>
+                        <span class="method-subtitle">Pago en caja de recepción al llegar. Sin recargo adicional.</span>
                       </div>
                     </label>
 
                     <label class="payment-method-option" data-method="tarjeta">
                       <input type="radio" name="payment_method" value="tarjeta" />
                       <div class="method-details">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                          <span class="method-title" style="margin: 0;">💳 Tarjeta de Crédito / Débito</span>
-                          <span style="background: #fef3c7; color: #b45309; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 4px;">Recargo legal +9.75%</span>
-                        </div>
-                        <span class="method-subtitle">Procesamiento digital en recepción.</span>
+                        <span class="method-title">💳 Tarjeta de Crédito / Débito en Recepción</span>
+                        <span class="method-subtitle">Aplica recargo bancario legal del <strong>+9.75%</strong> por procesamiento digital.</span>
                       </div>
                     </label>
                   </div>
@@ -853,20 +844,13 @@
                     </span>
                     <strong id="sum-card-fee-amount">+$1.95</strong>
                   </div>
-                  
-                  <div class="summary-divider"></div>
-                  
                   <div class="summary-row total-due">
                     <span>Total a Pagar en Recepción:</span>
                     <span class="amount" id="sum-total-due">$20.00</span>
                   </div>
-                  
-                  <div class="trust-note">
-                    <span class="trust-note-icon">🛡️</span>
-                    <p class="trust-note-text">
-                      <strong>Reserva Segura.</strong> El comprobante con código QR oficial se emitirá al confirmar. No requiere pagos por adelantado en la web.
-                    </p>
-                  </div>
+                  <p style="font-size: 0.74rem; color: var(--text-subtle); line-height: 1.3;">
+                    El comprobante digital con código QR oficial se emitirá al confirmar. No requiere pagos por adelantado en la web.
+                  </p>
                 </div>
               </div>
             </div>
@@ -875,65 +859,61 @@
             <div class="wizard-step-pane" data-step="4" style="display: none;">
               <div class="confirmation-container">
                 <div class="confirmation-success-badge">
-                  <span>⏱️</span> Pendiente de Recepción
+                  <span>✓</span> ¡Cita Médica Reservada Exitosamente!
                 </div>
 
-                <!-- Tarjeta Imprimible del Ticket Rediseñada -->
-                <div class="ticket-card-printable" id="printable-ticket-element" style="max-width: 460px; margin: 0 auto; overflow-wrap: break-word; word-break: break-word; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.05); border: 1px solid #e2e8f0; background: #ffffff;">
-                  
-                  <div class="ticket-header" style="background: #0f172a; color: white; padding: 24px; text-align: center; border-radius: 16px 16px 0 0;">
-                    <div class="ticket-header-content">
-                      <h3 style="font-size: 1.25rem; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 4px; color: white;">MONTEPIEDRA SALUD</h3>
-                      <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 12px;">Pase Clínico Oficial</p>
-                      <div class="ticket-code-value" id="ticket-code-display" style="font-size: 1.5rem; font-weight: 900; color: #06b6d4; letter-spacing: 1px;">#MED-84920</div>
+                <!-- Tarjeta Imprimible del Ticket -->
+                <div class="ticket-card-printable" id="printable-ticket-element">
+                  <div class="ticket-header">
+                    <div>
+                      <h3 style="font-size: 1.15rem; color: var(--dark-navy); font-weight: 800;">TICKET OFICIAL DE CITA</h3>
+                      <p style="font-size: 0.74rem; color: var(--text-muted);">Servicio de Medicina General - Dr. Carlos Campoverde</p>
                     </div>
-                  </div>
-                  
-                  <div class="ticket-body-layout" style="display: flex; flex-direction: column; background: #ffffff;">
-                    
-                    <!-- Columna Unificada: Detalles -->
-                    <div class="ticket-details-grid" style="padding: 24px 24px 12px 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%;">
-                      <div class="ticket-detail-item" style="grid-column: 1 / -1; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
-                        <div class="label" style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Paciente</div>
-                        <div class="value" id="ticket-patient-name" style="font-size: 0.95rem; font-weight: 700; color: #0f172a;">Carlos Mendoza Moreira</div>
-                      </div>
-                      <div class="ticket-detail-item" style="background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
-                        <div class="label" style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Cédula de Identidad</div>
-                        <div class="value" id="ticket-patient-id" style="font-size: 0.95rem; font-weight: 700; color: #0f172a;">0987654321</div>
-                      </div>
-                      <div class="ticket-detail-item" style="background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
-                        <div class="label" style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Fecha y Hora</div>
-                        <div class="value" id="ticket-datetime-display" style="font-size: 0.95rem; font-weight: 700; color: #0f172a;">2026-09-23 - 10:30</div>
-                      </div>
-                      <div class="ticket-detail-item" style="grid-column: 1 / -1; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
-                        <div class="label" style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Servicio y Sede Médica</div>
-                        <div class="value" id="ticket-clinic-display" style="font-size: 0.95rem; font-weight: 700; color: #0f172a;">Medicina General - Clínica Ceibos</div>
-                      </div>
-                    </div>
-
-                    <!-- Módulo de Total a Pagar -->
-                    <div style="padding: 0 24px 24px 24px;">
-                      <div class="ticket-detail-item total-price-badge" style="background: #ecfdf5; padding: 16px; border-radius: 12px; border: 2px solid #34d399; display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                          <div class="label" style="font-size: 0.75rem; color: #065f46; text-transform: uppercase; font-weight: 800; margin-bottom: 4px;">Total a Pagar</div>
-                          <div id="ticket-payment-status" style="display: inline-block; background: #10b981; color: white; padding: 4px 10px; border-radius: 99px; font-size: 0.75rem; font-weight: 700;">Pago en Recepción</div>
-                        </div>
-                        <div class="value" id="ticket-total-display" style="font-size: 1.8rem; font-weight: 900; color: #065f46;">$20.00</div>
-                      </div>
-                    </div>
-
-                    <!-- Código QR Centrado -->
-                    <div class="ticket-qr-section" style="padding: 0 24px 24px 24px; display: flex; flex-direction: column; align-items: center;">
-                      <div class="qr-safe-box" style="background: #ffffff; padding: 14px; border-radius: 12px; display: inline-flex; justify-content: center; align-items: center; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08); margin: 15px auto;">
-                        <div id="qrcode-real"></div>
-                      </div>
-                      <p style="margin-top: 12px; font-size: 0.8rem; color: #475569; text-align: center; font-weight: 600; max-width: 240px; margin-bottom: 0;">Presenta este código QR en recepción para validar tu turno.</p>
+                    <div class="ticket-code-group">
+                      <div class="ticket-code-label">Código de Cita</div>
+                      <div class="ticket-code-value" id="ticket-code-display">#MED-84920</div>
                     </div>
                   </div>
 
-                  <div class="ticket-actions-group" style="padding: 24px; border-top: 1px dashed #cbd5e1; display: flex; justify-content: center; background: #f8fafc; border-radius: 0 0 16px 16px;">
-                    <button type="button" class="btn-primary" id="btn-print-ticket" style="width: 100%; background: #0f172a; color: white; border: none; padding: 14px 28px; border-radius: 12px; font-weight: 700; font-size: 1rem; cursor: pointer; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2); transition: all 0.2s ease;">
-                      🖨️ Descargar PDF / Imprimir
+                  <!-- Código QR Dinámico -->
+                  <div class="qr-code-display-box" id="ticket-qr-container">
+                    <!-- Código SVG inyectado desde qr-generator.js -->
+                  </div>
+
+                  <div class="ticket-details-grid">
+                    <div class="ticket-detail-item">
+                      <div class="label">Paciente</div>
+                      <div class="value" id="ticket-patient-name">Carlos Mendoza Moreira</div>
+                    </div>
+                    <div class="ticket-detail-item">
+                      <div class="label">Cédula de Identidad</div>
+                      <div class="value" id="ticket-patient-id">0987654321</div>
+                    </div>
+                    <div class="ticket-detail-item">
+                      <div class="label">Sede / Consultorio</div>
+                      <div class="value" id="ticket-clinic-display">Clínica Ceibos (Consultorio 2)</div>
+                    </div>
+                    <div class="ticket-detail-item">
+                      <div class="label">Fecha y Hora Asignada</div>
+                      <div class="value" id="ticket-datetime-display">2026-09-19 - 10:30</div>
+                    </div>
+                    <div class="ticket-detail-item">
+                      <div class="label">Método de Pago</div>
+                      <div class="value" id="ticket-method-display">Efectivo</div>
+                    </div>
+                    <div class="ticket-detail-item">
+                      <div class="label">Total a Abonar</div>
+                      <div class="value" id="ticket-total-display" style="color: var(--primary-blue); font-size: 1.05rem;">$20.00</div>
+                    </div>
+                  </div>
+
+                  <p style="font-size: 0.76rem; color: var(--text-muted); line-height: 1.3;">
+                    📧 Hemos enviado la confirmación oficial con copia al correo del paciente y a la agenda del doctor. Se activará una alerta 24h antes de su turno.
+                  </p>
+
+                  <div class="ticket-actions-group">
+                    <button type="button" class="btn-primary" id="btn-print-ticket">
+                      🖨️ Descargar Comprobante PDF / Imprimir
                     </button>
                   </div>
                 </div>
@@ -945,7 +925,7 @@
               <button type="button" class="btn-secondary" id="wizard-btn-prev" style="visibility: hidden;">
                 ← Paso Anterior
               </button>
-              <button type="button" class="btn-primary btn-confirm-ticket" id="wizard-btn-next">
+              <button type="button" class="btn-primary" id="wizard-btn-next">
                 Continuar Siguiente Paso →
               </button>
             </div>
@@ -1360,8 +1340,6 @@
   <!-- Raíz de Notificaciones Toast -->
   <div class="toast-container" id="toast-notifications-root"></div>
 
-  <!-- Motor de Código QR Estándar (CDN) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <!-- Script Principal de la Aplicación (Compatible con file:/// y http://) -->
   <script src="js/app.bundle.js"></script>
 </body>
