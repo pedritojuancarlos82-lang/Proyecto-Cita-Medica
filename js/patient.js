@@ -5,7 +5,7 @@
  */
 
 import { CLINICS, CREDIT_CARD_SURCHARGE_RATE, store } from './state.js';
-import { generateQRCodeSVG } from './qr-generator.js';
+import { renderizarCodigoQR } from './qr-generator.js';
 import { validarCedulaEcuatoriana, validarTelefono } from './validaciones-globales.js';
 
 // Utilidades locales para UI de errores
@@ -41,7 +41,16 @@ export function setupPatientPortal(showToast) {
   });
   let currentStep = 1;
   let selectedClinicId = 'ceibos';
-  let selectedDate = '2026-09-19'; // Fecha base activa del prototipo
+  
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  const currentDay = now.getDate();
+  const currentMonthStr = currentMonth < 10 ? `0${currentMonth}` : `${currentMonth}`;
+  const currentDayStr = currentDay < 10 ? `0${currentDay}` : `${currentDay}`;
+  const todayStr = `${currentYear}-${currentMonthStr}-${currentDayStr}`;
+
+  let selectedDate = todayStr;
   let selectedTimeSlot = '10:30';
   let selectedPaymentMethod = 'efectivo'; // 'efectivo' o 'tarjeta'
   let createdAppointment = null;
@@ -141,16 +150,16 @@ export function setupPatientPortal(showToast) {
   if (calendarDaysContainer) {
     const daysInMonth = 30;
     let html = '';
-    // Días vacíos para iniciar el martes 1 de Septiembre
+    // Días vacíos para iniciar
     for (let i = 0; i < 2; i++) {
       html += `<div class="calendar-day-cell disabled"></div>`;
     }
     for (let d = 1; d <= daysInMonth; d++) {
       const dayStr = d < 10 ? `0${d}` : `${d}`;
-      const dateVal = `2026-09-${dayStr}`;
+      const dateVal = `${currentYear}-${currentMonthStr}-${dayStr}`;
       const isSelected = dateVal === selectedDate;
-      const isPast = d < 19; // Bloquear días pasados antes del 19
-      const isToday = d === 19;
+      const isPast = d < currentDay;
+      const isToday = d === currentDay;
       html += `
         <div class="calendar-day-cell ${isSelected ? 'selected' : ''} ${isPast ? 'disabled' : ''} ${isToday ? 'today' : ''}" data-date="${dateVal}">
           ${d}
@@ -174,46 +183,20 @@ export function setupPatientPortal(showToast) {
     if (!slotsContainer) return;
 
     const baseSlots = ['08:30', '09:00', '09:45', '10:30', '11:15', '12:00', '13:00', '13:45', '14:30', '15:15', '16:00', '16:45', '17:30'];
-    const state = store.getState();
-
-    // Obtener citas ya agendadas en la fecha seleccionada
-    const bookedTimes = state.appointments
-      .filter(a => a.date === selectedDate && a.status !== 'cancelada')
-      .map(a => a.time);
-
-    // Obtener franjas de traslado en ruta
-    // Ejemplo: Entre 11:00 y 12:45 o entre 15:00 y 15:45 el doctor está en carretera
-    const transitTimes = ['11:15', '12:00', '15:15'];
 
     slotsContainer.innerHTML = baseSlots.map(time => {
-      const isBooked = bookedTimes.includes(time);
-      const isTransit = transitTimes.includes(time);
-      const isSelected = (time === selectedTimeSlot && !isBooked && !isTransit);
-
+      const isSelected = (time === selectedTimeSlot);
       let classes = 'slot-pill-btn';
-      let title = 'Disponible';
-      let disabled = false;
-
-      if (isBooked) {
-        classes += ' disabled';
-        title = 'Horario reservado por otro paciente';
-        disabled = true;
-      } else if (isTransit) {
-        classes += ' disabled';
-        title = 'Franja protegida: El doctor está en traslado interurbano en ruta';
-        disabled = true;
-      } else if (isSelected) {
-        classes += ' selected';
-      }
+      if (isSelected) classes += ' selected';
 
       return `
-        <button type="button" class="${classes}" data-time="${time}" ${disabled ? 'disabled' : ''} title="${title}">
+        <button type="button" class="${classes}" data-time="${time}" title="Disponible">
           ${time}
         </button>
       `;
     }).join('');
 
-    slotsContainer.querySelectorAll('.slot-pill-btn:not(.disabled)').forEach(btn => {
+    slotsContainer.querySelectorAll('.slot-pill-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         slotsContainer.querySelectorAll('.slot-pill-btn').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
@@ -223,10 +206,8 @@ export function setupPatientPortal(showToast) {
     });
 
     if (travelNoticeBox) {
-      travelNoticeBox.innerHTML = `
-        <span>🚗</span>
-        <span><b>Lógica de Protección en Ruta:</b> Las franjas de traslado hacia y desde Ceibos / Mapasingue (11:15, 12:00, 15:15) se encuentran bloqueadas automáticamente para asegurar que el doctor llegue a tiempo a su consultorio.</span>
-      `;
+      travelNoticeBox.innerHTML = '';
+      travelNoticeBox.style.display = 'none';
     }
   }
 
@@ -250,6 +231,40 @@ export function setupPatientPortal(showToast) {
     const nameInput = document.getElementById('pat-input-name');
     const phoneInput = document.getElementById('pat-input-phone');
     const emailInput = document.getElementById('pat-input-email');
+
+    // Bloqueos físicos de teclado
+    if (idInput) {
+      idInput.addEventListener('keydown', (e) => {
+        if (!/[0-9]/.test(e.key) && !['Backspace', 'ArrowLeft', 'ArrowRight', 'Delete', 'Tab'].includes(e.key)) {
+          e.preventDefault();
+        }
+      });
+      idInput.addEventListener('input', (e) => {
+        e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+      });
+    }
+
+    if (phoneInput) {
+      phoneInput.addEventListener('keydown', (e) => {
+        if (!/[0-9]/.test(e.key) && !['Backspace', 'ArrowLeft', 'ArrowRight', 'Delete', 'Tab'].includes(e.key)) {
+          e.preventDefault();
+        }
+      });
+      phoneInput.addEventListener('input', (e) => {
+        e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+      });
+    }
+
+    if (nameInput) {
+      nameInput.addEventListener('keydown', (e) => {
+        if (!/^[a-zA-Z\s]*$/.test(e.key) && !['Backspace', 'ArrowLeft', 'ArrowRight', 'Delete', 'Tab'].includes(e.key)) {
+          e.preventDefault();
+        }
+      });
+      nameInput.addEventListener('input', (e) => {
+        e.target.value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+      });
+    }
 
     if (user && user.role === 'paciente') {
       if (idInput && !idInput.value) idInput.value = user.idNumber || '';
@@ -316,10 +331,24 @@ export function setupPatientPortal(showToast) {
     if (ticketTotal) ticketTotal.textContent = `$${appointment.totalPaid.toFixed(2)}`;
     if (ticketMethod) ticketMethod.textContent = appointment.paymentMethod === 'tarjeta' ? 'Tarjeta de Crédito (+9.75%)' : 'Efectivo / Transferencia';
 
-    // Generar SVG del Código QR
-    if (qrContainer) {
-      const qrData = `TICKET:${appointment.code}|PACIENTE:${appointment.patientId}|SEDE:${clinic.name}|HORA:${appointment.date} ${appointment.time}`;
-      qrContainer.innerHTML = generateQRCodeSVG(qrData, 180);
+    // Generar Código QR (Inyección Inmediata de API Dinámica)
+    const qrSection = document.querySelector(".ticket-qr-section");
+    if (qrSection) {
+      const nombrePaciente = document.getElementById('pat-input-name')?.value.trim() || appointment.patientName || 'Paciente';
+      const payloadQR = `MONTEPIEDRA SALUD - Turno: #${appointment.code}\nPaciente: ${nombrePaciente}\nCedula: ${appointment.patientId}\nSede: ${clinic.name} (${clinic.consultorio})\nFecha: ${appointment.date} ${appointment.time}\nTotal: $${appointment.totalPaid.toFixed(2)}`;
+
+      qrSection.innerHTML = `
+        <div style="background: #ffffff; padding: 12px; border-radius: 12px; display: inline-flex; justify-content: center; align-items: center; margin: 15px auto; border: 1px solid #e2e8f0; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+          <img 
+            id="img-qr-ticket"
+            src="https://quickchart.io/qr?text=${encodeURIComponent(payloadQR)}&size=180&margin=2&ecLevel=M" 
+            alt="Código QR Oficial de Cita" 
+            style="width: 170px; height: 170px; display: block; border: none;"
+            onerror="this.src='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`MONTEPIEDRA-SALUD-${appointment.code}`)}&margin=10';"
+          />
+        </div>
+        <p style="margin-top: 12px; font-size: 0.8rem; color: #475569; text-align: center; font-weight: 600; max-width: 240px; margin-bottom: 0;">Presenta este código QR en recepción para validar tu turno.</p>
+      `;
     }
   }
 

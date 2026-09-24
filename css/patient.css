@@ -7,7 +7,7 @@
   display: flex;
   flex-direction: column;
   min-height: 100%;
-  background: var(--bg-app);
+  background: #f8fafc;
 }
 
 /* Cabecera del Portal Paciente */
@@ -170,25 +170,26 @@
 
 .clinic-selection-card {
   background: #ffffff;
-  border-radius: var(--radius-lg);
-  border: 2px solid var(--border-light);
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
   overflow: hidden;
   cursor: pointer;
   transition: all var(--transition-normal);
   display: flex;
   flex-direction: column;
   position: relative;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05);
 }
 
 .clinic-selection-card:hover {
   transform: translateY(-3px);
-  box-shadow: var(--shadow-lg);
-  border-color: #94a3b8;
+  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+  border-color: #cbd5e1;
 }
 
 .clinic-selection-card.selected {
-  border-color: var(--primary-blue);
-  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.25), var(--shadow-md);
+  border-color: #0284c7;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.25), 0 4px 6px -1px rgba(0,0,0,0.05);
 }
 
 .clinic-card-image {
@@ -196,6 +197,7 @@
   width: 100%;
   object-fit: cover;
   background: #cbd5e1;
+  border-radius: 14px 14px 0 0;
 }
 
 .clinic-card-body {
@@ -215,12 +217,12 @@
 .clinic-card-name {
   font-size: 1.05rem;
   font-weight: 800;
-  color: var(--dark-navy);
+  color: #0f172a;
 }
 
 .clinic-card-address {
   font-size: 0.78rem;
-  color: var(--text-muted);
+  color: #475569;
   line-height: 1.35;
 }
 
@@ -235,14 +237,14 @@
 
 .price-tag-label {
   font-size: 0.76rem;
-  color: var(--text-muted);
+  color: #64748b;
   font-weight: 600;
 }
 
 .price-tag-amount {
   font-size: 1.25rem;
   font-weight: 800;
-  color: var(--dark-navy);
+  color: #0f172a;
 }
 
 .price-tag-free {
@@ -254,14 +256,16 @@
   display: grid;
   grid-template-columns: 1fr 1.2fr;
   gap: 24px;
+  max-width: 980px;
+  margin: 0 auto;
 }
 
-.calendar-card {
+.calendar-card, .time-slots-card {
   background: #ffffff;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
-  padding: 18px;
-  box-shadow: var(--shadow-sm);
+  border-radius: 18px;
+  border: 1px solid #e2e8f0;
+  padding: 24px;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.04);
 }
 
 .calendar-nav-header {
@@ -272,23 +276,24 @@
 }
 
 .calendar-current-month {
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 700;
-  color: var(--dark-navy);
+  color: #0f172a;
 }
 
 .calendar-grid-days {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
+  gap: 8px;
   text-align: center;
 }
 
 .calendar-day-name {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 700;
-  color: var(--text-subtle);
+  color: #64748b;
   padding-bottom: 6px;
+  text-transform: uppercase;
 }
 
 .calendar-day-cell {
@@ -296,88 +301,91 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
+  border-radius: 12px;
   font-size: 0.84rem;
   font-weight: 600;
-  color: var(--dark-navy);
+  color: #0f172a;
   cursor: pointer;
-  transition: var(--transition-fast);
-  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  border: 1.5px solid transparent;
 }
 
 .calendar-day-cell:hover:not(.disabled) {
-  background: var(--primary-blue-light);
-  color: var(--primary-blue);
+  background: #f0f9ff;
+  border-color: #bae6fd;
 }
 
 .calendar-day-cell.selected {
-  background: var(--primary-blue) !important;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
   color: #ffffff !important;
   font-weight: 700;
-  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
 }
 
 .calendar-day-cell.today {
-  border-color: var(--primary-blue);
+  border-color: #e0f2fe;
 }
 
 .calendar-day-cell.disabled {
   color: #cbd5e1;
   cursor: not-allowed;
-  background: #f8fafc;
+  background: transparent;
+  border: none;
 }
 
 /* Slots de Horas en Pills */
-.time-slots-card {
-  background: #ffffff;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
-  padding: 18px;
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  flex-direction: column;
-}
-
 .time-slots-subtitle {
-  font-size: 0.84rem;
+  font-size: 0.88rem;
   font-weight: 700;
-  color: var(--dark-navy);
-  margin-bottom: 12px;
+  color: #0f172a;
+  margin-bottom: 16px;
 }
 
 .slots-pill-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
 }
 
 .slot-pill-btn {
-  background: #f8fafc;
-  border: 1.5px solid var(--border-light);
-  padding: 10px 6px;
-  border-radius: var(--radius-md);
-  font-size: 0.84rem;
-  font-weight: 700;
-  color: var(--dark-navy);
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  padding: 12px 6px;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1e293b;
   cursor: pointer;
   text-align: center;
-  transition: var(--transition-fast);
+  transition: all 0.2s ease;
+  font-family: monospace;
 }
 
-.slot-pill-btn:hover:not(.disabled) {
-  background: #ffffff;
-  border-color: var(--primary-blue);
-  color: var(--primary-blue);
+.slot-pill-btn:hover:not(.disabled):not(.transit) {
+  background: #f0f9ff;
+  border-color: #0284c7;
+  color: #0f172a;
+  transform: translateY(-1px);
 }
 
 .slot-pill-btn.selected {
-  background: var(--primary-blue);
+  background: #0284c7;
   color: #ffffff;
-  border-color: var(--primary-blue);
-  box-shadow: 0 4px 10px rgba(2, 132, 199, 0.3);
+  border-color: #0284c7;
+  box-shadow: 0 4px 10px rgba(2, 132, 199, 0.25);
 }
 
-.slot-pill-btn.disabled {
+.slot-pill-btn.disabled:not(.transit) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  border-style: dashed;
+  color: #94a3b8;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.slot-pill-btn.transit {
   background: #f1f5f9;
   border-color: #e2e8f0;
   color: #94a3b8;
@@ -386,16 +394,17 @@
 }
 
 .travel-warning-slot-notice {
-  margin-top: 14px;
-  padding: 10px 14px;
-  background: var(--amber-transit-light);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  border-radius: var(--radius-md);
-  color: var(--amber-transit-dark);
-  font-size: 0.78rem;
+  margin-top: 20px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 3px solid #0284c7;
+  border-radius: 8px;
+  color: #334155;
+  font-size: 0.8rem;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 /* PASO 3: Formulario de Datos y Desglose Financiero */
@@ -410,10 +419,28 @@
   border-radius: 16px;
   border: 1px solid #e2e8f0;
   padding: 32px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
+}
+
+.patient-info-form-card .form-input {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+  transition: all 0.2s ease;
+}
+
+.patient-info-form-card .form-input:hover {
+  border-color: #94a3b8;
+}
+
+.patient-info-form-card .form-input:focus {
+  border-color: #0284c7;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+  outline: none;
 }
 
 .payment-methods-selector {
@@ -424,14 +451,15 @@
 }
 
 .payment-method-option {
-  border: 2px solid var(--border-light);
-  border-radius: var(--radius-md);
-  padding: 14px;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
   cursor: pointer;
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  transition: var(--transition-fast);
+  gap: 14px;
+  transition: all 0.2s ease;
 }
 
 .payment-method-option:hover {
@@ -440,8 +468,13 @@
 }
 
 .payment-method-option.selected {
-  border-color: var(--primary-blue);
-  background: rgba(2, 132, 199, 0.04);
+  border-color: #0284c7;
+  background: #f0f9ff;
+  box-shadow: 0 0 0 1px #0284c7;
+}
+
+.payment-method-option .method-details {
+  flex: 1;
 }
 
 .payment-method-option input[type="radio"] {
@@ -468,17 +501,22 @@
 
 /* Resumen Financiero Transparente (Página 3) */
 .order-summary-card {
-  background: #f8fafc;
+  background: #ffffff;
   border-radius: 16px;
   border: 1px solid #e2e8f0;
-  padding: 32px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
   height: fit-content;
   position: sticky;
   top: 100px;
+}
+
+.summary-divider {
+  border-top: 2px dashed #cbd5e1;
+  margin: 4px 0;
 }
 
 .order-summary-title {
@@ -495,25 +533,52 @@
   justify-content: space-between;
   align-items: center;
   font-size: 0.86rem;
-  color: var(--text-muted);
+  color: #475569;
 }
 
 .summary-row.bold {
   font-weight: 700;
-  color: var(--dark-navy);
+  color: #0f172a;
 }
 
 .summary-row.total-due {
-  margin-top: 8px;
-  padding-top: 14px;
-  border-top: 2px dashed var(--border-light);
-  font-size: 1.15rem;
-  font-weight: 800;
-  color: var(--dark-navy);
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0f172a;
+  align-items: baseline;
 }
 
 .summary-row.total-due .amount {
-  color: var(--primary-blue);
+  color: #0284c7;
+  font-size: 1.75rem;
+  font-weight: 800;
+}
+
+.trust-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #f8fafc;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  border-left: 3px solid #0284c7;
+  margin-top: 4px;
+}
+
+.trust-note-icon {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.trust-note-text {
+  font-size: 0.78rem;
+  color: #475569;
+  line-height: 1.35;
+  margin: 0;
 }
 
 .transparent-fee-badge {
@@ -538,19 +603,21 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--emerald-green-light);
-  color: var(--emerald-green-dark);
-  font-size: 0.88rem;
-  font-weight: 700;
-  padding: 8px 18px;
+  background: #fef3c7;
+  color: #b45309;
+  font-size: 0.9rem;
+  font-weight: 800;
+  padding: 10px 22px;
   border-radius: var(--radius-full);
+  border: 1px solid #fde68a;
+  box-shadow: 0 4px 10px rgba(245, 158, 11, 0.15);
 }
 
 .ticket-card-printable {
   background: #ffffff;
   border-radius: 16px;
   border: 1px solid #e2e8f0;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   max-width: 480px;
   width: 100%;
   padding: 0;
@@ -567,12 +634,12 @@
   left: 0;
   right: 0;
   height: 6px;
-  background: linear-gradient(90deg, var(--primary-blue), var(--emerald-green));
+  background: #0284c7;
 }
 
 .ticket-header {
   padding: 24px;
-  background: linear-gradient(135deg, #0284c7, #0ea5e9);
+  background: #0f172a;
   color: #ffffff;
   text-align: center;
 }
@@ -610,7 +677,27 @@
 .ticket-body-layout {
   display: flex;
   flex-direction: row;
-  background: #ffffff;
+  background: transparent;
+  position: relative;
+}
+
+.ticket-body-layout::before,
+.ticket-body-layout::after {
+  content: '';
+  position: absolute;
+  top: -10px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #f8fafc;
+}
+
+.ticket-body-layout::before {
+  left: -10px;
+}
+
+.ticket-body-layout::after {
+  right: -10px;
 }
 
 .ticket-side-panel {
@@ -618,7 +705,7 @@
   flex-direction: column;
   align-items: center;
   padding: 24px;
-  border-right: 2px dashed #e2e8f0;
+  border-right: 2px dashed #cbd5e1;
   background: #f8fafc;
   min-width: 180px;
 }
@@ -631,7 +718,7 @@
   background: #ffffff;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .ticket-details-grid {
@@ -644,7 +731,7 @@
 }
 
 .ticket-detail-item {
-  background: #f8fafc;
+  background: #ffffff;
   padding: 12px 16px;
   border-radius: 8px;
   border: 1px solid #f1f5f9;
@@ -666,20 +753,20 @@
 }
 
 .ticket-detail-item.total-price-badge {
-  background: #dcfce7;
-  border-color: #bbf7d0;
+  background: #f0f9ff;
+  border-color: #e0f2fe;
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
 
 .ticket-detail-item.total-price-badge .label {
-  color: #166534;
+  color: #0369a1;
 }
 
 .ticket-detail-item.total-price-badge .value {
-  color: #15803d;
-  font-size: 1.15rem;
+  color: #0284c7;
+  font-size: 1.25rem;
   font-weight: 800;
 }
 
@@ -718,6 +805,39 @@
   margin-top: 28px;
   padding-top: 18px;
   border-top: 1px solid var(--border-light);
+}
+
+.btn-confirm-ticket {
+  background: #0284c7;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 28px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.btn-confirm-ticket:hover {
+  background: #0369a1;
+  box-shadow: 0 4px 8px rgba(2, 132, 199, 0.3);
+}
+
+.btn-secondary {
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 14px 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: #f8fafc;
+  color: #0f172a;
 }
 
 /* Responsividad para Móvil y Pantallas de Cualquier Tamaño */
@@ -781,4 +901,12 @@
 .ticket-detail-item .value {
   overflow-wrap: break-word !important;
   word-break: break-word !important;
+}
+
+/* Limpieza estricta para el Código QR dinámico */
+#qrcode-real img, #qrcode-real canvas {
+  display: block !important;
+  margin: 0 auto !important;
+  filter: none !important;
+  opacity: 1 !important;
 }
