@@ -709,12 +709,19 @@
               <span><strong>Aviso de Especialidad:</strong> La atención médica provista en todas las sedes corresponde exclusivamente a <strong>Medicina General y Consulta Primaria</strong> para evitar confusiones de especialidad.</span>
             </div>
 
-            <!-- PASO 1: Elección de Sede -->
+            <!-- PASO 1: Elección de Servicio y Sede -->
             <div class="wizard-step-pane" data-step="1">
               <div class="step-section-header">
-                <h3 class="step-section-title">Paso 1: Selecciona la Sede de tu Preferencia</h3>
-                <p class="step-section-desc">Elige entre nuestras clínicas privadas y centros con tarifas fijas transparentes.</p>
+                <h3 class="step-section-title">Paso 1: Selecciona el Tipo de Consulta y la Sede</h3>
+                <p class="step-section-desc">Primero elige el servicio médico requerido, y luego la sede de tu preferencia.</p>
               </div>
+              
+              <h4 style="font-size: 1.1rem; color: var(--dark-navy); margin-bottom: 12px;">1. Tipo de Consulta</h4>
+              <div class="consultation-cards-grid" id="consultation-cards-container">
+                <!-- Se llena dinámicamente con los servicios -->
+              </div>
+
+              <h4 style="font-size: 1.1rem; color: var(--dark-navy); margin-bottom: 12px;">2. Sede de Atención</h4>
               <div class="clinic-cards-grid" id="clinics-cards-container">
                 <!-- Se llena dinámicamente desde patient.js -->
               </div>

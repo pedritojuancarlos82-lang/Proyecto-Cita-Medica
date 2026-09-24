@@ -7,6 +7,7 @@
 import { CLINICS, CREDIT_CARD_SURCHARGE_RATE, store } from './state.js';
 import { renderizarCodigoQR } from './qr-generator.js';
 import { validarCedulaEcuatoriana, validarTelefono } from './validaciones-globales.js';
+import { MedicalService } from './services/medical-service.js';
 
 // Utilidades locales para UI de errores
 const showFieldError = (inputEl, message) => {
@@ -41,6 +42,7 @@ export function setupPatientPortal(showToast) {
   });
   let currentStep = 1;
   let selectedClinicId = 'ceibos';
+  let selectedServiceId = 'CG-01';
   
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -102,7 +104,36 @@ export function setupPatientPortal(showToast) {
     }
   }
 
-  // --- PASO 1: Renderizar Selección de Sedes ---
+  // --- PASO 1: Renderizar Selección de Servicio y Sedes ---
+  const servicesContainer = document.getElementById('consultation-cards-container');
+  if (servicesContainer) {
+    const catalogo = MedicalService.getCatalogo();
+    servicesContainer.innerHTML = catalogo.map(servicio => {
+      const isSelected = servicio.id === selectedServiceId;
+      return `
+        <div class="clinic-selection-card ${isSelected ? 'selected' : ''}" data-service-id="${servicio.id}" style="cursor: pointer;">
+          <div class="clinic-card-body">
+            <h3 class="clinic-card-name" style="color: var(--dark-navy);">${servicio.nombre}</h3>
+            <p style="font-size: 0.85rem; color: #64748b; margin-top: 5px; margin-bottom: 10px;">${servicio.descripcionCorta}</p>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span class="badge-sede badge-hospital" style="background: #e2e8f0; color: #475569;">⏱️ ${servicio.duracionMinutos} min</span>
+              <span class="price-tag-amount" style="font-weight: 800; color: var(--emerald-green-dark);">$${servicio.precioBase.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    servicesContainer.querySelectorAll('.clinic-selection-card').forEach(card => {
+      card.addEventListener('click', () => {
+        servicesContainer.querySelectorAll('.clinic-selection-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        selectedServiceId = card.dataset.serviceId;
+        updateSummaryCard();
+      });
+    });
+  }
+
   const clinicsContainer = document.getElementById('clinics-cards-container');
   if (clinicsContainer) {
     clinicsContainer.innerHTML = Object.values(CLINICS).map(clinic => {
@@ -241,6 +272,14 @@ export function setupPatientPortal(showToast) {
       });
       idInput.addEventListener('input', (e) => {
         e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+        if (e.target.value.length === 10) {
+          const paciente = MedicalService.buscarPorCedula(e.target.value);
+          if (paciente) {
+            if (nameInput) nameInput.value = paciente.nombreCompleto;
+            if (phoneInput) phoneInput.value = paciente.telefono;
+            if (emailInput) emailInput.value = paciente.email;
+          }
+        }
       });
     }
 
@@ -277,7 +316,11 @@ export function setupPatientPortal(showToast) {
 
   function updateSummaryCard() {
     const clinic = CLINICS[selectedClinicId] || CLINICS.ceibos;
-    const baseFee = clinic.basePrice;
+    const catalogo = MedicalService.getCatalogo();
+    const service = catalogo.find(s => s.id === selectedServiceId) || catalogo[0];
+    
+    // Si la clínica es gratuita, el costo base es 0; si no, es el de la consulta.
+    const baseFee = clinic.basePrice === 0 ? 0 : service.precioBase;
     let cardFee = 0;
     let totalDue = baseFee;
 
@@ -415,9 +458,23 @@ export function setupPatientPortal(showToast) {
         
         if (hasError) return;
 
+        // Guardar ficha básica del paciente si es nuevo o actualizar
+        MedicalService.guardarFicha({
+          cedula: patId,
+          nombreCompleto: patName,
+          telefono: patPhone,
+          email: patEmail
+        });
+
+        const service = MedicalService.getCatalogo().find(s => s.id === selectedServiceId) || MedicalService.getCatalogo()[0];
+        const clinic = CLINICS[selectedClinicId];
+        const totalAmount = clinic.basePrice === 0 ? 0 : service.precioBase * (selectedPaymentMethod === 'tarjeta' ? 1 + CREDIT_CARD_SURCHARGE_RATE : 1);
+
         // Crear la cita en el estado central
         createdAppointment = store.addAppointment({
           clinicId: selectedClinicId,
+          serviceId: selectedServiceId,
+          serviceName: service.nombre,
           date: selectedDate,
           time: selectedTimeSlot,
           patientId: patId,
@@ -425,8 +482,11 @@ export function setupPatientPortal(showToast) {
           patientPhone: patPhone,
           patientEmail: patEmail,
           reason: patReason,
-          paymentMethod: selectedPaymentMethod
+          paymentMethod: selectedPaymentMethod,
+          totalPaid: totalAmount
         });
+
+        MedicalService.registrarAtencionEnHistorial(patId, createdAppointment);
 
         renderConfirmationTicket(createdAppointment);
         currentStep = 4;

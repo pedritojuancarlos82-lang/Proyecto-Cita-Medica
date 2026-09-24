@@ -160,7 +160,14 @@
   font-weight: 600;
 }
 
-/* PASO 1: Rejilla de Selección de Sedes */
+/* PASO 1: Rejilla de Selección de Consultas y Sedes */
+.consultation-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
 .clinic-cards-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
