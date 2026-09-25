@@ -780,10 +780,10 @@
 /* Error UI Feedback */
 .input-error-msg {
   color: #dc2626;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   margin-top: 0.35rem;
   display: none;
-  font-weight: 500;
+  font-weight: 600;
   animation: fadeIn 0.2s ease-in;
 }
 .input-error-msg.visible {
@@ -792,6 +792,66 @@
 .form-input.error {
   border-color: #ef4444 !important;
   background-color: #fef2f2 !important;
+}
+.form-input.valid {
+  border-color: #10b981 !important;
+  background-color: #f0fdf4 !important;
+}
+
+/* SRI Status and Feedback Badges */
+.sri-status-box {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  animation: fadeIn 0.2s ease-in;
+}
+
+.sri-badge-loading {
+  color: #0369a1;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sri-badge-success {
+  color: #065f46;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sri-badge-info {
+  color: #1e40af;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.sri-spinner {
+  display: inline-block;
+  animation: spin 1s linear infinite;
 }
 
 .ticket-actions-group {

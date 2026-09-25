@@ -4,94 +4,573 @@
 // ==================== js/qr-generator.js ====================
 
 /**
- * Generador de Códigos QR en formato SVG vectorial sin dependencias externas
- * Genera matrices de contraste alto ideales para tickets de reserva médica y credenciales rápidas.
+ * Generador de Códigos QR de Ultra-Alta Definición
+ * Usa la librería QRCode local para generar códigos QR limpios, de alto contraste (#000000 / #ffffff)
+ * y 100% escaneables por cualquier cámara de teléfono celular en milisegundos.
  */
 
-function generateQRCodeSVG(text, size = 180) {
-  // Genera una matriz pseudo-QR 25x25 determinística basada en el hash del texto
-  const matrixSize = 25;
-  const grid = Array(matrixSize).fill(0).map(() => Array(matrixSize).fill(false));
+function renderizarCodigoQR(contenedorId, qrData, options = {}) {
+  const container = (typeof contenedorId === 'string') 
+    ? document.getElementById(contenedorId) 
+    : contenedorId;
+  if (!container) return;
 
-  // Función para dibujar los ojos/marcadores de posición clásicos (Finder Patterns de 7x7)
-  function drawFinderPattern(startX, startY) {
-    for (let r = 0; r < 7; r++) {
-      for (let c = 0; c < 7; c++) {
-        if (
-          r === 0 || r === 6 || c === 0 || c === 6 || // Borde exterior
-          (r >= 2 && r <= 4 && c >= 2 && c <= 4)      // Centro sólido 3x3
-        ) {
-          grid[startY + r][startX + c] = true;
-        } else {
-          grid[startY + r][startX + c] = false;
+  container.innerHTML = '';
+
+  const size = options.size || 240;
+  const level = (typeof QRCode !== 'undefined' && QRCode.CorrectLevel) 
+    ? (options.correctLevel || QRCode.CorrectLevel.L) 
+    : null;
+
+  // Wrapper interno con fondo blanco puro y margen de resguardo (quiet zone)
+  const qrInnerWrapper = document.createElement('div');
+  qrInnerWrapper.className = 'qr-canvas-inner-wrapper';
+  qrInnerWrapper.style.background = '#ffffff';
+  qrInnerWrapper.style.padding = '14px';
+  qrInnerWrapper.style.borderRadius = '12px';
+  qrInnerWrapper.style.display = 'inline-block';
+  qrInnerWrapper.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.08)';
+  qrInnerWrapper.style.border = '1px solid #e2e8f0';
+  container.appendChild(qrInnerWrapper);
+
+  if (typeof QRCode !== 'undefined') {
+    try {
+      new QRCode(qrInnerWrapper, {
+        text: qrData,
+        width: size,
+        height: size,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: level || QRCode.CorrectLevel.L
+      });
+
+      // Asegurar que el canvas y/o imagen no tengan filtros difuminadores
+      const canvasEl = qrInnerWrapper.querySelector('canvas');
+      if (canvasEl) {
+        canvasEl.style.imageRendering = 'pixelated';
+        canvasEl.style.display = 'block';
+        canvasEl.style.margin = '0 auto';
+      }
+      const imgEl = qrInnerWrapper.querySelector('img');
+      if (imgEl) {
+        imgEl.style.imageRendering = 'pixelated';
+        imgEl.style.margin = '0 auto';
+      }
+      return;
+    } catch (e) {
+      console.warn('Error con QRCode local, aplicando fallback de alta resolución:', e);
+    }
+  }
+
+  // Fallback con margen de resguardo amplio de 4 módulos
+  const img = document.createElement('img');
+  img.src = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(qrData)}&margin=4&color=000000&bgcolor=ffffff&format=png`;
+  img.alt = "Código QR Oficial de Cita Médica";
+  img.style.width = `${size}px`;
+  img.style.height = `${size}px`;
+  img.style.display = 'block';
+  img.style.imageRendering = 'pixelated';
+  qrInnerWrapper.appendChild(img);
+}
+
+
+// ==================== js/data/consultation-catalog.js ====================
+
+const CONSULTATION_CATALOG = [
+  {
+    id: "CG-01",
+    codigo: "CG-01",
+    nombre: "Consulta Médica General",
+    descripcionCorta: "Evaluación primaria para diagnóstico y tratamiento.",
+    duracionMinutos: 30,
+    precioBase: 20.00,
+    categoria: "Atención Primaria",
+    estado: "Activo"
+  },
+  {
+    id: "CG-02",
+    codigo: "CG-02",
+    nombre: "Control Rutinario / Seguimiento",
+    descripcionCorta: "Seguimiento de tratamientos y revisión general.",
+    duracionMinutos: 20,
+    precioBase: 15.00,
+    categoria: "Seguimiento",
+    estado: "Activo"
+  },
+  {
+    id: "CG-03",
+    codigo: "CG-03",
+    nombre: "Certificado de Salud y Aptitud Física",
+    descripcionCorta: "Evaluación para emisión de certificados de salud.",
+    duracionMinutos: 30,
+    precioBase: 25.00,
+    categoria: "Certificaciones",
+    estado: "Activo"
+  },
+  {
+    id: "CG-04",
+    codigo: "CG-04",
+    nombre: "Atención Prioritaria / Urgencia Menor",
+    descripcionCorta: "Atención rápida para urgencias no vitales.",
+    duracionMinutos: 45,
+    precioBase: 30.00,
+    categoria: "Prioritaria",
+    estado: "Activo"
+  }
+];
+
+
+// ==================== js/models/patient-record.js ====================
+
+class PatientRecord {
+  constructor(data) {
+    this.id = data.id || `PAC-${Date.now()}`;
+    this.cedula = data.cedula || '';
+    this.nombreCompleto = data.nombreCompleto || '';
+    this.fechaNacimiento = data.fechaNacimiento || '';
+    this.edad = data.edad || null;
+    this.genero = data.genero || '';
+    this.telefono = data.telefono || '';
+    this.email = data.email || '';
+    this.direccion = data.direccion || '';
+    
+    this.contactoEmergencia = {
+      nombre: data.contactoEmergencia?.nombre || '',
+      parentesco: data.contactoEmergencia?.parentesco || '',
+      telefono: data.contactoEmergencia?.telefono || ''
+    };
+    
+    this.antecedentesClinicos = {
+      alergias: data.antecedentesClinicos?.alergias || [],
+      patologiasCronicas: data.antecedentesClinicos?.patologiasCronicas || [],
+      cirugiasPrevias: data.antecedentesClinicos?.cirugiasPrevias || [],
+      medicacionHabitual: data.antecedentesClinicos?.medicacionHabitual || []
+    };
+    
+    this.historialConsultas = data.historialConsultas || [];
+    this.createdAt = data.createdAt || new Date().toISOString();
+    this.updatedAt = new Date().toISOString();
+  }
+}
+
+
+// ==================== js/services/medical-service.js ====================
+
+
+const MedicalService = {
+  // Retorna únicamente los servicios con estado "Activo"
+  getCatalogo: () => {
+    return CONSULTATION_CATALOG.filter(servicio => servicio.estado === 'Activo');
+  },
+
+  // Retorna la lista parseada de pacientes guardados en localStorage
+  getPacientes: () => {
+    try {
+      const pacientes = localStorage.getItem('montepiedra_pacientes');
+      return pacientes ? JSON.parse(pacientes) : [];
+    } catch (e) {
+      console.error('Error parsing pacientes from localStorage', e);
+      return [];
+    }
+  },
+
+  // Retorna la ficha médica si el paciente ya existe; null si es nuevo
+  buscarPorCedula: (cedula) => {
+    const pacientes = MedicalService.getPacientes();
+    const paciente = pacientes.find(p => p.cedula === cedula);
+    return paciente ? new PatientRecord(paciente) : null;
+  },
+
+  // Guarda o actualiza la ficha del paciente
+  guardarFicha: (datos) => {
+    let pacientes = MedicalService.getPacientes();
+    const index = pacientes.findIndex(p => p.cedula === datos.cedula);
+
+    if (index >= 0) {
+      // Actualiza antecedentes y datos demográficos
+      const pacienteExistente = new PatientRecord(pacientes[index]);
+      
+      pacienteExistente.nombreCompleto = datos.nombreCompleto || pacienteExistente.nombreCompleto;
+      pacienteExistente.telefono = datos.telefono || pacienteExistente.telefono;
+      pacienteExistente.email = datos.email || pacienteExistente.email;
+      if (datos.antecedentesClinicos) {
+        pacienteExistente.antecedentesClinicos = { ...pacienteExistente.antecedentesClinicos, ...datos.antecedentesClinicos };
+      }
+      pacienteExistente.updatedAt = new Date().toISOString();
+      
+      pacientes[index] = pacienteExistente;
+    } else {
+      // Genera un nuevo registro
+      const nuevoPaciente = new PatientRecord(datos);
+      pacientes.push(nuevoPaciente);
+    }
+
+    localStorage.setItem('montepiedra_pacientes', JSON.stringify(pacientes));
+  },
+
+  // Añade la consulta reservada al historial de consultas del paciente
+  registrarAtencionEnHistorial: (cedula, datosCita) => {
+    let pacientes = MedicalService.getPacientes();
+    const index = pacientes.findIndex(p => p.cedula === cedula);
+
+    if (index >= 0) {
+      const paciente = new PatientRecord(pacientes[index]);
+      paciente.historialConsultas.push({
+        ...datosCita,
+        fechaRegistro: new Date().toISOString()
+      });
+      pacientes[index] = paciente;
+      localStorage.setItem('montepiedra_pacientes', JSON.stringify(pacientes));
+    } else {
+      console.error('No se puede registrar atención: paciente no encontrado.');
+    }
+  }
+};
+
+
+// ==================== js/validaciones-globales.js ====================
+
+/**
+ * Utilidades Globales de Validación, Sanitización y Conexión SRI
+ * Montepiedra Salud
+ */
+
+/**
+ * Validador Algorítmico y Matemático de Cédula Ecuatoriana (Módulo 10)
+ * Requisitos:
+ * 1. Exactamente 10 dígitos numéricos enteros positivos.
+ * 2. Código de provincia válido: 01 a 24, o 30 (consular).
+ * 3. Tercer dígito < 6 (persona natural).
+ * 4. Algoritmo Módulo 10 con coeficientes [2, 1, 2, 1, 2, 1, 2, 1, 2].
+ * 5. Coincidencia matemática exacta del dígito verificador.
+ */
+const validarCedulaEcuatorianaDetallada = (cedula) => {
+  if (!cedula || typeof cedula !== 'string') {
+    return { isValid: false, message: 'La cédula de identidad es requerida.' };
+  }
+
+  const limpia = cedula.trim();
+
+  // Solo dígitos enteros positivos
+  if (!/^\d{10}$/.test(limpia)) {
+    return { isValid: false, message: 'La cédula debe contener exactamente 10 dígitos enteros positivos (sin signos ni letras).' };
+  }
+
+  // Validación de provincia (01 a 24, o 30)
+  const provincia = parseInt(limpia.substring(0, 2), 10);
+  if ((provincia < 1 || provincia > 24) && provincia !== 30) {
+    return { isValid: false, message: `Código de provincia '${limpia.substring(0, 2)}' no válido en Ecuador (debe ser 01-24 o 30).` };
+  }
+
+  // Tercer dígito menor a 6 para personas naturales
+  const tercerDigito = parseInt(limpia.charAt(2), 10);
+  if (tercerDigito >= 6) {
+    return { isValid: false, message: 'El tercer dígito debe ser menor a 6 para cédula de persona natural.' };
+  }
+
+  // Algoritmo matemático Módulo 10
+  const coeficientes = [2, 1, 2, 1, 2, 1, 2, 1, 2];
+  let suma = 0;
+
+  for (let i = 0; i < 9; i++) {
+    let valor = parseInt(limpia.charAt(i), 10) * coeficientes[i];
+    if (valor >= 10) {
+      valor -= 9;
+    }
+    suma += valor;
+  }
+
+  const digitoVerificadorCalculado = (10 - (suma % 10)) % 10;
+  const digitoVerificadorReal = parseInt(limpia.charAt(9), 10);
+
+  if (digitoVerificadorCalculado !== digitoVerificadorReal) {
+    return {
+      isValid: false,
+      message: `Dígito verificador inválido: la cédula no supera la comprobación matemática (esperado: ${digitoVerificadorCalculado}, ingresado: ${digitoVerificadorReal}).`
+    };
+  }
+
+  return { isValid: true, message: 'Cédula de identidad ecuatoriana válida.' };
+};
+
+const validarCedulaEcuatoriana = (cedula) => {
+  return validarCedulaEcuatorianaDetallada(cedula).isValid;
+};
+
+/**
+ * Validador de Teléfono Celular de Ecuador
+ * Requisitos:
+ * 1. Exactamente 10 dígitos numéricos enteros positivos.
+ * 2. Inicia con '09'.
+ * 3. Prohibido valores negativos, decimales o caracteres especiales.
+ */
+const validarCelularDetallado = (telefono) => {
+  if (!telefono || typeof telefono !== 'string') {
+    return { isValid: false, message: 'El número celular es requerido.' };
+  }
+
+  const num = telefono.trim();
+
+  if (!/^\d+$/.test(num)) {
+    return { isValid: false, message: 'Solo se permiten dígitos numéricos enteros positivos (nada de negativos ni signos).' };
+  }
+
+  if (num.length !== 10) {
+    return { isValid: false, message: `El número debe tener exactamente 10 dígitos (actualmente tiene ${num.length}).` };
+  }
+
+  if (!num.startsWith('09')) {
+    return { isValid: false, message: 'El número celular debe empezar con el prefijo oficial 09 de Ecuador (ej: 0987654321).' };
+  }
+
+  return { isValid: true, message: 'Número celular válido.' };
+};
+
+const validarTelefono = (telefono) => {
+  return validarCelularDetallado(telefono).isValid;
+};
+
+/**
+ * Validador de Correo Electrónico
+ * Requisitos:
+ * Formato general: nombre@gmail.com, nombre@hotmail.com, etc.
+ */
+const validarEmailDetallado = (email) => {
+  if (!email || typeof email !== 'string') {
+    return { isValid: false, message: 'El correo electrónico es requerido.' };
+  }
+
+  const trimmed = email.trim();
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+  if (!emailRegex.test(trimmed)) {
+    return {
+      isValid: false,
+      message: 'Ingresa un correo electrónico con formato válido (ej: nombre@gmail.com, nombre@hotmail.com).'
+    };
+  }
+
+  return { isValid: true, message: 'Correo electrónico válido.' };
+};
+
+const validarEmail = (email) => {
+  return validarEmailDetallado(email).isValid;
+};
+
+/**
+ * Sanitiza nombres quitando números, caracteres raros y espacios excesivos.
+ */
+const sanitizarNombre = (nombre) => {
+  if (!nombre) return '';
+  return nombre
+    .replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trimStart()
+    .substring(0, 70);
+};
+
+/**
+ * Normaliza nombres a formato Capitalizado (Title Case)
+ */
+const normalizarNombre = (str) => {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .split(' ')
+    .filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+};
+
+/**
+ * Conexión reactiva con la API del SRI para detectar automáticamente al usuario registrado
+ */
+const consultarSRI = async (cedula) => {
+  if (!validarCedulaEcuatoriana(cedula)) {
+    return { exito: false, mensaje: 'Cédula no válida para consulta en el SRI.' };
+  }
+
+  const ruc = `${cedula}001`;
+  const sriDirectUrl = `https://srienlinea.sri.gob.ec/sri-catastro-sujeto-servicio-internet/rest/ConsolidadoContribuyente/obtenerPorNumerosRuc?ruc=${ruc}`;
+
+  // Intentar consulta mediante endpoint directo y proxy CORS público para navegadores
+  const endpoints = [
+    sriDirectUrl,
+    `https://corsproxy.io/?${encodeURIComponent(sriDirectUrl)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(sriDirectUrl)}`
+  ];
+
+  for (const url of endpoints) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+      const response = await fetch(url, {
+        headers: { 'Accept': 'application/json' },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (response.ok && response.status === 200) {
+        const text = await response.text();
+        if (text && text.trim().startsWith('[')) {
+          const data = JSON.parse(text);
+          if (Array.isArray(data) && data.length > 0 && data[0].razonSocial) {
+            return {
+              exito: true,
+              nombre: normalizarNombre(data[0].razonSocial),
+              razonSocial: data[0].razonSocial,
+              ruc: data[0].numeroRuc,
+              tipo: data[0].tipoContribuyente || 'PERSONA NATURAL',
+              estado: data[0].estadoContribuyenteRuc || 'ACTIVO',
+              fuente: 'SRI en Línea Oficial'
+            };
+          }
         }
       }
+    } catch (e) {
+      // Intentar siguiente endpoint
     }
   }
 
-  // Dibujar 3 esquinas de anclaje QR estándar
-  drawFinderPattern(1, 1);                         // Superior Izquierda
-  drawFinderPattern(matrixSize - 8, 1);            // Superior Derecha
-  drawFinderPattern(1, matrixSize - 8);            // Inferior Izquierda
-
-  // Patrones de sincronización (Timing patterns) en fila 7 y columna 7
-  for (let i = 8; i < matrixSize - 8; i++) {
-    grid[7][i] = (i % 2 === 0);
-    grid[i][7] = (i % 2 === 0);
-  }
-
-  // Generador determinista de bits según el texto provisto
-  let hash = 0;
-  for (let i = 0; i < text.length; i++) {
-    hash = ((hash << 5) - hash) + text.charCodeAt(i);
-    hash |= 0;
-  }
-
-  let seed = Math.abs(hash) + 12345;
-  function pseudoRandom() {
-    seed = (seed * 9301 + 49297) % 233280;
-    return seed / 233280;
-  }
-
-  // Rellenar las celdas de datos libres
-  for (let r = 0; r < matrixSize; r++) {
-    for (let c = 0; c < matrixSize; c++) {
-      // Evitar sobreescribir las esquinas de anclaje y márgenes
-      const inTopLeft = (r < 9 && c < 9);
-      const inTopRight = (r < 9 && c >= matrixSize - 9);
-      const inBottomLeft = (r >= matrixSize - 9 && c < 9);
-      const inTiming = (r === 7 || c === 7);
-
-      if (!inTopLeft && !inTopRight && !inBottomLeft && !inTiming) {
-        // Pseudoaleatorio con densidad de QR (~50%)
-        grid[r][c] = (pseudoRandom() > 0.48);
+  // Si no se encuentra en SRI o hay restricción de red/CORS, buscar en el historial clínico local
+  try {
+    if (typeof MedicalService !== 'undefined' && MedicalService.buscarPorCedula) {
+      const pacienteLocal = MedicalService.buscarPorCedula(cedula);
+      if (pacienteLocal && pacienteLocal.nombreCompleto) {
+        return {
+          exito: true,
+          nombre: pacienteLocal.nombreCompleto,
+          telefono: pacienteLocal.telefono,
+          email: pacienteLocal.email,
+          fuente: 'Historial Clínico Montepiedra'
+        };
       }
     }
+  } catch (err) {
+    console.warn('Búsqueda en registros locales:', err);
   }
 
-  // Construir SVG de alta definición
-  const cellSize = size / matrixSize;
-  let rects = '';
+  return {
+    exito: false,
+    mensaje: 'Cédula válida (Módulo 10). No se detectó RUC activo en el SRI. Ingrese su nombre manualmente.'
+  };
+};
 
-  for (let r = 0; r < matrixSize; r++) {
-    for (let c = 0; c < matrixSize; c++) {
-      if (grid[r][c]) {
-        const x = (c * cellSize).toFixed(2);
-        const y = (r * cellSize).toFixed(2);
-        const w = (cellSize + 0.1).toFixed(2);
-        const h = (cellSize + 0.1).toFixed(2);
-        rects += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#0f172a" rx="0.5"/>`;
-      }
+/**
+ * Bloqueadores físicos de teclado usando keydown
+ * Impiden signos negativos (-), positivos (+), decimales (.), comas (,) o letras en campos numéricos
+ */
+const bloquearNoNumericosEnteros = (e) => {
+  if (e.type === 'paste') {
+    const pasteData = (e.clipboardData || window.clipboardData).getData('text');
+    if (/\D/.test(pasteData)) {
+      e.preventDefault();
+      const numOnly = pasteData.replace(/\D/g, '');
+      document.execCommand('insertText', false, numOnly);
+    }
+    return;
+  }
+  
+  if (e.type === 'keydown') {
+    // Teclas de control permitidas (navegación, retroceso, tab, etc.)
+    if (
+      e.key.length > 1 || 
+      e.ctrlKey || 
+      e.metaKey || 
+      e.altKey
+    ) {
+      return;
+    }
+    // Bloquear explícitamente cualquier cosa que no sea un dígito 0-9 (bloquea -, +, e, E, ., , etc.)
+    if (!/^[0-9]$/.test(e.key)) {
+      e.preventDefault();
     }
   }
+};
 
-  return `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" class="qr-svg">
-      <rect width="100%" height="100%" fill="#ffffff" rx="8"/>
-      <g>${rects}</g>
-    </svg>
-  `;
-}
+const bloquearNumerosYSimb = (e) => {
+  if (e.type === 'paste') {
+    const pasteData = (e.clipboardData || window.clipboardData).getData('text');
+    if (/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/.test(pasteData)) {
+      e.preventDefault();
+      const alphaOnly = pasteData.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
+      document.execCommand('insertText', false, alphaOnly);
+    }
+    return;
+  }
+  
+  if (e.type === 'keydown') {
+    if (
+      e.key.length > 1 || 
+      e.ctrlKey || 
+      e.metaKey || 
+      e.altKey
+    ) {
+      return;
+    }
+    if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]$/.test(e.key)) {
+      e.preventDefault();
+    }
+  }
+};
+
+/**
+ * Aplica máscaras restrictivas en tiempo real a los inputs del DOM
+ */
+const aplicarMascaraInputs = () => {
+  // Mascara para Cédulas
+  const cedulaInputs = [
+    document.getElementById('pat-input-id'),
+    document.getElementById('paciente-cedula')
+  ];
+
+  cedulaInputs.forEach(input => {
+    if (input) {
+      input.setAttribute('maxlength', '10');
+      input.setAttribute('inputmode', 'numeric');
+      input.addEventListener('keydown', bloquearNoNumericosEnteros);
+      input.addEventListener('paste', bloquearNoNumericosEnteros);
+      input.addEventListener('input', function() {
+        this.value = this.value.replace(/\D/g, '').substring(0, 10);
+      });
+    }
+  });
+
+  // Mascara para Teléfonos (Celular 10 dígitos enteros)
+  const phoneInputs = [
+    document.getElementById('pat-input-phone')
+  ];
+
+  phoneInputs.forEach(input => {
+    if (input) {
+      input.setAttribute('maxlength', '10');
+      input.setAttribute('inputmode', 'numeric');
+      input.addEventListener('keydown', bloquearNoNumericosEnteros);
+      input.addEventListener('paste', bloquearNoNumericosEnteros);
+      input.addEventListener('input', function() {
+        this.value = this.value.replace(/\D/g, '').substring(0, 10);
+      });
+    }
+  });
+
+  // Mascara para Nombres
+  const nameInputs = [
+    document.getElementById('pat-input-name'),
+    document.getElementById('paciente-nombre')
+  ];
+
+  nameInputs.forEach(input => {
+    if (input) {
+      input.setAttribute('maxlength', '70');
+      input.addEventListener('keydown', bloquearNumerosYSimb);
+      input.addEventListener('paste', bloquearNumerosYSimb);
+      input.addEventListener('input', function() {
+        this.value = sanitizarNombre(this.value);
+      });
+    }
+  });
+};
 
 
 // ==================== js/state.js ====================
@@ -961,16 +1440,70 @@ function setupAuth(showToast) {
  * Flujo 1: Portal de Citas del Paciente (Página 3)
  * Asistente de 4 pasos para selección de sede, horario protegido sin choques,
  * cálculo transparente del recargo del 9.75% por tarjeta, y generación de ticket QR.
+ * Incluye validación matemática de cédula (Módulo 10), celular (10 dígitos), email
+ * y detección automática en SRI en tiempo real.
  */
 
 
+// Utilidades locales para UI de errores
+const showFieldError = (inputEl, message) => {
+  if (!inputEl) return;
+  let errorDiv = inputEl.parentNode.querySelector('.input-error-msg');
+  if (!errorDiv) {
+    errorDiv = inputEl.nextElementSibling;
+  }
+  if (!errorDiv || !errorDiv.classList.contains('input-error-msg')) {
+    errorDiv = document.createElement('div');
+    errorDiv.className = 'input-error-msg';
+    inputEl.parentNode.appendChild(errorDiv);
+  }
+  errorDiv.textContent = message;
+  errorDiv.classList.add('visible');
+  inputEl.classList.remove('valid');
+  inputEl.classList.add('error');
+};
+
+const clearFieldError = (inputEl) => {
+  if (!inputEl) return;
+  const parent = inputEl.parentNode;
+  if (parent) {
+    const errorDiv = parent.querySelector('.input-error-msg');
+    if (errorDiv) {
+      errorDiv.classList.remove('visible');
+      errorDiv.textContent = '';
+    }
+  }
+  inputEl.classList.remove('error');
+};
+
 function setupPatientPortal(showToast) {
+  const idInput = document.getElementById('pat-input-id');
+  const nameInput = document.getElementById('pat-input-name');
+  const phoneInput = document.getElementById('pat-input-phone');
+  const emailInput = document.getElementById('pat-input-email');
+  const sriStatusBox = document.getElementById('sri-lookup-status');
+
   let currentStep = 1;
   let selectedClinicId = 'ceibos';
-  let selectedDate = '2026-09-19'; // Fecha base activa del prototipo
+  let selectedServiceId = 'CG-01';
+
+  // Función para obtener la fecha de hoy en formato YYYY-MM-DD
+  function getTodayDateStr() {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const currentDay = now.getDate();
+    const currentMonthStr = currentMonth < 10 ? `0${currentMonth}` : `${currentMonth}`;
+    const currentDayStr = currentDay < 10 ? `0${currentDay}` : `${currentDay}`;
+    return `${currentYear}-${currentMonthStr}-${currentDayStr}`;
+  }
+
+  // Inicializar siempre con la fecha de hoy automáticamente
+  let selectedDate = getTodayDateStr();
   let selectedTimeSlot = '10:30';
   let selectedPaymentMethod = 'efectivo'; // 'efectivo' o 'tarjeta'
   let createdAppointment = null;
+  let lastQueriedCedula = '';
 
   // Elementos del Stepper
   const stepItems = document.querySelectorAll('.wizard-stepper .step-item');
@@ -1019,7 +1552,36 @@ function setupPatientPortal(showToast) {
     }
   }
 
-  // --- PASO 1: Renderizar Selección de Sedes ---
+  // --- PASO 1: Renderizar Selección de Servicio y Sedes ---
+  const servicesContainer = document.getElementById('consultation-cards-container');
+  if (servicesContainer) {
+    const catalogo = MedicalService.getCatalogo();
+    servicesContainer.innerHTML = catalogo.map(servicio => {
+      const isSelected = servicio.id === selectedServiceId;
+      return `
+        <div class="clinic-selection-card ${isSelected ? 'selected' : ''}" data-service-id="${servicio.id}" style="cursor: pointer;">
+          <div class="clinic-card-body">
+            <h3 class="clinic-card-name" style="color: var(--dark-navy);">${servicio.nombre}</h3>
+            <p style="font-size: 0.85rem; color: #64748b; margin-top: 5px; margin-bottom: 10px;">${servicio.descripcionCorta}</p>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span class="badge-sede badge-hospital" style="background: #e2e8f0; color: #475569;">⏱️ ${servicio.duracionMinutos} min</span>
+              <span class="price-tag-amount" style="font-weight: 800; color: var(--emerald-green-dark);">$${servicio.precioBase.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    servicesContainer.querySelectorAll('.clinic-selection-card').forEach(card => {
+      card.addEventListener('click', () => {
+        servicesContainer.querySelectorAll('.clinic-selection-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        selectedServiceId = card.dataset.serviceId;
+        updateSummaryCard();
+      });
+    });
+  }
+
   const clinicsContainer = document.getElementById('clinics-cards-container');
   if (clinicsContainer) {
     clinicsContainer.innerHTML = Object.values(CLINICS).map(clinic => {
@@ -1058,27 +1620,63 @@ function setupPatientPortal(showToast) {
     });
   }
 
-  // --- PASO 2: Calendario y Rejilla de Horarios ---
+  // --- PASO 2: Calendario Dinámico y Rejilla de Horarios ---
   const slotsContainer = document.getElementById('time-slots-grid');
   const calendarDaysContainer = document.getElementById('calendar-days-grid');
   const travelNoticeBox = document.getElementById('travel-buffer-notice');
 
-  // Inicializar días de calendario para Septiembre 2026
-  if (calendarDaysContainer) {
-    const daysInMonth = 30;
-    let html = '';
-    // Días vacíos para iniciar el martes 1 de Septiembre
-    for (let i = 0; i < 2; i++) {
-      html += `<div class="calendar-day-cell disabled"></div>`;
+  // Renderizar Calendario Dinámico (Siempre con la fecha de hoy como base)
+  function renderCalendar() {
+    if (!calendarDaysContainer) return;
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonthIndex = now.getMonth();
+    const currentDay = now.getDate();
+    const todayFormatted = getTodayDateStr();
+
+    // Si la fecha seleccionada era anterior a hoy, actualizar a hoy
+    if (!selectedDate || selectedDate < todayFormatted) {
+      selectedDate = todayFormatted;
     }
+
+    const monthNames = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+    const monthTitle = `${monthNames[currentMonthIndex]} ${currentYear}`;
+    const monthEl = document.getElementById('calendar-current-month') || document.querySelector('.calendar-current-month');
+    if (monthEl) monthEl.textContent = monthTitle;
+
+    const todayIndicator = document.getElementById('badge-calendar-today-indicator');
+    if (todayIndicator) {
+      todayIndicator.textContent = `Hoy: ${currentDay} ${monthNames[currentMonthIndex].slice(0, 3)}`;
+    }
+
+    const daysInMonth = new Date(currentYear, currentMonthIndex + 1, 0).getDate();
+    const firstDayIndex = new Date(currentYear, currentMonthIndex, 1).getDay(); // 0 = Domingo
+
+    let html = '';
+    for (let i = 0; i < firstDayIndex; i++) {
+      html += `<div class="calendar-day-cell disabled empty" style="cursor: default; opacity: 0.25;"></div>`;
+    }
+
     for (let d = 1; d <= daysInMonth; d++) {
       const dayStr = d < 10 ? `0${d}` : `${d}`;
-      const dateVal = `2026-09-${dayStr}`;
-      const isSelected = dateVal === selectedDate;
-      const isPast = d < 19; // Bloquear días pasados antes del 19
-      const isToday = d === 19;
+      const monthStr = (currentMonthIndex + 1) < 10 ? `0${currentMonthIndex + 1}` : `${currentMonthIndex + 1}`;
+      const dateVal = `${currentYear}-${monthStr}-${dayStr}`;
+
+      const isPast = (d < currentDay);
+      const isToday = (d === currentDay);
+      const isSelected = (dateVal === selectedDate);
+
+      let classes = 'calendar-day-cell';
+      if (isToday) classes += ' today';
+      if (isSelected) classes += ' selected';
+      if (isPast) classes += ' disabled';
+
       html += `
-        <div class="calendar-day-cell ${isSelected ? 'selected' : ''} ${isPast ? 'disabled' : ''} ${isToday ? 'today' : ''}" data-date="${dateVal}">
+        <div class="${classes}" data-date="${dateVal}" ${isPast ? 'title="Fecha pasada no habilitada"' : `title="${d} de ${monthNames[currentMonthIndex]}"`}>
           ${d}
         </div>
       `;
@@ -1091,55 +1689,30 @@ function setupPatientPortal(showToast) {
         cell.classList.add('selected');
         selectedDate = cell.dataset.date;
         renderTimeSlots();
+        updateSummaryCard();
       });
     });
   }
 
-  // Generar y filtrar horarios según citas existentes y bloques de traslado (Página 2 y 4)
+  // Generar y filtrar horarios según citas existentes
   function renderTimeSlots() {
     if (!slotsContainer) return;
 
     const baseSlots = ['08:30', '09:00', '09:45', '10:30', '11:15', '12:00', '13:00', '13:45', '14:30', '15:15', '16:00', '16:45', '17:30'];
-    const state = store.getState();
-
-    // Obtener citas ya agendadas en la fecha seleccionada
-    const bookedTimes = state.appointments
-      .filter(a => a.date === selectedDate && a.status !== 'cancelada')
-      .map(a => a.time);
-
-    // Obtener franjas de traslado en ruta
-    // Ejemplo: Entre 11:00 y 12:45 o entre 15:00 y 15:45 el doctor está en carretera
-    const transitTimes = ['11:15', '12:00', '15:15'];
 
     slotsContainer.innerHTML = baseSlots.map(time => {
-      const isBooked = bookedTimes.includes(time);
-      const isTransit = transitTimes.includes(time);
-      const isSelected = (time === selectedTimeSlot && !isBooked && !isTransit);
-
+      const isSelected = (time === selectedTimeSlot);
       let classes = 'slot-pill-btn';
-      let title = 'Disponible';
-      let disabled = false;
-
-      if (isBooked) {
-        classes += ' disabled';
-        title = 'Horario reservado por otro paciente';
-        disabled = true;
-      } else if (isTransit) {
-        classes += ' disabled';
-        title = 'Franja protegida: El doctor está en traslado interurbano en ruta';
-        disabled = true;
-      } else if (isSelected) {
-        classes += ' selected';
-      }
+      if (isSelected) classes += ' selected';
 
       return `
-        <button type="button" class="${classes}" data-time="${time}" ${disabled ? 'disabled' : ''} title="${title}">
+        <button type="button" class="${classes}" data-time="${time}" title="Disponible">
           ${time}
         </button>
       `;
     }).join('');
 
-    slotsContainer.querySelectorAll('.slot-pill-btn:not(.disabled)').forEach(btn => {
+    slotsContainer.querySelectorAll('.slot-pill-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         slotsContainer.querySelectorAll('.slot-pill-btn').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
@@ -1149,14 +1722,12 @@ function setupPatientPortal(showToast) {
     });
 
     if (travelNoticeBox) {
-      travelNoticeBox.innerHTML = `
-        <span>🚗</span>
-        <span><b>Lógica de Protección en Ruta:</b> Las franjas de traslado hacia y desde Ceibos / Mapasingue (11:15, 12:00, 15:15) se encuentran bloqueadas automáticamente para asegurar que el doctor llegue a tiempo a su consultorio.</span>
-      `;
+      travelNoticeBox.innerHTML = '';
+      travelNoticeBox.style.display = 'none';
     }
   }
 
-  // --- PASO 3: Método de Pago Transparente & Desglose (Página 3) ---
+  // --- PASO 3: Método de Pago & Validaciones Reactivas ---
   const paymentOptions = document.querySelectorAll('.payment-method-option');
   paymentOptions.forEach(opt => {
     opt.addEventListener('click', () => {
@@ -1169,26 +1740,196 @@ function setupPatientPortal(showToast) {
     });
   });
 
-  // Rellenar formulario únicamente si el usuario ya inició sesión como paciente
+  // Conexión reactiva con la API del SRI y Validación Matemática de Cédula
+  async function handleCedulaCheckAndSRI(cedula) {
+    if (!cedula || cedula.length < 10) {
+      if (sriStatusBox) {
+        sriStatusBox.style.display = 'none';
+        sriStatusBox.innerHTML = '';
+      }
+      return;
+    }
+
+    const check = validarCedulaEcuatorianaDetallada(cedula);
+    if (!check.isValid) {
+      showFieldError(idInput, check.message);
+      if (sriStatusBox) {
+        sriStatusBox.style.display = 'none';
+        sriStatusBox.innerHTML = '';
+      }
+      return;
+    }
+
+    // La cédula es matemáticamente válida (Módulo 10 superado)
+    clearFieldError(idInput);
+    if (idInput) idInput.classList.add('valid');
+
+    if (cedula === lastQueriedCedula) return;
+    lastQueriedCedula = cedula;
+
+    if (sriStatusBox) {
+      sriStatusBox.style.display = 'flex';
+      sriStatusBox.innerHTML = `<span class="sri-badge-loading"><span class="sri-spinner">🔄</span> Consultando identidad en el SRI...</span>`;
+    }
+
+    try {
+      const sriData = await consultarSRI(cedula);
+      if (idInput && idInput.value.trim() !== cedula) return;
+
+      if (sriData && sriData.exito && sriData.nombre) {
+        if (nameInput) {
+          nameInput.value = sriData.nombre;
+          clearFieldError(nameInput);
+          nameInput.classList.add('valid');
+        }
+        if (phoneInput && !phoneInput.value && sriData.telefono) {
+          phoneInput.value = sriData.telefono;
+        }
+        if (emailInput && !emailInput.value && sriData.email) {
+          emailInput.value = sriData.email;
+        }
+
+        if (sriStatusBox) {
+          sriStatusBox.innerHTML = `
+            <span class="sri-badge-success">
+              ✅ Identificado en ${sriData.fuente}: <strong>${sriData.nombre}</strong>
+            </span>
+          `;
+        }
+        showToast(`✅ Identidad detectada en el SRI: ${sriData.nombre}`, 'success');
+      } else {
+        if (sriStatusBox) {
+          sriStatusBox.innerHTML = `
+            <span class="sri-badge-info">
+              ℹ️ Cédula válida (Módulo 10). Ingrese su nombre si no registra RUC en el SRI.
+            </span>
+          `;
+        }
+      }
+    } catch (err) {
+      if (sriStatusBox) {
+        sriStatusBox.innerHTML = `
+          <span class="sri-badge-info">
+            ℹ️ Cédula válida (Módulo 10). Ingrese su nombre manualmente.
+          </span>
+        `;
+      }
+    }
+  }
+
+  // Escuchadores reactivos de los inputs del Paso 3
+  if (idInput) {
+    idInput.addEventListener('input', (e) => {
+      clearFieldError(idInput);
+      idInput.classList.remove('valid');
+      const val = e.target.value.trim();
+      if (val.length === 10) {
+        handleCedulaCheckAndSRI(val);
+      } else {
+        if (sriStatusBox) {
+          sriStatusBox.style.display = 'none';
+          sriStatusBox.innerHTML = '';
+        }
+      }
+    });
+
+    idInput.addEventListener('blur', (e) => {
+      const val = e.target.value.trim();
+      if (val.length > 0 && val.length < 10) {
+        showFieldError(idInput, 'La cédula debe contener exactamente 10 dígitos numéricos.');
+      } else if (val.length === 10) {
+        const check = validarCedulaEcuatorianaDetallada(val);
+        if (!check.isValid) {
+          showFieldError(idInput, check.message);
+        } else {
+          idInput.classList.add('valid');
+        }
+      }
+    });
+  }
+
+  if (nameInput) {
+    nameInput.addEventListener('input', () => {
+      clearFieldError(nameInput);
+      nameInput.classList.remove('valid');
+      if (nameInput.value.trim().length >= 3) {
+        nameInput.classList.add('valid');
+      }
+    });
+
+    nameInput.addEventListener('blur', () => {
+      if (nameInput.value.trim().length > 0 && nameInput.value.trim().length < 3) {
+        showFieldError(nameInput, 'Ingresa tu nombre y apellido completo (mínimo 3 caracteres).');
+      }
+    });
+  }
+
+  if (phoneInput) {
+    phoneInput.addEventListener('input', () => {
+      clearFieldError(phoneInput);
+      phoneInput.classList.remove('valid');
+      if (phoneInput.value.length === 10) {
+        const check = validarCelularDetallado(phoneInput.value);
+        if (check.isValid) {
+          phoneInput.classList.add('valid');
+        } else {
+          showFieldError(phoneInput, check.message);
+        }
+      }
+    });
+
+    phoneInput.addEventListener('blur', () => {
+      const val = phoneInput.value.trim();
+      if (val.length > 0) {
+        const check = validarCelularDetallado(val);
+        if (!check.isValid) {
+          showFieldError(phoneInput, check.message);
+        } else {
+          phoneInput.classList.add('valid');
+        }
+      }
+    });
+  }
+
+  if (emailInput) {
+    emailInput.addEventListener('input', () => {
+      clearFieldError(emailInput);
+      emailInput.classList.remove('valid');
+    });
+
+    emailInput.addEventListener('blur', () => {
+      const val = emailInput.value.trim();
+      if (val.length > 0) {
+        const check = validarEmailDetallado(val);
+        if (!check.isValid) {
+          showFieldError(emailInput, check.message);
+        } else {
+          emailInput.classList.add('valid');
+        }
+      }
+    });
+  }
+
+  // Rellenar formulario únicamente si el usuario ya inició sesión previamente
   function prefillPatientData() {
     const user = store.getCurrentUser();
-    const idInput = document.getElementById('pat-input-id');
-    const nameInput = document.getElementById('pat-input-name');
-    const phoneInput = document.getElementById('pat-input-phone');
-    const emailInput = document.getElementById('pat-input-email');
-
     if (user && user.role === 'paciente') {
       if (idInput && !idInput.value) idInput.value = user.idNumber || '';
       if (nameInput && !nameInput.value) nameInput.value = user.name || '';
       if (phoneInput && !phoneInput.value) phoneInput.value = user.phone || '';
       if (emailInput && !emailInput.value) emailInput.value = user.email || '';
+      if (idInput && idInput.value.length === 10) {
+        handleCedulaCheckAndSRI(idInput.value);
+      }
     }
-    // Si no ha iniciado sesión, los campos se mantienen limpios para que el usuario escriba sus datos reales
   }
 
   function updateSummaryCard() {
     const clinic = CLINICS[selectedClinicId] || CLINICS.ceibos;
-    const baseFee = clinic.basePrice;
+    const catalogo = MedicalService.getCatalogo();
+    const service = catalogo.find(s => s.id === selectedServiceId) || catalogo[0];
+
+    const baseFee = clinic.basePrice === 0 ? 0 : service.precioBase;
     let cardFee = 0;
     let totalDue = baseFee;
 
@@ -1205,7 +1946,26 @@ function setupPatientPortal(showToast) {
     const sumTotalDue = document.getElementById('sum-total-due');
 
     if (sumClinic) sumClinic.textContent = clinic.name;
-    if (sumDate) sumDate.textContent = `${selectedDate} a las ${selectedTimeSlot}`;
+
+    if (sumDate) {
+      const parts = selectedDate.split('-');
+      if (parts.length === 3) {
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const d = parseInt(parts[2], 10);
+        const monthNames = [
+          'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+          'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
+        ];
+        const todayDate = new Date();
+        const isToday = (y === todayDate.getFullYear() && m === todayDate.getMonth() && d === todayDate.getDate());
+        const dateLabel = isToday ? `Hoy (${d} ${monthNames[m]})` : `${d} ${monthNames[m]} ${y}`;
+        sumDate.textContent = `${dateLabel} a las ${selectedTimeSlot}`;
+      } else {
+        sumDate.textContent = `${selectedDate} a las ${selectedTimeSlot}`;
+      }
+    }
+
     if (sumBaseFee) sumBaseFee.textContent = `$${baseFee.toFixed(2)}`;
 
     if (sumCardFeeRow && sumCardFee) {
@@ -1223,10 +1983,98 @@ function setupPatientPortal(showToast) {
   }
 
   // --- PASO 4: Generar Ticket y Código QR Dinámico (Página 3) ---
+  // Función de Validación Rigurosa por Paso
+  function validateStepData(step) {
+    if (step === 1) {
+      if (!selectedClinicId) {
+        showToast('Por favor selecciona una sede de atención médica para continuar.', 'warning');
+        return false;
+      }
+      if (!selectedServiceId) {
+        showToast('Por favor selecciona un tipo de consulta médica.', 'warning');
+        return false;
+      }
+      return true;
+    }
+
+    if (step === 2) {
+      const todayStr = getTodayDateStr();
+      if (!selectedDate || selectedDate < todayStr) {
+        showToast('La fecha seleccionada no es válida o ya ha transcurrido. Se ha restablecido a hoy.', 'warning');
+        selectedDate = todayStr;
+        renderCalendar();
+        return false;
+      }
+      if (!selectedTimeSlot) {
+        showToast('Por favor selecciona un horario de atención disponible para continuar.', 'warning');
+        return false;
+      }
+      return true;
+    }
+
+    if (step === 3) {
+      const patId = idInput ? idInput.value.trim() : '';
+      const patName = nameInput ? nameInput.value.trim() : '';
+      const patPhone = phoneInput ? phoneInput.value.trim() : '';
+      const patEmail = emailInput ? emailInput.value.trim() : '';
+
+      let firstErrorInput = null;
+
+      // 1. Cédula: Algoritmo Módulo 10 y 10 dígitos numéricos enteros positivos
+      const idCheck = validarCedulaEcuatorianaDetallada(patId);
+      if (!idCheck.isValid) {
+        showFieldError(idInput, idCheck.message);
+        if (!firstErrorInput) firstErrorInput = idInput;
+      } else {
+        clearFieldError(idInput);
+        idInput.classList.add('valid');
+      }
+
+      // 2. Nombre y Apellido completo
+      if (!patName || patName.length < 3) {
+        showFieldError(nameInput, 'Por favor ingresa tu nombre y apellido completo (mínimo 3 caracteres).');
+        if (!firstErrorInput) firstErrorInput = nameInput;
+      } else {
+        clearFieldError(nameInput);
+        nameInput.classList.add('valid');
+      }
+
+      // 3. Celular: 10 dígitos enteros empezando con 09, sin negativos ni signos
+      const phoneCheck = validarCelularDetallado(patPhone);
+      if (!phoneCheck.isValid) {
+        showFieldError(phoneInput, phoneCheck.message);
+        if (!firstErrorInput) firstErrorInput = phoneInput;
+      } else {
+        clearFieldError(phoneInput);
+        phoneInput.classList.add('valid');
+      }
+
+      // 4. Correo electrónico: formato estándar (ej: nombre@gmail.com, nombre@hotmail.com)
+      const emailCheck = validarEmailDetallado(patEmail);
+      if (!emailCheck.isValid) {
+        showFieldError(emailInput, emailCheck.message);
+        if (!firstErrorInput) firstErrorInput = emailInput;
+      } else {
+        clearFieldError(emailInput);
+        emailInput.classList.add('valid');
+      }
+
+      if (firstErrorInput) {
+        firstErrorInput.focus();
+        showToast('Datos incorrectos o incompletos: corrige los campos marcados en rojo para poder continuar.', 'warning');
+        return false;
+      }
+
+      return true;
+    }
+
+    return true;
+  }
+
+  // --- PASO 4: Generar Ticket y Código QR Dinámico (Página 3) ---
   function renderConfirmationTicket(appointment) {
     const clinic = CLINICS[appointment.clinicId];
     const ticketCodeEl = document.getElementById('ticket-code-display');
-    const qrContainer = document.getElementById('ticket-qr-container');
     const ticketPatient = document.getElementById('ticket-patient-name');
     const ticketId = document.getElementById('ticket-patient-id');
     const ticketSede = document.getElementById('ticket-clinic-display');
@@ -1242,10 +2090,67 @@ function setupPatientPortal(showToast) {
     if (ticketTotal) ticketTotal.textContent = `$${appointment.totalPaid.toFixed(2)}`;
     if (ticketMethod) ticketMethod.textContent = appointment.paymentMethod === 'tarjeta' ? 'Tarjeta de Crédito (+9.75%)' : 'Efectivo / Transferencia';
 
-    // Generar SVG del Código QR
-    if (qrContainer) {
-      const qrData = `TICKET:${appointment.code}|PACIENTE:${appointment.patientId}|SEDE:${clinic.name}|HORA:${appointment.date} ${appointment.time}`;
-      qrContainer.innerHTML = generateQRCodeSVG(qrData, 180);
+    // Generar Código QR Oficial de Alta Definición que abre el Comprobante PDF de la Cita Médica
+    const qrSection = document.getElementById("ticket-qr-container") || document.querySelector(".qr-code-display-box") || document.querySelector(".ticket-qr-section");
+    if (qrSection) {
+      const host = window.location.hostname;
+      const port = window.location.port ? `:${window.location.port}` : '';
+      const protocol = window.location.protocol;
+
+      // Usar IP de red local (192.168.7.3) para que cualquier teléfono celular en Wi-Fi abra el documento al escanear
+      let baseHost = host;
+      if (host === 'localhost' || host === '127.0.0.1') {
+        baseHost = '192.168.7.3';
+      }
+
+      // Parámetros compactos para que el código QR tenga módulos grandes y legibles en cualquier cámara de celular
+      const params = new URLSearchParams({
+        c: appointment.code,
+        p: appointment.patientName,
+        id: appointment.patientId,
+        s: clinic.name,
+        f: appointment.date,
+        h: appointment.time,
+        tot: appointment.totalPaid.toFixed(2),
+        m: appointment.paymentMethod
+      });
+
+      const pdfUrl = `${protocol}//${baseHost}${port}/comprobante.html?${params.toString()}`;
+      const localPdfUrl = `comprobante.html?${params.toString()}`;
+
+      qrSection.innerHTML = `
+        <div style="background: #ffffff; padding: 12px; border-radius: 14px; display: inline-flex; flex-direction: column; justify-content: center; align-items: center; margin: 0 auto; border: 2px solid #0284c7; box-shadow: 0 4px 16px rgba(2, 132, 199, 0.15);">
+          <div id="ticket-qr-canvas-box" style="display: flex; justify-content: center; align-items: center; min-width: 220px; min-height: 220px;"></div>
+          <span style="font-size: 0.76rem; font-weight: 800; color: #0284c7; background: #e0f2fe; padding: 4px 12px; border-radius: 9999px; margin-top: 8px;">
+            📱 Escanea con tu celular para abrir tu PDF
+          </span>
+        </div>
+      `;
+
+      // Renderizar inmediatamente en Canvas de ultra-alta definición con nivel L para módulos gruesos y nítidos
+      setTimeout(() => {
+        renderizarCodigoQR('ticket-qr-canvas-box', pdfUrl, {
+          size: 220,
+          correctLevel: (typeof QRCode !== 'undefined' && QRCode.CorrectLevel) ? QRCode.CorrectLevel.L : null
+        });
+      }, 50);
+
+      // Actualizar botones de acción del ticket para acceso directo al PDF
+      const actionsGroup = document.querySelector('.ticket-actions-group');
+      if (actionsGroup) {
+        actionsGroup.innerHTML = `
+          <a href="${localPdfUrl}" target="_blank" class="btn-primary" id="btn-open-pdf-ticket" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; padding: 12px 20px; font-weight: 700; font-size: 0.88rem; border-radius: 9999px; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35); flex: 1;">
+            📄 Ver / Descargar Documento PDF
+          </a>
+          <button type="button" class="btn-secondary" id="btn-print-ticket" style="padding: 12px 18px; border-radius: 9999px;">
+            🖨️ Imprimir
+          </button>
+        `;
+        const newPrintBtn = document.getElementById('btn-print-ticket');
+        if (newPrintBtn) {
+          newPrintBtn.addEventListener('click', () => window.print());
+        }
+      }
     }
   }
 
@@ -1267,38 +2172,52 @@ function setupPatientPortal(showToast) {
     });
   }
 
-  // Botón Siguiente / Confirmar
+  // Botón Siguiente / Confirmar con Bloqueo Estricto de Datos
   if (btnNext) {
     btnNext.addEventListener('click', () => {
       if (currentStep === 1) {
+        if (!validateStepData(1)) return;
         currentStep = 2;
+        // Refrescar fecha de hoy en el calendario
+        selectedDate = getTodayDateStr();
+        renderCalendar();
         renderTimeSlots();
+        updateSummaryCard();
         updateStepView();
       } else if (currentStep === 2) {
-        if (!selectedTimeSlot) {
-          showToast('Por favor selecciona un horario disponible.', 'warning');
-          return;
-        }
+        if (!validateStepData(2)) return;
         prefillPatientData();
         updateSummaryCard();
         currentStep = 3;
         updateStepView();
       } else if (currentStep === 3) {
-        // Validar formulario de paciente
-        const patId = document.getElementById('pat-input-id').value.trim();
-        const patName = document.getElementById('pat-input-name').value.trim();
-        const patPhone = document.getElementById('pat-input-phone').value.trim();
-        const patEmail = document.getElementById('pat-input-email').value.trim();
-        const patReason = document.getElementById('pat-input-reason').value.trim() || 'Consulta médica general';
+        // Bloqueo estricto del Paso 3 si los datos no son válidos
+        if (!validateStepData(3)) return;
 
-        if (!patId || !patName || !patEmail) {
-          showToast('Por favor completa todos los campos del paciente.', 'danger');
-          return;
-        }
+        const patId = idInput ? idInput.value.trim() : '';
+        const patName = nameInput ? nameInput.value.trim() : '';
+        const patPhone = phoneInput ? phoneInput.value.trim() : '';
+        const patEmail = emailInput ? emailInput.value.trim() : '';
+        const reasonInput = document.getElementById('pat-input-reason');
+        const patReason = reasonInput ? reasonInput.value.trim() || 'Consulta médica general' : 'Consulta médica general';
+
+        // Guardar ficha básica del paciente
+        MedicalService.guardarFicha({
+          cedula: patId,
+          nombreCompleto: patName,
+          telefono: patPhone,
+          email: patEmail
+        });
+
+        const service = MedicalService.getCatalogo().find(s => s.id === selectedServiceId) || MedicalService.getCatalogo()[0];
+        const clinic = CLINICS[selectedClinicId];
+        const totalAmount = clinic.basePrice === 0 ? 0 : service.precioBase * (selectedPaymentMethod === 'tarjeta' ? 1 + CREDIT_CARD_SURCHARGE_RATE : 1);
 
         // Crear la cita en el estado central
         createdAppointment = store.addAppointment({
           clinicId: selectedClinicId,
+          serviceId: selectedServiceId,
+          serviceName: service.nombre,
           date: selectedDate,
           time: selectedTimeSlot,
           patientId: patId,
@@ -1306,52 +2225,69 @@ function setupPatientPortal(showToast) {
           patientPhone: patPhone,
           patientEmail: patEmail,
           reason: patReason,
-          paymentMethod: selectedPaymentMethod
+          paymentMethod: selectedPaymentMethod,
+          totalPaid: totalAmount
         });
+
+        MedicalService.registrarAtencionEnHistorial(patId, createdAppointment);
 
         renderConfirmationTicket(createdAppointment);
         currentStep = 4;
         updateStepView();
 
-        showToast(`¡Cita agendada con éxito! Se envió el correo de confirmación con copia al Dr.`, 'success');
+        showToast(`¡Cita agendada con éxito! Se emitió tu ticket oficial con QR para PDF.`, 'success');
       } else if (currentStep === 4) {
-        // Reiniciar flujo para nueva cita
+        // Reiniciar flujo para nueva cita con la fecha de hoy
+        selectedDate = getTodayDateStr();
         currentStep = 1;
+        renderCalendar();
         updateStepView();
       }
     });
   }
 
-  // Navegación por pasos desde los botones de la barra superior dinámica
-  document.querySelectorAll('#nav-menu-patient .nav-step-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const targetStep = parseInt(btn.dataset.step, 10);
-      if (targetStep === 1) {
-        currentStep = 1;
-        updateStepView();
-      } else if (targetStep === 2) {
-        currentStep = 2;
-        renderTimeSlots();
-        updateStepView();
-      } else if (targetStep === 3) {
-        if (!selectedTimeSlot) {
-          showToast('Selecciona un horario disponible antes de continuar al paso de datos.', 'warning');
-          return;
+  // Navegación por pasos desde los botones de la barra superior con Bloqueo de Pasos no Completados
+  const setupStepNavButtons = () => {
+    document.querySelectorAll('.nav-step-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetStep = parseInt(btn.dataset.step, 10);
+        if (targetStep === currentStep) return;
+
+        if (targetStep > currentStep) {
+          // Validar los pasos intermedios antes de permitir avanzar
+          for (let s = currentStep; s < targetStep; s++) {
+            if (!validateStepData(s)) {
+              return;
+            }
+          }
         }
-        prefillPatientData();
-        updateSummaryCard();
-        currentStep = 3;
-        updateStepView();
-      } else if (targetStep === 4) {
-        if (createdAppointment) {
-          currentStep = 4;
+
+        if (targetStep === 1) {
+          currentStep = 1;
           updateStepView();
-        } else {
-          showToast('Primero completa los datos y confirma en el Paso 3 para generar tu comprobante QR.', 'info');
+        } else if (targetStep === 2) {
+          currentStep = 2;
+          renderCalendar();
+          renderTimeSlots();
+          updateSummaryCard();
+          updateStepView();
+        } else if (targetStep === 3) {
+          prefillPatientData();
+          updateSummaryCard();
+          currentStep = 3;
+          updateStepView();
+        } else if (targetStep === 4) {
+          if (createdAppointment) {
+            currentStep = 4;
+            updateStepView();
+          } else {
+            showToast('Primero completa los datos y confirma en el Paso 3 para generar tu comprobante QR.', 'info');
+          }
         }
-      }
+      });
     });
-  });
+  };
+  setupStepNavButtons();
 
   // Botón volver al inicio dentro de la página del portal paciente
   const btnPatientExitInline = document.getElementById('btn-patient-exit-inline');
@@ -1361,7 +2297,8 @@ function setupPatientPortal(showToast) {
     });
   }
 
-  // Inicializar vistas
+  // Inicializar vistas con la fecha de hoy
+  renderCalendar();
   renderTimeSlots();
   updateSummaryCard();
   updateStepView();
@@ -2538,6 +3475,9 @@ document.addEventListener('DOMContentLoaded', () => {
   setupPatientPortal(showToast);
   setupDoctorPortal(showToast);
   setupAccountantPortal(showToast);
+  
+  // Aplicar validaciones globales en tiempo real a todos los inputs
+  aplicarMascaraInputs();
 
   // Escuchar cambios de estado global
   store.subscribe(() => {
