@@ -605,7 +605,11 @@
       
       const parsedTotal = parseFloat(total);
       document.getElementById('doc-total-amount').textContent = `$${isNaN(parsedTotal) ? '20.00' : parsedTotal.toFixed(2)}`;
-      document.getElementById('doc-payment-method').textContent = paymentMethod === 'tarjeta' ? 'Tarjeta de Crédito (+9.75% recargo bancario)' : 'Efectivo o Transferencia Directa en Caja';
+      
+      const isCard = paymentMethod === 'tarjeta';
+      document.getElementById('doc-payment-method').innerHTML = isCard
+        ? 'Tarjeta de Crédito / Débito <span style="font-size:0.75rem; color:#475569; font-weight:normal;">(100% Precio de Lista Oficial)</span>'
+        : 'Efectivo o Transferencia Directa <span style="font-size:0.75rem; color:#15803d; font-weight:normal;">(Incluye Descuento especial por pago directo del 9.75%)</span>';
 
       const now = new Date();
       document.getElementById('doc-issued-date').textContent = 'Emitido: ' + now.toLocaleDateString('es-EC', { day: 'numeric', month: 'long', year: 'numeric' });

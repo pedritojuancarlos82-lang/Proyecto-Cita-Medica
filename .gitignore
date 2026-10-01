@@ -3,6 +3,16 @@
 .system_generated/
 scratch/
 
+# Environment & Secrets
+.env
+.env.*
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
 # OS and Editor files
 .DS_Store
 Thumbs.db

@@ -6,6 +6,7 @@
  */
 
 import { DEMO_USERS, store } from './state.js';
+import { SUPABASE_CONFIG } from './supabase-config.js';
 import { setupAuth } from './auth.js';
 import { setupPatientPortal } from './patient.js';
 import { setupDoctorPortal } from './doctor.js';
@@ -44,6 +45,8 @@ export function showToast(message, type = 'info') {
     setTimeout(() => toast.remove(), 400);
   }, 4000);
 }
+
+
 
 // Inicialización de la Aplicación
 document.addEventListener('DOMContentLoaded', () => {

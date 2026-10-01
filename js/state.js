@@ -13,7 +13,9 @@ export const CLINICS = {
     type: 'Consultorio Privado',
     consultorio: 'Consultorio 2',
     address: 'Av. del Bombero, Edificio Ceibos Plaza, Piso 3',
-    basePrice: 20.00,
+    realCost: 20.00,
+    listPrice: 21.95, // 9.75% sobre costo real
+    basePrice: 21.95, // Precio oficial estándar de lista
     retentionRate: 0.25, // 25% retención clínica
     color: '#6366f1', // Índigo Ceibos
     badgeClass: 'badge-ceibos',
@@ -25,7 +27,9 @@ export const CLINICS = {
     type: 'Consultorio Privado',
     consultorio: 'Consultorio 1A',
     address: 'Av. Primera y Calle 3ra, Mapasingue Oeste',
-    basePrice: 20.00,
+    realCost: 20.00,
+    listPrice: 21.95, // 9.75% sobre costo real
+    basePrice: 21.95, // Precio oficial estándar de lista
     retentionRate: 0.05, // 5% retención clínica
     color: '#0284c7', // Azul Clínico Principal
     badgeClass: 'badge-mapasingue',
@@ -37,7 +41,9 @@ export const CLINICS = {
     type: 'Atención Comunitaria / Tarifa Reducida',
     consultorio: 'Consultorio 4',
     address: 'Av. Rodolfo Baquerizo Nazur, Alborada Etapa 8',
-    basePrice: 10.00,
+    realCost: 10.00,
+    listPrice: 10.98, // 9.75% sobre costo real
+    basePrice: 10.98, // Precio oficial estándar de lista
     retentionRate: 0.10, // 10% retención clínica
     color: '#10b981', // Verde Éxito / Alborada
     badgeClass: 'badge-alborada',
@@ -49,6 +55,8 @@ export const CLINICS = {
     type: 'Servicio Público de Salud',
     consultorio: 'Área de Emergencia y Triaje',
     address: 'Vía a la Costa km 6.5, Hospital General',
+    realCost: 0.00,
+    listPrice: 0.00,
     basePrice: 0.00, // Gratuito
     retentionRate: 0.00,
     color: '#f59e0b', // Naranja Hospital
@@ -382,30 +390,89 @@ const INITIAL_STATE = {
   }
 };
 
+import { SupabaseDB } from './supabase-client.js';
+import { SUPABASE_CONFIG } from './supabase-config.js';
+
 class StateStore {
   constructor() {
-    this.state = this.loadState();
+    // Eliminar base de datos previa en LocalStorage para garantizar migración limpia a Supabase
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem('cita_medica_pacientes');
+      localStorage.removeItem('montepiedra_pacientes');
+    } catch (e) {
+      console.warn('Aviso limpiando localStorage:', e);
+    }
+
+    this.state = JSON.parse(JSON.stringify(INITIAL_STATE));
     this.listeners = [];
+    this.isSupabaseConnected = false;
+    this.realtimeSubscribed = false;
+
+    // Sincronizar inmediatamente con la nueva base de datos en Supabase
+    this.syncWithSupabase();
   }
 
-  loadState() {
+  async syncWithSupabase() {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
+      const [apts, exps, recs, rxs, guard, users, clinics] = await Promise.all([
+        SupabaseDB.getAppointments(),
+        SupabaseDB.getExpenses(),
+        SupabaseDB.getMedicalRecords(),
+        SupabaseDB.getPrescriptions(),
+        SupabaseDB.getEmergencyGuard(),
+        SupabaseDB.getUsers(),
+        SupabaseDB.getClinics()
+      ]);
+
+      let hasChanges = false;
+
+      if (apts && apts.length > 0) {
+        this.state.appointments = apts;
+        hasChanges = true;
       }
-    } catch (e) {
-      console.warn('Error cargando estado desde LocalStorage:', e);
+      if (exps && exps.length > 0) {
+        this.state.expenses = exps;
+        hasChanges = true;
+      }
+      if (recs && recs.length > 0) {
+        this.state.medicalRecords = recs;
+        hasChanges = true;
+      }
+      if (rxs && rxs.length > 0) {
+        this.state.prescriptions = rxs;
+        hasChanges = true;
+      }
+      if (guard) {
+        this.state.emergencyGuard = guard;
+        hasChanges = true;
+      }
+      if (users && Object.keys(users).length > 0) {
+        Object.assign(DEMO_USERS, users);
+      }
+      if (clinics && Object.keys(clinics).length > 0) {
+        Object.assign(CLINICS, clinics);
+      }
+
+      this.isSupabaseConnected = true;
+
+      if (!this.realtimeSubscribed) {
+        this.realtimeSubscribed = true;
+        SupabaseDB.subscribeRealtime(() => {
+          this.syncWithSupabase();
+        });
+      }
+
+      if (hasChanges) {
+        this.notify();
+      }
+    } catch (err) {
+      console.warn('Conexión con Supabase pendiente o sin conexión:', err);
     }
-    return JSON.parse(JSON.stringify(INITIAL_STATE));
   }
 
   saveState() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
-    } catch (e) {
-      console.error('Error guardando estado en LocalStorage:', e);
-    }
+    // La persistencia oficial ahora reside en Supabase.
     this.notify();
   }
 
@@ -473,8 +540,10 @@ class StateStore {
 
     // Calcular montos y retenciones según sede
     const clinic = CLINICS[newApt.clinicId] || CLINICS.ceibos;
-    newApt.basePrice = clinic.basePrice;
-    newApt.retentionRate = clinic.retentionRate;
+    newApt.basePrice = (appointmentData.basePrice !== undefined && appointmentData.basePrice !== null && !isNaN(appointmentData.basePrice))
+      ? Number(appointmentData.basePrice)
+      : clinic.basePrice;
+    newApt.retentionRate = (clinic.retentionRate !== undefined) ? clinic.retentionRate : 0.05;
 
     if (newApt.paymentMethod === 'tarjeta' && newApt.basePrice > 0) {
       newApt.feePercentage = CREDIT_CARD_SURCHARGE_RATE;
@@ -493,8 +562,10 @@ class StateStore {
 
     // Asegurar que exista ficha clínica para el paciente
     let record = this.state.medicalRecords.find(r => r.patientId === newApt.patientId);
+    let isNewRecord = false;
     if (!record) {
-      this.state.medicalRecords.push({
+      isNewRecord = true;
+      record = {
         id: `REC-${Math.floor(100 + Math.random() * 900)}`,
         patientId: newApt.patientId,
         patientName: newApt.patientName,
@@ -511,7 +582,14 @@ class StateStore {
             pa: '120/80 mmHg'
           }
         ]
-      });
+      };
+      this.state.medicalRecords.push(record);
+    }
+
+    // Persistir directamente en Supabase
+    SupabaseDB.insertAppointment(newApt).catch(e => console.error('Error guardando cita en Supabase:', e));
+    if (isNewRecord) {
+      SupabaseDB.upsertMedicalRecord(record).catch(e => console.error('Error guardando ficha en Supabase:', e));
     }
 
     this.saveState();
@@ -522,6 +600,7 @@ class StateStore {
     const apt = this.state.appointments.find(a => a.id === aptId);
     if (apt) {
       apt.status = status;
+      SupabaseDB.updateAppointmentStatus(aptId, status).catch(e => console.error('Error actualizando estado en Supabase:', e));
       this.saveState();
     }
   }
@@ -530,6 +609,7 @@ class StateStore {
     const apt = this.state.appointments.find(a => a.id === aptId);
     if (apt) {
       apt.settlementStatus = apt.settlementStatus === 'Liquidado' ? 'Pendiente' : 'Liquidado';
+      SupabaseDB.updateAppointmentSettlement(aptId, apt.settlementStatus).catch(e => console.error('Error actualizando liquidación en Supabase:', e));
       this.saveState();
     }
   }
@@ -545,6 +625,7 @@ class StateStore {
       ...expenseData
     };
     this.state.expenses.unshift(newExp);
+    SupabaseDB.insertExpense(newExp).catch(e => console.error('Error guardando gasto en Supabase:', e));
     this.saveState();
     return newExp;
   }
@@ -561,6 +642,7 @@ class StateStore {
       ...prescriptionData
     };
     this.state.prescriptions.unshift(newRx);
+    SupabaseDB.insertPrescription(newRx).catch(e => console.error('Error guardando receta en Supabase:', e));
     this.saveState();
     return newRx;
   }
@@ -583,7 +665,10 @@ class StateStore {
     affected.forEach(a => {
       a.status = 'en_guardia';
       a.notes = (a.notes ? a.notes + ' | ' : '') + '🚨 Interrumpida por Guardia Hospitalaria de Emergencia.';
+      SupabaseDB.updateAppointmentStatus(a.id, 'en_guardia').catch(e => console.error(e));
     });
+
+    SupabaseDB.updateEmergencyGuard(this.state.emergencyGuard).catch(e => console.error('Error guardando guardia en Supabase:', e));
 
     this.saveState();
     return affected;
@@ -597,9 +682,11 @@ class StateStore {
       apt.date = '2026-09-21'; // Próximo día hábil
       apt.status = 'confirmada';
       apt.notes += ' [Reagendado automáticamente para el lunes 21]';
+      SupabaseDB.updateAppointmentStatus(aptId, 'confirmada').catch(e => console.error(e));
     } else if (action === 'cancel') {
       apt.status = 'cancelada';
       apt.notes += ' [Cancelado por fuerza mayor de guardia médica]';
+      SupabaseDB.updateAppointmentStatus(aptId, 'cancelada').catch(e => console.error(e));
     }
 
     this.state.emergencyGuard.affectedAppointments = 
@@ -609,11 +696,14 @@ class StateStore {
       this.state.emergencyGuard.isActive = false;
     }
 
+    SupabaseDB.updateEmergencyGuard(this.state.emergencyGuard).catch(e => console.error(e));
+
     this.saveState();
   }
 
   deactivateEmergencyGuard() {
     this.state.emergencyGuard.isActive = false;
+    SupabaseDB.updateEmergencyGuard(this.state.emergencyGuard).catch(e => console.error(e));
     this.saveState();
   }
 

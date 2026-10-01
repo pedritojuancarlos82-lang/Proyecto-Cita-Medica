@@ -245,7 +245,7 @@
                     </p>
                     <div class="featured-clinic-footer">
                       <div class="featured-clinic-price">
-                        $20.00 <small>Consulta General</small>
+                        $21.95 <small>Lista ($20.00 en efectivo/transf.)</small>
                       </div>
                       <button type="button" class="btn-clinic-book btn-book-clinic-direct" data-clinic="ceibos">
                         Reservar Aquí →
@@ -270,7 +270,7 @@
                     </p>
                     <div class="featured-clinic-footer">
                       <div class="featured-clinic-price">
-                        $20.00 <small>Consulta General</small>
+                        $21.95 <small>Lista ($20.00 en efectivo/transf.)</small>
                       </div>
                       <button type="button" class="btn-clinic-book btn-book-clinic-direct" data-clinic="mapasingue">
                         Reservar Aquí →
@@ -295,7 +295,7 @@
                     </p>
                     <div class="featured-clinic-footer">
                       <div class="featured-clinic-price" style="color: var(--emerald-green-dark);">
-                        $10.00 <small>Tarifa Social</small>
+                        $10.98 <small>Lista ($10.00 en efectivo/transf.)</small>
                       </div>
                       <button type="button" class="btn-clinic-book btn-book-clinic-direct" data-clinic="alborada">
                         Reservar Aquí →
@@ -756,8 +756,8 @@
                     <label class="payment-method-option selected" data-method="efectivo">
                       <input type="radio" name="payment_method" value="efectivo" checked />
                       <div class="method-details">
-                        <span class="method-title">💵 Efectivo o Transferencia Bancaria Directa</span>
-                        <span class="method-subtitle">Pago en caja de recepción al llegar. Sin recargo adicional.</span>
+                        <span class="method-title">💵 Efectivo o Transferencia Directa</span>
+                        <span class="method-subtitle" style="color: #15803d; font-weight: 600;">Incluye <strong>Descuento especial por pago directo del 9.75%</strong> sobre el precio de lista.</span>
                       </div>
                     </label>
 
@@ -765,7 +765,7 @@
                       <input type="radio" name="payment_method" value="tarjeta" />
                       <div class="method-details">
                         <span class="method-title">💳 Tarjeta de Crédito / Débito en Recepción</span>
-                        <span class="method-subtitle">Aplica recargo bancario legal del <strong>+9.75%</strong> por procesamiento digital.</span>
+                        <span class="method-subtitle">Cobro del 100% del precio oficial de lista estándar (sin recargo adicional).</span>
                       </div>
                     </label>
                   </div>
@@ -773,7 +773,7 @@
 
                 <!-- Resumen Financiero Transparente (Página 3) -->
                 <div class="order-summary-card">
-                  <h4 class="order-summary-title">Resumen Transparente de Reserva</h4>
+                  <h4 class="order-summary-title">Resumen de Liquidación de la Consulta</h4>
                   <div class="summary-row">
                     <span>Sede Médica:</span>
                     <strong id="sum-clinic-name" style="color: var(--dark-navy);">Clínica Ceibos</strong>
@@ -787,14 +787,14 @@
                     <span>Medicina General</span>
                   </div>
                   <div class="summary-row bold">
-                    <span>Tarifa Base de Consulta:</span>
-                    <span id="sum-base-fee">$20.00</span>
+                    <span>Precio Oficial de Lista (Base):</span>
+                    <span id="sum-base-fee">$21.95</span>
                   </div>
-                  <div class="summary-row" id="sum-card-fee-row" style="display: none; color: #b45309;">
+                  <div class="summary-row" id="sum-card-fee-row" style="display: flex; color: #15803d;">
                     <span>
-                      Recargo Bancario Tarjeta <span class="transparent-fee-badge">+9.75%</span>:
+                      Descuento especial por pago directo (9.75%):
                     </span>
-                    <strong id="sum-card-fee-amount">+$1.95</strong>
+                    <strong id="sum-card-fee-amount">-$1.95</strong>
                   </div>
                   <div class="summary-row total-due">
                     <span>Total a Pagar en Recepción:</span>
@@ -975,6 +975,10 @@
                 <span class="pill-icon">💰</span>
                 <span class="pill-text">Gastos</span>
               </button>
+              <button type="button" class="doc-mobile-pill" data-tab="ingresos" id="pill-doc-ingresos">
+                <span class="pill-icon">💸</span>
+                <span class="pill-text">Ingresos</span>
+              </button>
             </nav>
           </div>
 
@@ -1111,6 +1115,77 @@
                 <div id="doctor-expenses-history-list"></div>
               </div>
             </div>
+
+            <!-- PESTAÑA 5: Módulo de Ingresos Médicos por Sede y Día -->
+            <div class="doctor-pane-view" data-pane="ingresos" id="doctor-pane-ingresos" style="display: none; flex-direction: column; gap: 16px;">
+              <div class="ingresos-container">
+                <!-- Cabecera Principal -->
+                <div class="ingresos-header-card">
+                  <div class="ingresos-header-row">
+                    <div>
+                      <h3 class="ingresos-header-title">💸 Liquidación e Ingresos Médicos</h3>
+                      <p class="ingresos-header-desc">
+                        Control transparente de honorarios brutos, retenciones por sede y desglose neto recibido día a día.
+                      </p>
+                    </div>
+                    <button type="button" class="btn-open-payment-modal" id="btn-open-registrar-pago">
+                      <span>➕ Registrar Consulta / Pago</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Barra de Filtros de Fecha -->
+                <div class="ingresos-filter-toolbar">
+                  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <span style="font-size: 0.76rem; font-weight: 700; color: #475569; text-transform: uppercase;">
+                      📅 Rango de Fechas:
+                    </span>
+                    <div class="ingresos-filter-pills" id="ingresos-filter-pills-group">
+                      <button type="button" class="ingresos-pill-btn" data-range="hoy">Hoy</button>
+                      <button type="button" class="ingresos-pill-btn" data-range="semana">Esta Semana</button>
+                      <button type="button" class="ingresos-pill-btn" data-range="mes">Este Mes</button>
+                      <button type="button" class="ingresos-pill-btn active" data-range="todas">Todas</button>
+                      <button type="button" class="ingresos-pill-btn" data-range="personalizado">Personalizado...</button>
+                    </div>
+                  </div>
+
+                  <!-- Selector Rango Personalizado -->
+                  <div class="ingresos-custom-range" id="ingresos-custom-range-box">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <label style="font-size: 0.75rem; font-weight: 700; color: #64748b;">Desde:</label>
+                      <input type="date" id="ingresos-date-start" class="form-input" style="padding: 4px 8px; font-size: 0.78rem;" />
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <label style="font-size: 0.75rem; font-weight: 700; color: #64748b;">Hasta:</label>
+                      <input type="date" id="ingresos-date-end" class="form-input" style="padding: 4px 8px; font-size: 0.78rem;" />
+                    </div>
+                    <button type="button" class="btn-primary" id="btn-apply-custom-dates" style="padding: 6px 12px; font-size: 0.75rem;">
+                      Aplicar
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Banner Informativo de Reglas de Comisión Oficiales -->
+                <div class="ingresos-commission-legend">
+                  <span style="font-weight: 800;">⚖️ Comisiones Oficiales:</span>
+                  <span class="commission-rule-tag"><span style="width: 8px; height: 8px; border-radius: 50%; background: #0284c7;"></span> Mapasingue: <strong>5%</strong></span>
+                  <span class="commission-rule-tag"><span style="width: 8px; height: 8px; border-radius: 50%; background: #6366f1;"></span> Ceibos Privado: <strong>25%</strong></span>
+                  <span class="commission-rule-tag"><span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span> Alborada: <strong>10%</strong></span>
+                  <span class="commission-rule-tag"><span style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b;"></span> Hospital Público: <strong>0%</strong> (Sueldo Fijo)</span>
+                  <span style="margin-left: auto; font-size: 0.72rem; color: #64748b;">ℹ️ Recargo Tarjeta Datafast (9.75%) es independiente de la comisión.</span>
+                </div>
+
+                <!-- KPIs Totales Generales del Período -->
+                <div class="ingresos-kpi-summary-grid" id="ingresos-kpis-root">
+                  <!-- Se inyecta dinámicamente -->
+                </div>
+
+                <!-- Contenedor Principal: Segmentación por Días y por Sedes -->
+                <div style="display: flex; flex-direction: column; gap: 14px;" id="ingresos-days-container">
+                  <!-- Inyectado desde doctor.js -->
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Botón Flotante Rojo de Guardia de Emergencia (Página 4) -->
@@ -1136,6 +1211,10 @@
             <button type="button" class="bottom-nav-item" data-tab="gastos">
               <span class="nav-icon">💰</span>
               <span>Gastos</span>
+            </button>
+            <button type="button" class="bottom-nav-item" data-tab="ingresos">
+              <span class="nav-icon">💸</span>
+              <span>Ingresos</span>
             </button>
           </nav>
         </section>
@@ -1376,13 +1455,114 @@
     </div>
   </div>
 
+  <!-- Modal 6: Registrar Nueva Consulta / Pago Médico -->
+  <div class="modal-overlay" id="modal-registrar-pago">
+    <div class="modal-card" style="max-width: 520px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.3rem;">💳</span>
+          <div>
+            <h3 class="modal-title" style="margin: 0;">Registrar Consulta / Pago</h3>
+            <span style="font-size: 0.74rem; color: #64748b;">Añade una atención con cálculo automático de comisión y neto</span>
+          </div>
+        </div>
+        <button type="button" class="modal-close-btn" id="btn-close-payment-modal">✕</button>
+      </div>
+
+      <form id="form-registrar-consulta-pago" style="display: flex; flex-direction: column; gap: 12px; margin-top: 10px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Sede de Atención *</label>
+            <select class="form-input" id="reg-pago-sede" required>
+              <option value="mapasingue">Consultorio Mapasingue (5% com.)</option>
+              <option value="ceibos">Clínica Ceibos (25% com.)</option>
+              <option value="alborada">Consultorio Alborada (10% com.)</option>
+              <option value="hospital">Hospital Público Ceibos (0% com.)</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Fecha de Atención *</label>
+            <input type="date" class="form-input" id="reg-pago-fecha" required />
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Paciente (Nombre) *</label>
+            <input type="text" class="form-input" id="reg-pago-nombre" placeholder="Nombre completo" required />
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Cédula / Identificación *</label>
+            <input type="text" class="form-input" id="reg-pago-cedula" placeholder="10 dígitos" required />
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Precio Oficial de Lista ($) *</label>
+            <input type="number" step="0.01" class="form-input" id="reg-pago-precio" value="21.95" required />
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Método de Pago *</label>
+            <select class="form-input" id="reg-pago-metodo" required>
+              <option value="efectivo">💵 Efectivo (Descuento directo 9.75%)</option>
+              <option value="transferencia">🏦 Transferencia (Descuento directo 9.75%)</option>
+              <option value="tarjeta">💳 Tarjeta (100% Precio de Lista)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label">Motivo o Diagnóstico</label>
+          <input type="text" class="form-input" id="reg-pago-motivo" placeholder="ej. Chequeo rutinario, Control HTA" value="Consulta médica general" />
+        </div>
+
+        <!-- Previsualización en Vivo de Desglose Financiero -->
+        <div id="reg-pago-preview-box" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; font-size: 0.8rem; display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #64748b;">Precio Oficial de Lista:</span>
+            <strong id="prev-bruto">$21.95</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;" id="prev-recargo-row">
+            <span style="color: #15803d;">Descuento pago directo (9.75%):</span>
+            <strong style="color: #15803d;" id="prev-recargo">-$1.95</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #475569;">Total Cobrado al Paciente:</span>
+            <strong style="color: #0f172a;" id="prev-cobrado">$20.00</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #dc2626;">Descuento Comisión Sede (<span id="prev-com-pct">5%</span>):</span>
+            <strong style="color: #dc2626;" id="prev-comision">-$1.00</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; border-top: 1px dashed #cbd5e1; padding-top: 6px; font-size: 0.9rem;">
+            <strong style="color: #0f172a;">Ingreso Neto para Médico:</strong>
+            <strong style="color: #10b981;" id="prev-neto">$19.00</strong>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 6px;">
+          <button type="submit" class="btn-primary" style="flex: 1;">
+            💾 Registrar Turno y Guardar en Supabase
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+
+
   <!-- Raíz de Notificaciones Toast -->
   <div class="toast-container" id="toast-notifications-root"></div>
+
+  <!-- Librería Oficial Supabase JS v2 CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <!-- Librería Local QRCode de Alta Definición (Compatible offline y móvil) -->
   <script src="js/qrcode.min.js"></script>
 
   <!-- Script Principal de la Aplicación (Compatible con file:/// y http://) -->
-  <script src="js/app.bundle.js?v=20260924_3"></script>
+  <script src="js/app.bundle.js?v=20260930_supabase"></script>
 </body>
 </html>

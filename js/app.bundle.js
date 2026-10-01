@@ -1,6 +1,470 @@
 // Montepiedra Salud - Bundle Unificado (Compatible con file:/// y http://)
 
 
+// ==================== js/supabase-config.js ====================
+
+/**
+ * Montepiedra Salud - Configuración de Credenciales de Supabase
+ * Contiene la URL y la llave pública (Anon / Publishable) para el navegador.
+ */
+
+const SUPABASE_CONFIG = {
+  // URL oficial del proyecto en Supabase
+  url: 'https://spzyhpdhvqqdyyxqmxav.supabase.co',
+  
+  // Clave pública (Publishable Key / Anon) - Segura para el navegador con RLS
+  publishableKey: 'sb_publishable_zXgeds1KH5FZtPYWRAGnew_TsT5sf90',
+
+  // Helper para verificar si la URL configurada es válida
+  isConfigured() {
+    return !!this.url && !!this.publishableKey;
+  }
+};
+
+
+
+// ==================== js/supabase-client.js ====================
+
+/**
+ * Montepiedra Salud - Cliente de Integración Supabase
+ * Maneja todas las operaciones CRUD y sincronización en tiempo real con Supabase.
+ */
+
+
+let supabaseInstance = null;
+
+/**
+ * Obtiene o inicializa la instancia del cliente Supabase
+ */
+function getSupabase() {
+  if (supabaseInstance) return supabaseInstance;
+
+  if (typeof window !== 'undefined' && window.supabase) {
+    try {
+      supabaseInstance = window.supabase.createClient(
+        SUPABASE_CONFIG.url,
+        SUPABASE_CONFIG.publishableKey,
+        {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true
+          }
+        }
+      );
+      console.log('✅ Cliente Supabase inicializado exitosamente:', SUPABASE_CONFIG.url);
+    } catch (err) {
+      console.warn('⚠️ No se pudo inicializar el cliente de Supabase:', err);
+    }
+  } else {
+    console.warn('⚠️ Librería @supabase/supabase-js no detectada en window.supabase.');
+  }
+
+  return supabaseInstance;
+}
+
+/**
+ * Mapeo de columnas Postgres (snake_case) a modelo JS (camelCase)
+ */
+function mapAppointmentFromDB(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    code: row.code,
+    patientName: row.patient_name,
+    patientId: row.patient_id,
+    patientPhone: row.patient_phone,
+    patientEmail: row.patient_email,
+    clinicId: row.clinic_id,
+    date: row.date,
+    time: row.time,
+    durationMinutes: row.duration_minutes || 45,
+    reason: row.reason,
+    paymentMethod: row.payment_method || 'efectivo',
+    basePrice: Number(row.base_price) || 0,
+    feePercentage: Number(row.fee_percentage) || 0,
+    feeAmount: Number(row.fee_amount) || 0,
+    totalPaid: Number(row.total_paid) || 0,
+    retentionRate: Number(row.retention_rate) || 0,
+    retentionAmount: Number(row.retention_amount) || 0,
+    netClinicYield: Number(row.net_clinic_yield) || 0,
+    status: row.status || 'confirmada',
+    settlementStatus: row.settlement_status || 'Pendiente',
+    notes: row.notes || ''
+  };
+}
+
+function mapAppointmentToDB(apt) {
+  return {
+    id: apt.id,
+    code: apt.code,
+    patient_name: apt.patientName,
+    patient_id: apt.patientId,
+    patient_phone: apt.patientPhone,
+    patient_email: apt.patientEmail,
+    clinic_id: apt.clinicId,
+    date: apt.date,
+    time: apt.time,
+    duration_minutes: apt.durationMinutes || 45,
+    reason: apt.reason,
+    payment_method: apt.paymentMethod || 'efectivo',
+    base_price: apt.basePrice || 0,
+    fee_percentage: apt.feePercentage || 0,
+    fee_amount: apt.feeAmount || 0,
+    total_paid: apt.totalPaid || 0,
+    retention_rate: apt.retentionRate || 0,
+    retention_amount: apt.retentionAmount || 0,
+    net_clinic_yield: apt.netClinicYield || 0,
+    status: apt.status || 'confirmada',
+    settlement_status: apt.settlementStatus || 'Pendiente',
+    notes: apt.notes || ''
+  };
+}
+
+function mapExpenseFromDB(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    date: row.date,
+    category: row.category,
+    description: row.description,
+    amount: Number(row.amount) || 0,
+    paymentMethod: row.payment_method || 'Efectivo',
+    quickLogged: Boolean(row.quick_logged),
+    deductibleSRI: Boolean(row.deductible_sri)
+  };
+}
+
+function mapExpenseToDB(exp) {
+  return {
+    id: exp.id,
+    date: exp.date,
+    category: exp.category,
+    description: exp.description,
+    amount: exp.amount,
+    payment_method: exp.paymentMethod || 'Efectivo',
+    quick_logged: Boolean(exp.quickLogged),
+    deductible_sri: Boolean(exp.deductibleSRI)
+  };
+}
+
+function mapPrescriptionFromDB(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    code: row.code,
+    patientName: row.patient_name,
+    patientId: row.patient_id,
+    doctorName: row.doctor_name,
+    doctorCode: row.doctor_code,
+    date: row.date,
+    diagnosis: row.diagnosis,
+    items: row.items || [],
+    indications: row.indications || ''
+  };
+}
+
+function mapPrescriptionToDB(rx) {
+  return {
+    id: rowIdOrGen(rx.id, 'RX'),
+    code: rx.code,
+    patient_name: rx.patientName,
+    patient_id: rx.patientId,
+    doctor_name: rx.doctorName,
+    doctor_code: rx.doctorCode,
+    date: rx.date,
+    diagnosis: rx.diagnosis,
+    items: rx.items || [],
+    indications: rx.indications || ''
+  };
+}
+
+function rowIdOrGen(id, prefix) {
+  return id || `${prefix}-${Math.floor(100 + Math.random() * 900)}`;
+}
+
+function mapMedicalRecordFromDB(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    patientId: row.patient_id,
+    patientName: row.patient_name,
+    age: row.age,
+    bloodType: row.blood_type,
+    allergies: row.allergies,
+    history: row.history,
+    lastDiagnosis: row.last_diagnosis,
+    consultationHistory: row.consultation_history || []
+  };
+}
+
+function mapMedicalRecordToDB(rec) {
+  return {
+    id: rec.id,
+    patient_id: rec.patientId,
+    patient_name: rec.patientName,
+    age: rec.age,
+    blood_type: rec.bloodType,
+    allergies: rec.allergies,
+    history: rec.history,
+    last_diagnosis: rec.lastDiagnosis,
+    consultation_history: rec.consultationHistory || []
+  };
+}
+
+// ====================================================================
+// OPERACIONES CRUD CON SUPABASE
+// ====================================================================
+
+const SupabaseDB = {
+  // Citas
+  async getAppointments() {
+    const sb = getSupabase();
+    if (!sb) return null;
+    const { data, error } = await sb.from('appointments').select('*').order('date', { ascending: false });
+    if (error) {
+      console.error('Error obteniendo citas de Supabase:', error);
+      return null;
+    }
+    return data.map(mapAppointmentFromDB);
+  },
+
+  async insertAppointment(apt) {
+    const sb = getSupabase();
+    if (!sb) return null;
+    const payload = mapAppointmentToDB(apt);
+    const { data, error } = await sb.from('appointments').insert([payload]).select().single();
+    if (error) {
+      console.error('Error insertando cita en Supabase:', error);
+      return null;
+    }
+    return mapAppointmentFromDB(data);
+  },
+
+  async updateAppointmentStatus(id, status) {
+    const sb = getSupabase();
+    if (!sb) return false;
+    const { error } = await sb.from('appointments').update({ status }).eq('id', id);
+    if (error) {
+      console.error('Error actualizando estado de cita en Supabase:', error);
+      return false;
+    }
+    return true;
+  },
+
+  async updateAppointmentSettlement(id, settlementStatus) {
+    const sb = getSupabase();
+    if (!sb) return false;
+    const { error } = await sb.from('appointments').update({ settlement_status: settlementStatus }).eq('id', id);
+    if (error) {
+      console.error('Error actualizando liquidación de cita en Supabase:', error);
+      return false;
+    }
+    return true;
+  },
+
+  // Gastos
+  async getExpenses() {
+    const sb = getSupabase();
+    if (!sb) return null;
+    const { data, error } = await sb.from('expenses').select('*').order('date', { ascending: false });
+    if (error) {
+      console.error('Error obteniendo gastos de Supabase:', error);
+      return null;
+    }
+    return data.map(mapExpenseFromDB);
+  },
+
+  async insertExpense(exp) {
+    const sb = getSupabase();
+    if (!sb) return null;
+    const payload = mapExpenseToDB(exp);
+    const { data, error } = await sb.from('expenses').insert([payload]).select().single();
+    if (error) {
+      console.error('Error guardando gasto en Supabase:', error);
+      return null;
+    }
+    return mapExpenseFromDB(data);
+  },
+
+  // Fichas Clínicas
+  async getMedicalRecords() {
+    const sb = getSupabase();
+    if (!sb) return null;
+    const { data, error } = await sb.from('medical_records').select('*');
+    if (error) {
+      console.error('Error obteniendo historias clínicas de Supabase:', error);
+      return null;
+    }
+    return data.map(mapMedicalRecordFromDB);
+  },
+
+  async upsertMedicalRecord(rec) {
+    const sb = getSupabase();
+    if (!sb) return null;
+    const payload = mapMedicalRecordToDB(rec);
+    const { data, error } = await sb.from('medical_records').upsert(payload, { onConflict: 'patient_id' }).select().single();
+    if (error) {
+      console.error('Error guardando historial clínico en Supabase:', error);
+      return null;
+    }
+    return mapMedicalRecordFromDB(data);
+  },
+
+  // Recetas
+  async getPrescriptions() {
+    const sb = getSupabase();
+    if (!sb) return null;
+    const { data, error } = await sb.from('prescriptions').select('*').order('date', { ascending: false });
+    if (error) {
+      console.error('Error obteniendo recetas de Supabase:', error);
+      return null;
+    }
+    return data.map(mapPrescriptionFromDB);
+  },
+
+  async insertPrescription(rx) {
+    const sb = getSupabase();
+    if (!sb) return null;
+    const payload = mapPrescriptionToDB(rx);
+    const { data, error } = await sb.from('prescriptions').insert([payload]).select().single();
+    if (error) {
+      console.error('Error guardando receta en Supabase:', error);
+      return null;
+    }
+    return mapPrescriptionFromDB(data);
+  },
+
+  // Guardia de Emergencia
+  async getEmergencyGuard() {
+    const sb = getSupabase();
+    if (!sb) return null;
+    const { data, error } = await sb.from('emergency_guard').select('*').eq('id', 1).maybeSingle();
+    if (error || !data) return null;
+    return {
+      isActive: data.is_active,
+      activatedAt: data.activated_at,
+      reason: data.reason,
+      affectedAppointments: data.affected_appointments || []
+    };
+  },
+
+  async updateEmergencyGuard(guard) {
+    const sb = getSupabase();
+    if (!sb) return false;
+    const payload = {
+      id: 1,
+      is_active: guard.isActive,
+      activated_at: guard.activatedAt,
+      reason: guard.reason,
+      affected_appointments: guard.affectedAppointments
+    };
+    const { error } = await sb.from('emergency_guard').upsert(payload, { onConflict: 'id' });
+    if (error) {
+      console.error('Error actualizando guardia en Supabase:', error);
+      return false;
+    }
+    return true;
+  },
+
+  // Usuarios del sistema
+  async getUsers() {
+    const sb = getSupabase();
+    if (!sb) return null;
+    const { data, error } = await sb.from('users').select('*');
+    if (error) {
+      console.error('Error obteniendo usuarios de Supabase:', error);
+      return null;
+    }
+    const usersMap = {};
+    data.forEach(u => {
+      usersMap[u.role] = {
+        role: u.role,
+        name: u.name,
+        email: u.email,
+        username: u.username,
+        idNumber: u.id_number,
+        password: u.password,
+        phone: u.phone,
+        specialty: u.specialty,
+        mspCode: u.msp_code,
+        allergies: u.allergies,
+        avatar: u.avatar,
+        firm: u.firm
+      };
+    });
+    return usersMap;
+  },
+
+  // Sedes
+  async getClinics() {
+    const sb = getSupabase();
+    if (!sb) return null;
+    const { data, error } = await sb.from('clinics').select('*');
+    if (error) return null;
+    const map = {};
+    data.forEach(c => {
+      map[c.id] = {
+        id: c.id,
+        name: c.name,
+        type: c.type,
+        consultorio: c.consultorio,
+        address: c.address,
+        basePrice: Number(c.base_price),
+        retentionRate: Number(c.retention_rate),
+        color: c.color,
+        badgeClass: c.badge_class,
+        image: c.image
+      };
+    });
+    return map;
+  },
+
+  // Franjas de Traslado
+  async getTravelBuffers() {
+    const sb = getSupabase();
+    if (!sb) return null;
+    const { data, error } = await sb.from('travel_buffers').select('*');
+    if (error) return null;
+    return data.map(b => ({
+      id: b.id,
+      date: b.date,
+      fromClinic: b.from_clinic,
+      toClinic: b.to_clinic,
+      startTime: b.start_time,
+      endTime: b.end_time,
+      durationMinutes: b.duration_minutes,
+      bufferLabel: b.buffer_label,
+      status: b.status
+    }));
+  },
+
+  // Suscripción Realtime (Sincronización instantánea de citas)
+  subscribeRealtime(onUpdate) {
+    const sb = getSupabase();
+    if (!sb) return null;
+    try {
+      const channel = sb
+        .channel('schema-db-changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public' },
+          (payload) => {
+            console.log('🔄 Cambio detectado en tiempo real desde Supabase:', payload);
+            if (typeof onUpdate === 'function') {
+              onUpdate(payload);
+            }
+          }
+        )
+        .subscribe();
+      return channel;
+    } catch (e) {
+      console.warn('Realtime no disponible:', e);
+      return null;
+    }
+  }
+};
+
+
 // ==================== js/qr-generator.js ====================
 
 /**
@@ -83,6 +547,8 @@ const CONSULTATION_CATALOG = [
     nombre: "Consulta Médica General",
     descripcionCorta: "Evaluación primaria para diagnóstico y tratamiento.",
     duracionMinutos: 30,
+    costoReal: 20.00,
+    precioLista: 21.95, // 9.75% sobre costo real
     precioBase: 20.00,
     categoria: "Atención Primaria",
     estado: "Activo"
@@ -93,6 +559,8 @@ const CONSULTATION_CATALOG = [
     nombre: "Control Rutinario / Seguimiento",
     descripcionCorta: "Seguimiento de tratamientos y revisión general.",
     duracionMinutos: 20,
+    costoReal: 15.00,
+    precioLista: 16.46, // 9.75% sobre costo real
     precioBase: 15.00,
     categoria: "Seguimiento",
     estado: "Activo"
@@ -103,6 +571,8 @@ const CONSULTATION_CATALOG = [
     nombre: "Certificado de Salud y Aptitud Física",
     descripcionCorta: "Evaluación para emisión de certificados de salud.",
     duracionMinutos: 30,
+    costoReal: 25.00,
+    precioLista: 27.44, // 9.75% sobre costo real
     precioBase: 25.00,
     categoria: "Certificaciones",
     estado: "Activo"
@@ -113,6 +583,8 @@ const CONSULTATION_CATALOG = [
     nombre: "Atención Prioritaria / Urgencia Menor",
     descripcionCorta: "Atención rápida para urgencias no vitales.",
     duracionMinutos: 45,
+    costoReal: 30.00,
+    precioLista: 32.93, // 9.75% sobre costo real
     precioBase: 30.00,
     categoria: "Prioritaria",
     estado: "Activo"
@@ -157,75 +629,609 @@ class PatientRecord {
 // ==================== js/services/medical-service.js ====================
 
 
+let pacientesCache = [];
+
 const MedicalService = {
   // Retorna únicamente los servicios con estado "Activo"
   getCatalogo: () => {
     return CONSULTATION_CATALOG.filter(servicio => servicio.estado === 'Activo');
   },
 
-  // Retorna la lista parseada de pacientes guardados en localStorage
+  // Retorna la lista de pacientes sincronizada con Supabase
   getPacientes: () => {
+    return pacientesCache;
+  },
+
+  // Carga inicial de pacientes desde Supabase
+  syncPacientesFromSupabase: async () => {
     try {
-      const pacientes = localStorage.getItem('montepiedra_pacientes');
-      return pacientes ? JSON.parse(pacientes) : [];
+      const records = await SupabaseDB.getMedicalRecords();
+      if (records && records.length > 0) {
+        pacientesCache = records.map(r => new PatientRecord({
+          cedula: r.patientId,
+          nombreCompleto: r.patientName,
+          antecedentesClinicos: {
+            alergias: r.allergies ? r.allergies.split(',').map(s => s.trim()) : [],
+            enfermedadesPrevias: r.history ? [r.history] : []
+          },
+          historialConsultas: r.consultationHistory || []
+        }));
+      }
     } catch (e) {
-      console.error('Error parsing pacientes from localStorage', e);
-      return [];
+      console.warn('Aviso cargando pacientes desde Supabase:', e);
     }
+    return pacientesCache;
   },
 
   // Retorna la ficha médica si el paciente ya existe; null si es nuevo
   buscarPorCedula: (cedula) => {
-    const pacientes = MedicalService.getPacientes();
-    const paciente = pacientes.find(p => p.cedula === cedula);
+    const paciente = pacientesCache.find(p => p.cedula === cedula);
     return paciente ? new PatientRecord(paciente) : null;
   },
 
-  // Guarda o actualiza la ficha del paciente
-  guardarFicha: (datos) => {
-    let pacientes = MedicalService.getPacientes();
-    const index = pacientes.findIndex(p => p.cedula === datos.cedula);
+  // Guarda o actualiza la ficha del paciente en Supabase
+  guardarFicha: async (datos) => {
+    const index = pacientesCache.findIndex(p => p.cedula === datos.cedula);
+    let targetPaciente = null;
 
     if (index >= 0) {
-      // Actualiza antecedentes y datos demográficos
-      const pacienteExistente = new PatientRecord(pacientes[index]);
-      
-      pacienteExistente.nombreCompleto = datos.nombreCompleto || pacienteExistente.nombreCompleto;
-      pacienteExistente.telefono = datos.telefono || pacienteExistente.telefono;
-      pacienteExistente.email = datos.email || pacienteExistente.email;
+      targetPaciente = new PatientRecord(pacientesCache[index]);
+      targetPaciente.nombreCompleto = datos.nombreCompleto || targetPaciente.nombreCompleto;
+      targetPaciente.telefono = datos.telefono || targetPaciente.telefono;
+      targetPaciente.email = datos.email || targetPaciente.email;
       if (datos.antecedentesClinicos) {
-        pacienteExistente.antecedentesClinicos = { ...pacienteExistente.antecedentesClinicos, ...datos.antecedentesClinicos };
+        targetPaciente.antecedentesClinicos = { ...targetPaciente.antecedentesClinicos, ...datos.antecedentesClinicos };
       }
-      pacienteExistente.updatedAt = new Date().toISOString();
-      
-      pacientes[index] = pacienteExistente;
+      targetPaciente.updatedAt = new Date().toISOString();
+      pacientesCache[index] = targetPaciente;
     } else {
-      // Genera un nuevo registro
-      const nuevoPaciente = new PatientRecord(datos);
-      pacientes.push(nuevoPaciente);
+      targetPaciente = new PatientRecord(datos);
+      pacientesCache.push(targetPaciente);
     }
 
-    localStorage.setItem('montepiedra_pacientes', JSON.stringify(pacientes));
+    // Persistir en Supabase
+    try {
+      await SupabaseDB.upsertMedicalRecord({
+        id: `REC-${Math.floor(100 + Math.random() * 900)}`,
+        patientId: targetPaciente.cedula,
+        patientName: targetPaciente.nombreCompleto,
+        age: 35,
+        allergies: targetPaciente.antecedentesClinicos.alergias.join(', '),
+        history: targetPaciente.antecedentesClinicos.enfermedadesPrevias.join('. '),
+        consultationHistory: targetPaciente.historialConsultas || []
+      });
+    } catch (e) {
+      console.error('Error guardando paciente en Supabase:', e);
+    }
   },
 
   // Añade la consulta reservada al historial de consultas del paciente
-  registrarAtencionEnHistorial: (cedula, datosCita) => {
-    let pacientes = MedicalService.getPacientes();
-    const index = pacientes.findIndex(p => p.cedula === cedula);
+  registrarAtencionEnHistorial: async (cedula, datosCita) => {
+    const index = pacientesCache.findIndex(p => p.cedula === cedula);
 
     if (index >= 0) {
-      const paciente = new PatientRecord(pacientes[index]);
+      const paciente = new PatientRecord(pacientesCache[index]);
       paciente.historialConsultas.push({
         ...datosCita,
         fechaRegistro: new Date().toISOString()
       });
-      pacientes[index] = paciente;
-      localStorage.setItem('montepiedra_pacientes', JSON.stringify(pacientes));
+      pacientesCache[index] = paciente;
+
+      try {
+        await SupabaseDB.upsertMedicalRecord({
+          id: `REC-${Math.floor(100 + Math.random() * 900)}`,
+          patientId: paciente.cedula,
+          patientName: paciente.nombreCompleto,
+          age: 35,
+          allergies: paciente.antecedentesClinicos.alergias.join(', '),
+          history: paciente.antecedentesClinicos.enfermedadesPrevias.join('. '),
+          consultationHistory: paciente.historialConsultas || []
+        });
+      } catch (e) {
+        console.error('Error actualizando historial en Supabase:', e);
+      }
     } else {
       console.error('No se puede registrar atención: paciente no encontrado.');
     }
   }
 };
+
+
+
+// ==================== js/services/collision-engine.js ====================
+
+/**
+ * collision-engine.js
+ * Motor de Prevención de Choques, Tiempos de Traslado y Validación de Rotación Multisede
+ * Semana 2: Arquitectura del Calendario Inteligente (Montepiedra Salud)
+ */
+
+
+// 1. Matriz de Distancias y Tiempos de Traslado Interurbano (Guayaquil)
+const MATRIZ_DISTANCIAS_TRASLADO = {
+  'mapasingue-ceibos': { tiempoMinutos: 20, margenTrafico: 15, totalBuffer: 35 },
+  'ceibos-mapasingue': { tiempoMinutos: 20, margenTrafico: 15, totalBuffer: 35 },
+  'mapasingue-alborada': { tiempoMinutos: 30, margenTrafico: 20, totalBuffer: 50 },
+  'alborada-mapasingue': { tiempoMinutos: 30, margenTrafico: 20, totalBuffer: 50 },
+  'mapasingue-hospital': { tiempoMinutos: 25, margenTrafico: 15, totalBuffer: 40 },
+  'hospital-mapasingue': { tiempoMinutos: 25, margenTrafico: 15, totalBuffer: 40 },
+  'ceibos-alborada': { tiempoMinutos: 35, margenTrafico: 25, totalBuffer: 60 },
+  'alborada-ceibos': { tiempoMinutos: 35, margenTrafico: 25, totalBuffer: 60 },
+  'ceibos-hospital': { tiempoMinutos: 10, margenTrafico: 10, totalBuffer: 20 },
+  'hospital-ceibos': { tiempoMinutos: 10, margenTrafico: 10, totalBuffer: 20 },
+  'alborada-hospital': { tiempoMinutos: 40, margenTrafico: 25, totalBuffer: 65 },
+  'hospital-alborada': { tiempoMinutos: 40, margenTrafico: 25, totalBuffer: 65 }
+};
+
+// 2. Salas de Consultorio Físicas (Recursos Compartidos)
+const SALAS_CONSULTORIO = {
+  ceibos: [
+    { id: 'SALA-CEIBOS-2', codigo: 'CONS-2', nombre: 'Consultorio Privado 2', capacidad: 1 }
+  ],
+  mapasingue: [
+    { id: 'SALA-MAPASINGUE-1A', codigo: 'CONS-1A', nombre: 'Consultorio 1A', capacidad: 1 }
+  ],
+  alborada: [
+    { id: 'SALA-ALBORADA-4', codigo: 'CONS-4', nombre: 'Consultorio Comunitario 4', capacidad: 1 }
+  ],
+  hospital: [
+    { id: 'SALA-HOSPITAL-TRIAJE', codigo: 'TRIAJE-1', nombre: 'Área de Triaje y Guardia', capacidad: 5 }
+  ]
+};
+
+// 3. Plantilla de Horarios Rotativos Semanales del Médico
+const HORARIOS_ROTATIVOS = [
+  // Sábado (Día demo de operación)
+  { diaSemana: 'SABADO', sedeId: 'ceibos', horaInicio: '08:00', horaFin: '13:00' },
+  { diaSemana: 'SABADO', sedeId: 'mapasingue', horaInicio: '14:00', horaFin: '18:00' },
+  { diaSemana: 'SABADO', sedeId: 'alborada', horaInicio: '08:30', horaFin: '12:30' },
+  { diaSemana: 'SABADO', sedeId: 'hospital', horaInicio: '18:00', horaFin: '23:59' },
+
+  // Días laborables regulares
+  { diaSemana: 'LUNES', sedeId: 'ceibos', horaInicio: '08:00', horaFin: '13:00' },
+  { diaSemana: 'LUNES', sedeId: 'mapasingue', horaInicio: '14:00', horaFin: '18:00' },
+  { diaSemana: 'MARTES', sedeId: 'alborada', horaInicio: '08:30', horaFin: '13:00' },
+  { diaSemana: 'MARTES', sedeId: 'ceibos', horaInicio: '14:30', horaFin: '18:30' },
+  { diaSemana: 'MIERCOLES', sedeId: 'mapasingue', horaInicio: '08:30', horaFin: '13:00' },
+  { diaSemana: 'MIERCOLES', sedeId: 'ceibos', horaInicio: '14:30', horaFin: '18:30' },
+  { diaSemana: 'JUEVES', sedeId: 'ceibos', horaInicio: '08:00', horaFin: '13:00' },
+  { diaSemana: 'JUEVES', sedeId: 'alborada', horaInicio: '14:30', horaFin: '18:30' },
+  { diaSemana: 'VIERNES', sedeId: 'mapasingue', horaInicio: '08:30', horaFin: '13:00' },
+  { diaSemana: 'VIERNES', sedeId: 'ceibos', horaInicio: '14:00', horaFin: '18:00' }
+];
+
+const CollisionEngine = {
+  /**
+   * Validador Principal del Calendario Inteligente (4 pasos estrictos)
+   */
+  validarDisponibilidadSlot: ({
+    medicoId = 'doctor',
+    sedeId,
+    salaId = null,
+    fechaStr,
+    horaStr,
+    duracionMinutos = 45,
+    citas = [],
+    travelBuffers = []
+  }) => {
+    // Resolver sala física por defecto si no se pasa explícitamente
+    const salaEfectiva = salaId || (SALAS_CONSULTORIO[sedeId] && SALAS_CONSULTORIO[sedeId][0]?.id) || `SALA-${sedeId.toUpperCase()}`;
+
+    // Desglosar inicio y fin en minutos del día
+    const [h, m] = horaStr.split(':').map(Number);
+    const inicioSlotMin = h * 60 + m;
+    const finSlotMin = inicioSlotMin + duracionMinutos;
+
+    // Calcular día de la semana en español
+    const [y, mes, d] = fechaStr.split('-').map(Number);
+    const dateObj = new Date(y, mes - 1, d);
+    const diasMap = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
+    const diaSemanaNombre = diasMap[dateObj.getDay()];
+
+    // ========================================================================
+    // PASO 1: Validar horario de rotación configurado del médico
+    // ========================================================================
+    const rotacionesDelDia = HORARIOS_ROTATIVOS.filter(
+      r => r.diaSemana === diaSemanaNombre && r.sedeId === sedeId
+    );
+
+    // Si existen rotaciones registradas para ese día, verificar franja
+    if (rotacionesDelDia.length > 0) {
+      const enHorario = rotacionesDelDia.some(rot => {
+        const [rIniH, rIniM] = rot.horaInicio.split(':').map(Number);
+        const [rFinH, rFinM] = rot.horaFin.split(':').map(Number);
+        const rIni = rIniH * 60 + rIniM;
+        const rFin = rFinH * 60 + rFinM;
+        return inicioSlotMin >= rIni && finSlotMin <= rFin;
+      });
+
+      if (!enHorario) {
+        return {
+          valido: false,
+          razonRechazo: `El médico no tiene turno rotativo activo en ${CLINICS[sedeId]?.name || sedeId} en el horario ${horaStr}.`,
+          tiempoBufferRequerido: null,
+          codigoError: 'FUERA_DE_ROTACION'
+        };
+      }
+    }
+
+    // ========================================================================
+    // PASO 2: Validar que la sala física compartida esté libre
+    // ========================================================================
+    const citasMismaFecha = citas.filter(
+      c => c.date === fechaStr && c.status !== 'cancelada' && c.status !== 'reagendada'
+    );
+
+    for (const c of citasMismaFecha) {
+      const cSala = c.salaId || (SALAS_CONSULTORIO[c.clinicId] && SALAS_CONSULTORIO[c.clinicId][0]?.id);
+      if (cSala === salaEfectiva) {
+        const [ch, cm] = c.time.split(':').map(Number);
+        const cIni = ch * 60 + cm;
+        const cFin = cIni + (c.durationMinutes || 45);
+
+        // Solapamiento: max(ini1, ini2) < min(fin1, fin2)
+        if (Math.max(inicioSlotMin, cIni) < Math.min(finSlotMin, cFin)) {
+          return {
+            valido: false,
+            razonRechazo: `La sala física (${CLINICS[sedeId]?.consultorio || 'Consultorio'}) está ocupada por otra atención médica (#${c.code || c.id}).`,
+            tiempoBufferRequerido: null,
+            codigoError: 'SALA_OCUPADA'
+          };
+        }
+      }
+    }
+
+    // ========================================================================
+    // PASO 3: Validar tiempos de amortiguamiento y traslado (Buffer Times)
+    // ========================================================================
+    // 3.A. Citas previas en OTRA sede que impiden llegar a tiempo
+    const citasPrevias = citasMismaFecha
+      .filter(c => {
+        const [ch, cm] = c.time.split(':').map(Number);
+        const cFin = ch * 60 + cm + (c.durationMinutes || 45);
+        return cFin <= inicioSlotMin;
+      })
+      .sort((a, b) => a.time.localeCompare(b.time));
+
+    if (citasPrevias.length > 0) {
+      const ultimaPrevia = citasPrevias[citasPrevias.length - 1];
+      if (ultimaPrevia.clinicId !== sedeId) {
+        const rutaKey = `${ultimaPrevia.clinicId}-${sedeId}`;
+        const bufferConfig = MATRIZ_DISTANCIAS_TRASLADO[rutaKey] || { totalBuffer: 35 };
+        const bufferRequerido = bufferConfig.totalBuffer;
+
+        const [uH, uM] = ultimaPrevia.time.split(':').map(Number);
+        const uFin = uH * 60 + uM + (ultimaPrevia.durationMinutes || 45);
+        const tiempoDisponible = inicioSlotMin - uFin;
+
+        if (tiempoDisponible < bufferRequerido) {
+          return {
+            valido: false,
+            razonRechazo: `Tiempo de traslado insuficiente desde ${CLINICS[ultimaPrevia.clinicId]?.name}. Se requieren ${bufferRequerido} min de amortiguamiento vial (disponibles: ${tiempoDisponible} min).`,
+            tiempoBufferRequerido: bufferRequerido,
+            codigoError: 'TRASLADO_INSUFICIENTE_PRE'
+          };
+        }
+      }
+    }
+
+    // 3.B. Citas posteriores en OTRA sede a las que el médico no alcanzaría a llegar
+    const citasPosteriores = citasMismaFecha
+      .filter(c => {
+        const [ch, cm] = c.time.split(':').map(Number);
+        const cIni = ch * 60 + cm;
+        return cIni >= finSlotMin;
+      })
+      .sort((a, b) => a.time.localeCompare(b.time));
+
+    if (citasPosteriores.length > 0) {
+      const primeraPosterior = citasPosteriores[0];
+      if (primeraPosterior.clinicId !== sedeId) {
+        const rutaKey = `${sedeId}-${primeraPosterior.clinicId}`;
+        const bufferConfig = MATRIZ_DISTANCIAS_TRASLADO[rutaKey] || { totalBuffer: 35 };
+        const bufferRequerido = bufferConfig.totalBuffer;
+
+        const [pH, pM] = primeraPosterior.time.split(':').map(Number);
+        const pIni = pH * 60 + pM;
+        const tiempoDisponible = pIni - finSlotMin;
+
+        if (tiempoDisponible < bufferRequerido) {
+          return {
+            valido: false,
+            razonRechazo: `Tiempo de traslado insuficiente hacia la siguiente cita en ${CLINICS[primeraPosterior.clinicId]?.name}. Se requieren ${bufferRequerido} min de traslado (disponibles: ${tiempoDisponible} min).`,
+            tiempoBufferRequerido: bufferRequerido,
+            codigoError: 'TRASLADO_INSUFICIENTE_POST'
+          };
+        }
+      }
+    }
+
+    // 3.C. Validar si existe una franja explícita de travelBuffer activa
+    for (const tb of travelBuffers) {
+      if (tb.date === fechaStr) {
+        const [tbIniH, tbIniM] = tb.startTime.split(':').map(Number);
+        const [tbFinH, tbFinM] = tb.endTime.split(':').map(Number);
+        const tbIni = tbIniH * 60 + tbIniM;
+        const tbFin = tbFinH * 60 + tbFinM;
+
+        if (Math.max(inicioSlotMin, tbIni) < Math.min(finSlotMin, tbFin)) {
+          return {
+            valido: false,
+            razonRechazo: `El médico se encuentra en traslado interurbano (${tb.bufferLabel || 'En ruta'}).`,
+            tiempoBufferRequerido: tb.durationMinutes || 40,
+            codigoError: 'EN_RUTA_PROTEGIDA'
+          };
+        }
+      }
+    }
+
+    // ========================================================================
+    // PASO 4: Aprobación Integral
+    // ========================================================================
+    return {
+      valido: true,
+      razonRechazo: null,
+      tiempoBufferRequerido: 0
+    };
+  },
+
+  /**
+   * Micro-servicio de Liquidación Financiera Determinista
+   */
+  calcularLiquidacion: ({
+    sedeId,
+    metodoPago = 'efectivo',
+    tarifaBase = null
+  }) => {
+    const clinic = CLINICS[sedeId] || { basePrice: 21.95, realCost: 20.00, retentionRate: 0.05 };
+    const base = (tarifaBase !== null && !isNaN(tarifaBase)) ? Number(tarifaBase) : clinic.realCost;
+    const esHospital = (sedeId === 'hospital') || (clinic.retentionRate === 0);
+
+    const tasaRecargo = 0.0975;
+    const precioLista = +(base * (1 + tasaRecargo)).toFixed(2);
+
+    let montoRecargo = 0;
+    let montoDescuento = 0;
+    let totalCobrado = 0;
+
+    if (metodoPago.toLowerCase() === 'tarjeta') {
+      montoRecargo = +(base * tasaRecargo).toFixed(2);
+      totalCobrado = +(base + montoRecargo).toFixed(2);
+    } else {
+      montoDescuento = +(precioLista - base).toFixed(2);
+      totalCobrado = base;
+    }
+
+    const comisionSede = esHospital ? 0 : +(base * clinic.retentionRate).toFixed(2);
+    const netoMedico = esHospital ? 0 : +(base - comisionSede).toFixed(2);
+
+    return {
+      sedeId,
+      metodoPago,
+      tarifaBase: base,
+      precioListaOficial: precioLista,
+      montoRecargo,
+      montoDescuentoDirecto: montoDescuento,
+      totalCobrado,
+      porcentajeComisionSede: clinic.retentionRate,
+      montoComisionSede: comisionSede,
+      ingresoNetoMedico: netoMedico,
+      esHospitalSueldoFijo: esHospital
+    };
+  }
+};
+
+
+// ==================== js/services/qr-token-service.js ====================
+
+/**
+ * qr-token-service.js
+ * Servicio Criptográfico de Tickets QR, Control de Hold Temporal y Admisión de Pacientes
+ * Semana 3 (01 Oct - 07 Oct, 2026) - Hito 2
+ * Plataforma SaaS: Montepiedra Salud
+ */
+
+const SECRET_KEY_FRONTEND = 'montepiedra-salud-secret-key-2026-msp-ec';
+
+/**
+ * Generador de Hash ligero SHA-256 / Checksum criptográfico para navegador y offline
+ */
+function calcularChecksumSeguro(mensaje, clave = SECRET_KEY_FRONTEND) {
+  let h1 = 0xdeadbeef ^ clave.length;
+  let h2 = 0x41c6ce57 ^ clave.length;
+  const texto = `${mensaje}|${clave}`;
+  
+  for (let i = 0; i < texto.length; i++) {
+    const ch = texto.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  
+  const hashVal = 4294967296 * (2097151 & h2) + (h1 >>> 0);
+  return Math.abs(hashVal).toString(16).padStart(12, '0').slice(0, 12);
+}
+
+class QRTokenService {
+  /**
+   * Genera un token criptográfico no predecible para el código QR
+   * Previene ataques de enumeración y falsificación de citas médicas.
+   */
+  static generarTokenSeguro(citaId, codigoCita, fecha, hora, sedeId) {
+    const payload = `${citaId}|${codigoCita}|${fecha}|${hora}|${sedeId}`;
+    const firma = calcularChecksumSeguro(payload);
+    return `${payload}|${firma}`;
+  }
+
+  /**
+   * Valida un token de código QR escaneado por el recepcionista
+   */
+  static verificarToken(token) {
+    if (!token || typeof token !== 'string') {
+      return { valido: false, error: 'Token nulo o inválido' };
+    }
+
+    const partes = token.split('|');
+    if (partes.length !== 6) {
+      return { valido: false, error: 'Estructura de ticket alterada o incompleta' };
+    }
+
+    const [citaId, codigoCita, fecha, hora, sedeId, firmaRecibida] = partes;
+    const payload = `${citaId}|${codigoCita}|${fecha}|${hora}|${sedeId}`;
+    const firmaEsperada = calcularChecksumSeguro(payload);
+
+    if (firmaRecibida !== firmaEsperada) {
+      return {
+        valido: false,
+        error: 'Firma de seguridad inválida. El ticket ha sido adulterado.'
+      };
+    }
+
+    return {
+      valido: true,
+      citaId,
+      codigoCita,
+      fecha,
+      hora,
+      sedeId
+    };
+  }
+
+  /**
+   * Genera URL de verificación rápida para la cámara del recepcionista
+   */
+  static generarUrlVerificacion(tokenSeguro, baseUrl = '') {
+    const base = baseUrl || window.location.origin;
+    return `${base}/comprobante.html?token=${encodeURIComponent(tokenSeguro)}&verificar=1`;
+  }
+}
+
+/**
+ * Gestor del Hold Temporal (Anti Phantom-Booking) en el Navegador
+ */
+class SlotHoldManager {
+  static HOLDS_STORAGE_KEY = 'montepiedra_active_slot_holds';
+
+  /**
+   * Guarda un hold de 10 minutos para el slot actual
+   */
+  static registrarHold(sedeId, fecha, hora, duracionMinutos = 45, ttlMinutos = 10) {
+    const now = Date.now();
+    const expiraAt = now + (ttlMinutos * 60 * 1000);
+    const holdData = {
+      id: `HOLD-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+      sedeId,
+      fecha,
+      hora,
+      duracionMinutos,
+      creadoAt: now,
+      expiraAt
+    };
+
+    localStorage.setItem(this.HOLDS_STORAGE_KEY, JSON.stringify(holdData));
+    return holdData;
+  }
+
+  /**
+   * Obtiene el hold activo o null si expiró
+   */
+  static obtenerHoldActivo() {
+    try {
+      const raw = localStorage.getItem(this.HOLDS_STORAGE_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (Date.now() > data.expiraAt) {
+        this.liberarHold();
+        return null;
+      }
+      return data;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Calcula los segundos restantes del hold
+   */
+  static obtenerSegundosRestantes() {
+    const hold = this.obtenerHoldActivo();
+    if (!hold) return 0;
+    return Math.max(0, Math.floor((hold.expiraAt - Date.now()) / 1000));
+  }
+
+  /**
+   * Formatea el tiempo restante en MM:SS
+   */
+  static formatearTiempoRestante(segundos) {
+    const m = Math.floor(segundos / 60);
+    const s = segundos % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  }
+
+  /**
+   * Libera el hold tras confirmar la cita o por abandono voluntario
+   */
+  static liberarHold() {
+    localStorage.removeItem(this.HOLDS_STORAGE_KEY);
+  }
+}
+
+/**
+ * Reconciliador de Expedientes del Paciente (Anti-Duplicidad / Data Siloing)
+ */
+class PatientReconciliator {
+  /**
+   * Normaliza los datos del paciente para garantizar un único registro
+   */
+  static normalizarDatos(datos) {
+    return {
+      identificacion: (datos.identificacion || '').trim().replace(/\D/g, ''),
+      nombre: (datos.nombre || '').trim().toUpperCase(),
+      email: (datos.email || '').trim().toLowerCase(),
+      telefono: (datos.telefono || '').trim().replace(/\s+/g, ''),
+      alergias: (datos.alergias || '').trim() || 'Ninguna declarada'
+    };
+  }
+
+  /**
+   * Busca si el paciente ya existe en el historial local o central
+   */
+  static conciliar(pacientesExistentes, nuevoRegistro) {
+    const norm = this.normalizarDatos(nuevoRegistro);
+    if (!Array.isArray(pacientesExistentes)) return norm;
+
+    // 1. Coincidencia por Cédula (identificador único determinista)
+    let encontrado = pacientesExistentes.find(
+      p => (p.idNumber || p.identificacion || '').trim() === norm.identificacion
+    );
+
+    // 2. Coincidencia por Correo o Teléfono si no coincide la cédula
+    if (!encontrado && norm.email) {
+      encontrado = pacientesExistentes.find(
+        p => (p.email || '').trim().toLowerCase() === norm.email
+      );
+    }
+
+    if (encontrado) {
+      // Consolidar datos actualizados sin duplicar
+      return {
+        ...encontrado,
+        nombre: norm.nombre || encontrado.name || encontrado.nombre,
+        email: norm.email || encontrado.email,
+        telefono: norm.telefono || encontrado.phone || encontrado.telefono,
+        alergias: norm.alergias !== 'Ninguna declarada' ? norm.alergias : (encontrado.allergies || norm.alergias),
+        esRecurrente: true
+      };
+    }
+
+    return {
+      ...norm,
+      esRecurrente: false
+    };
+  }
+}
 
 
 // ==================== js/validaciones-globales.js ====================
@@ -590,7 +1596,9 @@ const CLINICS = {
     type: 'Consultorio Privado',
     consultorio: 'Consultorio 2',
     address: 'Av. del Bombero, Edificio Ceibos Plaza, Piso 3',
-    basePrice: 20.00,
+    realCost: 20.00,
+    listPrice: 21.95, // 9.75% sobre costo real
+    basePrice: 21.95, // Precio oficial estándar de lista
     retentionRate: 0.25, // 25% retención clínica
     color: '#6366f1', // Índigo Ceibos
     badgeClass: 'badge-ceibos',
@@ -602,7 +1610,9 @@ const CLINICS = {
     type: 'Consultorio Privado',
     consultorio: 'Consultorio 1A',
     address: 'Av. Primera y Calle 3ra, Mapasingue Oeste',
-    basePrice: 20.00,
+    realCost: 20.00,
+    listPrice: 21.95, // 9.75% sobre costo real
+    basePrice: 21.95, // Precio oficial estándar de lista
     retentionRate: 0.05, // 5% retención clínica
     color: '#0284c7', // Azul Clínico Principal
     badgeClass: 'badge-mapasingue',
@@ -614,7 +1624,9 @@ const CLINICS = {
     type: 'Atención Comunitaria / Tarifa Reducida',
     consultorio: 'Consultorio 4',
     address: 'Av. Rodolfo Baquerizo Nazur, Alborada Etapa 8',
-    basePrice: 10.00,
+    realCost: 10.00,
+    listPrice: 10.98, // 9.75% sobre costo real
+    basePrice: 10.98, // Precio oficial estándar de lista
     retentionRate: 0.10, // 10% retención clínica
     color: '#10b981', // Verde Éxito / Alborada
     badgeClass: 'badge-alborada',
@@ -626,6 +1638,8 @@ const CLINICS = {
     type: 'Servicio Público de Salud',
     consultorio: 'Área de Emergencia y Triaje',
     address: 'Vía a la Costa km 6.5, Hospital General',
+    realCost: 0.00,
+    listPrice: 0.00,
     basePrice: 0.00, // Gratuito
     retentionRate: 0.00,
     color: '#f59e0b', // Naranja Hospital
@@ -959,30 +1973,87 @@ const INITIAL_STATE = {
   }
 };
 
+
 class StateStore {
   constructor() {
-    this.state = this.loadState();
+    // Eliminar base de datos previa en LocalStorage para garantizar migración limpia a Supabase
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem('cita_medica_pacientes');
+      localStorage.removeItem('montepiedra_pacientes');
+    } catch (e) {
+      console.warn('Aviso limpiando localStorage:', e);
+    }
+
+    this.state = JSON.parse(JSON.stringify(INITIAL_STATE));
     this.listeners = [];
+    this.isSupabaseConnected = false;
+    this.realtimeSubscribed = false;
+
+    // Sincronizar inmediatamente con la nueva base de datos en Supabase
+    this.syncWithSupabase();
   }
 
-  loadState() {
+  async syncWithSupabase() {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
+      const [apts, exps, recs, rxs, guard, users, clinics] = await Promise.all([
+        SupabaseDB.getAppointments(),
+        SupabaseDB.getExpenses(),
+        SupabaseDB.getMedicalRecords(),
+        SupabaseDB.getPrescriptions(),
+        SupabaseDB.getEmergencyGuard(),
+        SupabaseDB.getUsers(),
+        SupabaseDB.getClinics()
+      ]);
+
+      let hasChanges = false;
+
+      if (apts && apts.length > 0) {
+        this.state.appointments = apts;
+        hasChanges = true;
       }
-    } catch (e) {
-      console.warn('Error cargando estado desde LocalStorage:', e);
+      if (exps && exps.length > 0) {
+        this.state.expenses = exps;
+        hasChanges = true;
+      }
+      if (recs && recs.length > 0) {
+        this.state.medicalRecords = recs;
+        hasChanges = true;
+      }
+      if (rxs && rxs.length > 0) {
+        this.state.prescriptions = rxs;
+        hasChanges = true;
+      }
+      if (guard) {
+        this.state.emergencyGuard = guard;
+        hasChanges = true;
+      }
+      if (users && Object.keys(users).length > 0) {
+        Object.assign(DEMO_USERS, users);
+      }
+      if (clinics && Object.keys(clinics).length > 0) {
+        Object.assign(CLINICS, clinics);
+      }
+
+      this.isSupabaseConnected = true;
+
+      if (!this.realtimeSubscribed) {
+        this.realtimeSubscribed = true;
+        SupabaseDB.subscribeRealtime(() => {
+          this.syncWithSupabase();
+        });
+      }
+
+      if (hasChanges) {
+        this.notify();
+      }
+    } catch (err) {
+      console.warn('Conexión con Supabase pendiente o sin conexión:', err);
     }
-    return JSON.parse(JSON.stringify(INITIAL_STATE));
   }
 
   saveState() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
-    } catch (e) {
-      console.error('Error guardando estado en LocalStorage:', e);
-    }
+    // La persistencia oficial ahora reside en Supabase.
     this.notify();
   }
 
@@ -1050,8 +2121,10 @@ class StateStore {
 
     // Calcular montos y retenciones según sede
     const clinic = CLINICS[newApt.clinicId] || CLINICS.ceibos;
-    newApt.basePrice = clinic.basePrice;
-    newApt.retentionRate = clinic.retentionRate;
+    newApt.basePrice = (appointmentData.basePrice !== undefined && appointmentData.basePrice !== null && !isNaN(appointmentData.basePrice))
+      ? Number(appointmentData.basePrice)
+      : clinic.basePrice;
+    newApt.retentionRate = (clinic.retentionRate !== undefined) ? clinic.retentionRate : 0.05;
 
     if (newApt.paymentMethod === 'tarjeta' && newApt.basePrice > 0) {
       newApt.feePercentage = CREDIT_CARD_SURCHARGE_RATE;
@@ -1070,8 +2143,10 @@ class StateStore {
 
     // Asegurar que exista ficha clínica para el paciente
     let record = this.state.medicalRecords.find(r => r.patientId === newApt.patientId);
+    let isNewRecord = false;
     if (!record) {
-      this.state.medicalRecords.push({
+      isNewRecord = true;
+      record = {
         id: `REC-${Math.floor(100 + Math.random() * 900)}`,
         patientId: newApt.patientId,
         patientName: newApt.patientName,
@@ -1088,7 +2163,14 @@ class StateStore {
             pa: '120/80 mmHg'
           }
         ]
-      });
+      };
+      this.state.medicalRecords.push(record);
+    }
+
+    // Persistir directamente en Supabase
+    SupabaseDB.insertAppointment(newApt).catch(e => console.error('Error guardando cita en Supabase:', e));
+    if (isNewRecord) {
+      SupabaseDB.upsertMedicalRecord(record).catch(e => console.error('Error guardando ficha en Supabase:', e));
     }
 
     this.saveState();
@@ -1099,6 +2181,7 @@ class StateStore {
     const apt = this.state.appointments.find(a => a.id === aptId);
     if (apt) {
       apt.status = status;
+      SupabaseDB.updateAppointmentStatus(aptId, status).catch(e => console.error('Error actualizando estado en Supabase:', e));
       this.saveState();
     }
   }
@@ -1107,6 +2190,7 @@ class StateStore {
     const apt = this.state.appointments.find(a => a.id === aptId);
     if (apt) {
       apt.settlementStatus = apt.settlementStatus === 'Liquidado' ? 'Pendiente' : 'Liquidado';
+      SupabaseDB.updateAppointmentSettlement(aptId, apt.settlementStatus).catch(e => console.error('Error actualizando liquidación en Supabase:', e));
       this.saveState();
     }
   }
@@ -1122,6 +2206,7 @@ class StateStore {
       ...expenseData
     };
     this.state.expenses.unshift(newExp);
+    SupabaseDB.insertExpense(newExp).catch(e => console.error('Error guardando gasto en Supabase:', e));
     this.saveState();
     return newExp;
   }
@@ -1138,6 +2223,7 @@ class StateStore {
       ...prescriptionData
     };
     this.state.prescriptions.unshift(newRx);
+    SupabaseDB.insertPrescription(newRx).catch(e => console.error('Error guardando receta en Supabase:', e));
     this.saveState();
     return newRx;
   }
@@ -1160,7 +2246,10 @@ class StateStore {
     affected.forEach(a => {
       a.status = 'en_guardia';
       a.notes = (a.notes ? a.notes + ' | ' : '') + '🚨 Interrumpida por Guardia Hospitalaria de Emergencia.';
+      SupabaseDB.updateAppointmentStatus(a.id, 'en_guardia').catch(e => console.error(e));
     });
+
+    SupabaseDB.updateEmergencyGuard(this.state.emergencyGuard).catch(e => console.error('Error guardando guardia en Supabase:', e));
 
     this.saveState();
     return affected;
@@ -1174,9 +2263,11 @@ class StateStore {
       apt.date = '2026-09-21'; // Próximo día hábil
       apt.status = 'confirmada';
       apt.notes += ' [Reagendado automáticamente para el lunes 21]';
+      SupabaseDB.updateAppointmentStatus(aptId, 'confirmada').catch(e => console.error(e));
     } else if (action === 'cancel') {
       apt.status = 'cancelada';
       apt.notes += ' [Cancelado por fuerza mayor de guardia médica]';
+      SupabaseDB.updateAppointmentStatus(aptId, 'cancelada').catch(e => console.error(e));
     }
 
     this.state.emergencyGuard.affectedAppointments = 
@@ -1186,11 +2277,14 @@ class StateStore {
       this.state.emergencyGuard.isActive = false;
     }
 
+    SupabaseDB.updateEmergencyGuard(this.state.emergencyGuard).catch(e => console.error(e));
+
     this.saveState();
   }
 
   deactivateEmergencyGuard() {
     this.state.emergencyGuard.isActive = false;
+    SupabaseDB.updateEmergencyGuard(this.state.emergencyGuard).catch(e => console.error(e));
     this.saveState();
   }
 
@@ -1694,36 +2788,98 @@ function setupPatientPortal(showToast) {
     });
   }
 
-  // Generar y filtrar horarios según citas existentes
+  // Generar y filtrar horarios según citas existentes y motor de colisiones
   function renderTimeSlots() {
     if (!slotsContainer) return;
 
     const baseSlots = ['08:30', '09:00', '09:45', '10:30', '11:15', '12:00', '13:00', '13:45', '14:30', '15:15', '16:00', '16:45', '17:30'];
+    const state = store.getState();
+
+    let firstAvailable = null;
 
     slotsContainer.innerHTML = baseSlots.map(time => {
-      const isSelected = (time === selectedTimeSlot);
-      let classes = 'slot-pill-btn';
-      if (isSelected) classes += ' selected';
+      const validacion = CollisionEngine.validarDisponibilidadSlot({
+        sedeId: selectedClinicId,
+        fechaStr: selectedDate,
+        horaStr: time,
+        duracionMinutos: 45,
+        citas: state.appointments,
+        travelBuffers: state.travelBuffers
+      });
+
+      const isAvailable = validacion.valido;
+      if (isAvailable && !firstAvailable) {
+        firstAvailable = time;
+      }
+
+      let extraClasses = '';
+      let badgeLabel = '';
+      if (!isAvailable) {
+        if (validacion.codigoError && validacion.codigoError.startsWith('TRASLADO')) {
+          extraClasses = 'disabled transit';
+          badgeLabel = ' 🚗';
+        } else if (validacion.codigoError === 'SALA_OCUPADA') {
+          extraClasses = 'disabled';
+          badgeLabel = ' 🔒';
+        } else {
+          extraClasses = 'disabled';
+          badgeLabel = ' ⏸️';
+        }
+      }
+
+      const isSelected = isAvailable && (time === selectedTimeSlot);
 
       return `
-        <button type="button" class="${classes}" data-time="${time}" title="Disponible">
-          ${time}
+        <button type="button" 
+                class="slot-pill-btn ${extraClasses} ${isSelected ? 'selected' : ''}" 
+                data-time="${time}" 
+                ${!isAvailable ? 'disabled' : ''} 
+                title="${validacion.razonRechazo || 'Horario disponible para consulta'}">
+          ${time}${badgeLabel}
         </button>
       `;
     }).join('');
 
-    slotsContainer.querySelectorAll('.slot-pill-btn').forEach(btn => {
+    // Si el horario seleccionado previamente quedó bloqueado, seleccionar el primero disponible
+    const currentBtnSelected = slotsContainer.querySelector('.slot-pill-btn.selected:not(.disabled)');
+    if (!currentBtnSelected && firstAvailable) {
+      selectedTimeSlot = firstAvailable;
+      const newSel = slotsContainer.querySelector(`.slot-pill-btn[data-time="${firstAvailable}"]`);
+      if (newSel) newSel.classList.add('selected');
+    }
+
+    slotsContainer.querySelectorAll('.slot-pill-btn:not(.disabled)').forEach(btn => {
       btn.addEventListener('click', () => {
         slotsContainer.querySelectorAll('.slot-pill-btn').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
         selectedTimeSlot = btn.dataset.time;
         updateSummaryCard();
+        actualizarAvisoBuffer();
       });
     });
 
-    if (travelNoticeBox) {
-      travelNoticeBox.innerHTML = '';
+    actualizarAvisoBuffer();
+  }
+
+  function actualizarAvisoBuffer() {
+    if (!travelNoticeBox) return;
+    const state = store.getState();
+    const buffersDelDia = state.travelBuffers.filter(t => t.date === selectedDate);
+
+    if (buffersDelDia.length > 0) {
+      travelNoticeBox.style.display = 'flex';
+      travelNoticeBox.innerHTML = `
+        <div style="font-size: 1.25rem;">🚗</div>
+        <div>
+          <strong style="color: #0284c7;">Amortiguamiento Vial Activo (Guayaquil):</strong>
+          <div style="font-size: 0.74rem; color: #475569; margin-top: 2px;">
+            ${buffersDelDia.map(b => `<span><strong>${b.fromClinic.toUpperCase()} → ${b.toClinic.toUpperCase()}:</strong> ${b.bufferLabel} (${b.startTime} - ${b.endTime})</span>`).join('<br/>')}
+          </div>
+        </div>
+      `;
+    } else {
       travelNoticeBox.style.display = 'none';
+      travelNoticeBox.innerHTML = '';
     }
   }
 
@@ -1929,13 +3085,20 @@ function setupPatientPortal(showToast) {
     const catalogo = MedicalService.getCatalogo();
     const service = catalogo.find(s => s.id === selectedServiceId) || catalogo[0];
 
-    const baseFee = clinic.basePrice === 0 ? 0 : service.precioBase;
-    let cardFee = 0;
-    let totalDue = baseFee;
+    const isHospital = selectedClinicId === 'hospital';
+    const realCost = isHospital ? 0 : (service.costoReal || service.precioBase || clinic.realCost || 20.00);
+    const listPrice = isHospital ? 0 : (service.precioLista || clinic.listPrice || +(realCost * 1.0975).toFixed(2));
 
-    if (selectedPaymentMethod === 'tarjeta' && baseFee > 0) {
-      cardFee = +(baseFee * CREDIT_CARD_SURCHARGE_RATE).toFixed(2);
-      totalDue = +(baseFee + cardFee).toFixed(2);
+    let discountAmount = 0;
+    let totalDue = listPrice;
+
+    if (selectedPaymentMethod === 'efectivo' || selectedPaymentMethod === 'transferencia') {
+      discountAmount = +(listPrice - realCost).toFixed(2);
+      totalDue = realCost;
+    } else {
+      // Tarjeta: Se cobra el 100% del precio de lista (sin desglosar ni aplicar recargo)
+      discountAmount = 0;
+      totalDue = listPrice;
     }
 
     const sumClinic = document.getElementById('sum-clinic-name');
@@ -1966,12 +3129,15 @@ function setupPatientPortal(showToast) {
       }
     }
 
-    if (sumBaseFee) sumBaseFee.textContent = `$${baseFee.toFixed(2)}`;
+    if (sumBaseFee) sumBaseFee.textContent = `$${listPrice.toFixed(2)}`;
 
     if (sumCardFeeRow && sumCardFee) {
-      if (selectedPaymentMethod === 'tarjeta' && baseFee > 0) {
+      if ((selectedPaymentMethod === 'efectivo' || selectedPaymentMethod === 'transferencia') && listPrice > 0) {
         sumCardFeeRow.style.display = 'flex';
-        sumCardFee.textContent = `+$${cardFee.toFixed(2)}`;
+        sumCardFeeRow.innerHTML = `
+          <span>Descuento especial por pago directo (9.75%):</span>
+          <strong id="sum-card-fee-amount" style="color: #15803d;">-$${discountAmount.toFixed(2)}</strong>
+        `;
       } else {
         sumCardFeeRow.style.display = 'none';
       }
@@ -2087,8 +3253,11 @@ function setupPatientPortal(showToast) {
     if (ticketId) ticketId.textContent = appointment.patientId;
     if (ticketSede) ticketSede.textContent = `${clinic.name} (${clinic.consultorio})`;
     if (ticketDate) ticketDate.textContent = `${appointment.date} - ${appointment.time}`;
-    if (ticketTotal) ticketTotal.textContent = `$${appointment.totalPaid.toFixed(2)}`;
-    if (ticketMethod) ticketMethod.textContent = appointment.paymentMethod === 'tarjeta' ? 'Tarjeta de Crédito (+9.75%)' : 'Efectivo / Transferencia';
+    if (ticketMethod) {
+      ticketMethod.textContent = appointment.paymentMethod === 'tarjeta'
+        ? 'Tarjeta de Crédito / Débito (100% Precio de Lista)'
+        : 'Efectivo / Transferencia (Descuento especial 9.75% aplicado)';
+    }
 
     // Generar Código QR Oficial de Alta Definición que abre el Comprobante PDF de la Cita Médica
     const qrSection = document.getElementById("ticket-qr-container") || document.querySelector(".qr-code-display-box") || document.querySelector(".ticket-qr-section");
@@ -2114,6 +3283,9 @@ function setupPatientPortal(showToast) {
         tot: appointment.totalPaid.toFixed(2),
         m: appointment.paymentMethod
       });
+      if (appointment.tokenSeguro) {
+        params.set('t', appointment.tokenSeguro);
+      }
 
       const pdfUrl = `${protocol}//${baseHost}${port}/comprobante.html?${params.toString()}`;
       const localPdfUrl = `comprobante.html?${params.toString()}`;
@@ -2123,6 +3295,9 @@ function setupPatientPortal(showToast) {
           <div id="ticket-qr-canvas-box" style="display: flex; justify-content: center; align-items: center; min-width: 220px; min-height: 220px;"></div>
           <span style="font-size: 0.76rem; font-weight: 800; color: #0284c7; background: #e0f2fe; padding: 4px 12px; border-radius: 9999px; margin-top: 8px;">
             📱 Escanea con tu celular para abrir tu PDF
+          </span>
+          <span style="font-size: 0.70rem; font-weight: 700; color: #059669; background: #ecfdf5; padding: 3px 10px; border-radius: 9999px; margin-top: 6px; border: 1px solid #a7f3d0; display: inline-flex; align-items: center; gap: 4px;">
+            ✓ Token Criptográfico Firmado (Inmutable)
           </span>
         </div>
       `;
@@ -2211,7 +3386,23 @@ function setupPatientPortal(showToast) {
 
         const service = MedicalService.getCatalogo().find(s => s.id === selectedServiceId) || MedicalService.getCatalogo()[0];
         const clinic = CLINICS[selectedClinicId];
-        const totalAmount = clinic.basePrice === 0 ? 0 : service.precioBase * (selectedPaymentMethod === 'tarjeta' ? 1 + CREDIT_CARD_SURCHARGE_RATE : 1);
+        const isHospital = selectedClinicId === 'hospital';
+        const realCost = isHospital ? 0 : (service.costoReal || service.precioBase || clinic.realCost || 20.00);
+        const listPrice = isHospital ? 0 : (service.precioLista || clinic.listPrice || +(realCost * 1.0975).toFixed(2));
+        const totalAmount = (selectedPaymentMethod === 'tarjeta') ? listPrice : realCost;
+        const discountAmount = +(listPrice - totalAmount).toFixed(2);
+
+        // Generar Token Criptográfico Firmado (HMAC-SHA256)
+        let tokenSeguro = null;
+        if (typeof QRTokenService !== 'undefined') {
+          tokenSeguro = QRTokenService.generarTokenSeguro(
+            `APT-${Date.now().toString(36).toUpperCase()}`,
+            `MED-${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
+            selectedDate,
+            selectedTimeSlot,
+            selectedClinicId
+          );
+        }
 
         // Crear la cita en el estado central
         createdAppointment = store.addAppointment({
@@ -2226,8 +3417,19 @@ function setupPatientPortal(showToast) {
           patientEmail: patEmail,
           reason: patReason,
           paymentMethod: selectedPaymentMethod,
-          totalPaid: totalAmount
+          listPrice: listPrice,
+          discountAmount: discountAmount,
+          discountLabel: (discountAmount > 0) ? 'Descuento especial por pago directo del 9.75%' : null,
+          basePrice: realCost, // Costo real del servicio para comisiones
+          totalPaid: totalAmount,
+          tokenSeguro: tokenSeguro,
+          estado: 'CONFIRMADA'
         });
+
+        // Liberar hold temporal tras confirmación formal
+        if (typeof SlotHoldManager !== 'undefined') {
+          SlotHoldManager.liberarHold();
+        }
 
         MedicalService.registrarAtencionEnHistorial(patId, createdAppointment);
 
@@ -2367,6 +3569,7 @@ function setupDoctorPortal(showToast) {
     if (activeDoctorTab === 'fichas') renderMedicalRecords();
     if (activeDoctorTab === 'recetas') setupPrescriptionTab();
     if (activeDoctorTab === 'gastos') renderExpensesTab();
+    if (activeDoctorTab === 'ingresos') renderIngresosTab();
   }
 
   bottomNavButtons.forEach(btn => {
@@ -2885,6 +4088,483 @@ function setupDoctorPortal(showToast) {
     }
   }
 
+  // --- 5. MÓDULO DE INGRESOS MÉDICOS POR SEDE Y DÍA ---
+  let ingresosFilter = 'todas'; // 'hoy', 'semana', 'mes', 'todas', 'personalizado'
+  let customDateStart = '';
+  let customDateEnd = '';
+  let isIngresosTabInitialized = false;
+
+  function setupIngresosTabEvents() {
+    if (isIngresosTabInitialized) return;
+    isIngresosTabInitialized = true;
+
+    // Filtros de fecha (Pills)
+    const pillButtons = document.querySelectorAll('#ingresos-filter-pills-group .ingresos-pill-btn');
+    const customBox = document.getElementById('ingresos-custom-range-box');
+    const inputStart = document.getElementById('ingresos-date-start');
+    const inputEnd = document.getElementById('ingresos-date-end');
+    const btnApplyDates = document.getElementById('btn-apply-custom-dates');
+
+    pillButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        pillButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        ingresosFilter = btn.dataset.range;
+
+        if (ingresosFilter === 'personalizado') {
+          if (customBox) customBox.classList.add('active');
+        } else {
+          if (customBox) customBox.classList.remove('active');
+          renderIngresosTab();
+        }
+      });
+    });
+
+    if (btnApplyDates) {
+      btnApplyDates.addEventListener('click', () => {
+        customDateStart = inputStart ? inputStart.value : '';
+        customDateEnd = inputEnd ? inputEnd.value : '';
+        if (!customDateStart || !customDateEnd) {
+          showToast('Selecciona la fecha inicial y final para el rango personalizado.', 'warning');
+          return;
+        }
+        renderIngresosTab();
+      });
+    }
+
+    // Modal de Registro de Consulta / Pago
+    const btnOpenModal = document.getElementById('btn-open-registrar-pago');
+    const modalPago = document.getElementById('modal-registrar-pago');
+    const btnCloseModal = document.getElementById('btn-close-payment-modal');
+    const formPago = document.getElementById('form-registrar-consulta-pago');
+
+    const selSede = document.getElementById('reg-pago-sede');
+    const inpFecha = document.getElementById('reg-pago-fecha');
+    const inpPrecio = document.getElementById('reg-pago-precio');
+    const selMetodo = document.getElementById('reg-pago-metodo');
+    const prevBruto = document.getElementById('prev-bruto');
+    const prevRecargo = document.getElementById('prev-recargo');
+    const prevComPct = document.getElementById('prev-com-pct');
+    const prevComision = document.getElementById('prev-comision');
+    const prevNeto = document.getElementById('prev-neto');
+
+    function updatePaymentPreview() {
+      const sedeKey = selSede ? selSede.value : 'mapasingue';
+      const precio = parseFloat(inpPrecio ? inpPrecio.value : 0) || 0;
+      const metodo = selMetodo ? selMetodo.value : 'efectivo';
+
+      const clinic = CLINICS[sedeKey] || { retentionRate: 0.05, name: 'Sede', realCost: 20.00, basePrice: 21.95 };
+      const retentionRate = clinic.retentionRate;
+
+      const listPrice = precio;
+      let descuentoDirecto = 0;
+      let totalCobrado = listPrice;
+
+      if (metodo === 'efectivo' || metodo === 'transferencia') {
+        const realTarget = (clinic.realCost && Math.abs(listPrice - (clinic.listPrice || clinic.basePrice)) < 0.1)
+          ? clinic.realCost
+          : +(listPrice / 1.0975).toFixed(2);
+        descuentoDirecto = +(listPrice - realTarget).toFixed(2);
+        totalCobrado = realTarget;
+      } else {
+        descuentoDirecto = 0;
+        totalCobrado = listPrice;
+      }
+
+      // Base para calcular la comisión de la sede (sobre costo real / base de la consulta)
+      const comisionBase = (clinic.realCost && Math.abs(listPrice - (clinic.listPrice || clinic.basePrice)) < 0.1) ? clinic.realCost : +(totalCobrado / 1.0975).toFixed(2);
+      const isHospital = sedeKey === 'hospital';
+      const comisionMonto = isHospital ? 0 : +(comisionBase * retentionRate).toFixed(2);
+      const netoDoctor = isHospital ? 0 : +(comisionBase - comisionMonto).toFixed(2);
+
+      if (prevBruto) prevBruto.textContent = `$${listPrice.toFixed(2)}`;
+      if (prevRecargo) {
+        prevRecargo.textContent = (metodo === 'efectivo' || metodo === 'transferencia')
+          ? `-$${descuentoDirecto.toFixed(2)} (9.75% directo)`
+          : '$0.00 (Precio de lista)';
+      }
+      const elCobrado = document.getElementById('prev-cobrado');
+      if (elCobrado) elCobrado.textContent = `$${totalCobrado.toFixed(2)}`;
+      if (prevComPct) prevComPct.textContent = `${(retentionRate * 100).toFixed(0)}%`;
+      if (prevComision) prevComision.textContent = `-$${comisionMonto.toFixed(2)}`;
+      if (prevNeto) prevNeto.textContent = isHospital ? '$0.00 (Sueldo Fijo)' : `$${netoDoctor.toFixed(2)}`;
+    }
+
+    if (selSede) {
+      selSede.addEventListener('change', () => {
+        const cKey = selSede.value;
+        const clinic = CLINICS[cKey] || { basePrice: 21.95 };
+        if (inpPrecio) {
+          inpPrecio.value = clinic.basePrice.toFixed(2);
+        }
+        updatePaymentPreview();
+      });
+    }
+
+    if (inpPrecio) inpPrecio.addEventListener('input', updatePaymentPreview);
+    if (selMetodo) selMetodo.addEventListener('change', updatePaymentPreview);
+
+    if (btnOpenModal && modalPago) {
+      btnOpenModal.addEventListener('click', () => {
+        if (inpFecha) inpFecha.value = activeDate || new Date().toISOString().split('T')[0];
+        updatePaymentPreview();
+        modalPago.classList.add('active');
+      });
+    }
+
+    if (btnCloseModal && modalPago) {
+      btnCloseModal.addEventListener('click', () => {
+        modalPago.classList.remove('active');
+      });
+    }
+
+    if (formPago) {
+      formPago.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const sede = selSede.value;
+        const fecha = inpFecha.value;
+        const nombre = document.getElementById('reg-pago-nombre').value.trim();
+        const cedula = document.getElementById('reg-pago-cedula').value.trim();
+        const precio = parseFloat(inpPrecio.value);
+        const metodo = selMetodo.value;
+        const motivo = document.getElementById('reg-pago-motivo').value.trim();
+
+        if (!sede || !fecha || !nombre || isNaN(precio)) {
+          showToast('Por favor completa todos los campos requeridos.', 'warning');
+          return;
+        }
+
+        const clinic = CLINICS[sede] || { retentionRate: 0.05, realCost: 20.00, basePrice: 21.95 };
+        const realTarget = (clinic.realCost && Math.abs(precio - (clinic.listPrice || clinic.basePrice)) < 0.1)
+          ? clinic.realCost
+          : +(precio / 1.0975).toFixed(2);
+        const totalCobrado = (metodo === 'tarjeta') ? precio : realTarget;
+        const discountAmount = +(precio - totalCobrado).toFixed(2);
+
+        store.addAppointment({
+          patientName: nombre,
+          patientId: cedula || '0000000000',
+          clinicId: sede,
+          date: fecha,
+          time: new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit', hour12: false }) || '11:00',
+          basePrice: realTarget,
+          listPrice: precio,
+          discountAmount: discountAmount,
+          discountLabel: (discountAmount > 0) ? 'Descuento especial por pago directo del 9.75%' : null,
+          paymentMethod: metodo,
+          totalPaid: totalCobrado,
+          reason: motivo || 'Consulta médica general'
+        });
+
+        showToast(`Consulta registrada para ${nombre} en ${CLINICS[sede]?.name}. Guardada en Supabase.`, 'success');
+        modalPago.classList.remove('active');
+        formPago.reset();
+        renderIngresosTab();
+      });
+    }
+  }
+
+  function renderIngresosTab() {
+    setupIngresosTabEvents();
+
+    const kpisRoot = document.getElementById('ingresos-kpis-root');
+    const daysContainer = document.getElementById('ingresos-days-container');
+    if (!kpisRoot || !daysContainer) return;
+
+    const state = store.getState();
+    const allAppointments = state.appointments.filter(a => a.status !== 'cancelada');
+
+    // Filtrar citas según el rango de fechas seleccionado
+    const refDate = activeDate || '2026-09-19';
+    let filteredAppointments = allAppointments;
+
+    if (ingresosFilter === 'hoy') {
+      filteredAppointments = allAppointments.filter(a => a.date === refDate);
+    } else if (ingresosFilter === 'semana') {
+      // Semana activa: 7 días de la semana en curso
+      const dRef = new Date(refDate);
+      const dayOfWeek = (dRef.getDay() + 6) % 7; // Lunes = 0
+      const monday = new Date(dRef);
+      monday.setDate(dRef.getDate() - dayOfWeek);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+
+      const monStr = monday.toISOString().split('T')[0];
+      const sunStr = sunday.toISOString().split('T')[0];
+      filteredAppointments = allAppointments.filter(a => a.date >= monStr && a.date <= sunStr);
+    } else if (ingresosFilter === 'mes') {
+      const monthPrefix = refDate.substring(0, 7); // ej '2026-09'
+      filteredAppointments = allAppointments.filter(a => a.date && a.date.startsWith(monthPrefix));
+    } else if (ingresosFilter === 'personalizado') {
+      if (customDateStart && customDateEnd) {
+        filteredAppointments = allAppointments.filter(a => a.date >= customDateStart && a.date <= customDateEnd);
+      }
+    }
+
+    // 1. Cálculos de Totales Globales
+    let totalConsultas = filteredAppointments.length;
+    let totalBruto = 0;
+    let totalComisiones = 0;
+    let totalRecargoTarjeta = 0;
+    let totalNeto = 0;
+    let hospitalConsultas = 0;
+
+    filteredAppointments.forEach(apt => {
+      const clinic = CLINICS[apt.clinicId] || { retentionRate: 0.05 };
+      const base = Number(apt.basePrice) || 0;
+      const rate = clinic.retentionRate;
+      const comision = +(base * rate).toFixed(2);
+      const neto = +(base - comision).toFixed(2);
+      const cardFee = (apt.paymentMethod === 'tarjeta' && base > 0) ? (Number(apt.feeAmount) || +(base * 0.0975).toFixed(2)) : 0;
+
+      totalBruto += base;
+      totalComisiones += comision;
+      totalRecargoTarjeta += cardFee;
+      totalNeto += neto;
+      if (apt.clinicId === 'hospital') {
+        hospitalConsultas++;
+      }
+    });
+
+    // Renderizar KPIs Globales
+    kpisRoot.innerHTML = `
+      <div class="ingresos-kpi-box" style="--kpi-border: #0284c7;">
+        <span class="ingresos-kpi-label">Total Consultas</span>
+        <div class="ingresos-kpi-val">${totalConsultas} <span style="font-size: 0.85rem; font-weight: 500; color: #64748b;">turnos</span></div>
+        <span class="ingresos-kpi-sub">${hospitalConsultas > 0 ? `${hospitalConsultas} en Hospital Público (0% com.)` : 'En sedes privadas activas'}</span>
+      </div>
+
+      <div class="ingresos-kpi-box" style="--kpi-border: #3b82f6;">
+        <span class="ingresos-kpi-label">Total Bruto Generado</span>
+        <div class="ingresos-kpi-val">$${totalBruto.toFixed(2)}</div>
+        <span class="ingresos-kpi-sub">Consultas × Tarifa base</span>
+      </div>
+
+      <div class="ingresos-kpi-box" style="--kpi-border: #ef4444;">
+        <span class="ingresos-kpi-label">Comisiones Retenidas</span>
+        <div class="ingresos-kpi-val" style="color: #dc2626;">-$${totalComisiones.toFixed(2)}</div>
+        <span class="ingresos-kpi-sub">Descuento de sedes (5%, 25%, 10%)</span>
+      </div>
+
+      <div class="ingresos-kpi-box" style="--kpi-border: #f59e0b;">
+        <span class="ingresos-kpi-label">Recargos Tarjeta Datafast</span>
+        <div class="ingresos-kpi-val" style="color: #b45309;">+$${totalRecargoTarjeta.toFixed(2)}</div>
+        <span class="ingresos-kpi-sub">9.75% bancario • No afecta comisión sede</span>
+      </div>
+
+      <div class="ingresos-kpi-box" style="--kpi-border: #10b981; background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%);">
+        <span class="ingresos-kpi-label" style="color: #15803d;">Ingreso Neto del Médico</span>
+        <div class="ingresos-kpi-val" style="color: #10b981;">$${totalNeto.toFixed(2)}</div>
+        <span class="ingresos-kpi-sub" style="color: #166534; font-weight: 600;">+ $1,200.00 sueldo fijo hospitalario</span>
+      </div>
+    `;
+
+    // 2. Agrupación por Días y por Sedes
+    if (filteredAppointments.length === 0) {
+      daysContainer.innerHTML = `
+        <div style="background: #ffffff; border: 1px dashed #cbd5e1; border-radius: 12px; padding: 32px 16px; text-align: center; color: #64748b;">
+          <div style="font-size: 2.2rem; margin-bottom: 8px;">📊</div>
+          <h4 style="color: #0f172a; margin-bottom: 4px;">No se encontraron consultas en este rango</h4>
+          <p style="font-size: 0.82rem; margin-bottom: 14px;">Cambia el filtro de fechas o registra un nuevo turno con el botón superior.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Días únicos ordenados desc
+    const uniqueDays = [...new Set(filteredAppointments.map(a => a.date))].sort((a, b) => b.localeCompare(a));
+
+    let htmlDays = '';
+
+    uniqueDays.forEach(dayStr => {
+      const dayApts = filteredAppointments.filter(a => a.date === dayStr);
+
+      let dayBruto = 0;
+      let dayComisiones = 0;
+      let dayNeto = 0;
+
+      dayApts.forEach(a => {
+        const c = CLINICS[a.clinicId] || { retentionRate: 0.05 };
+        const base = Number(a.basePrice) || 0;
+        const com = +(base * c.retentionRate).toFixed(2);
+        dayBruto += base;
+        dayComisiones += com;
+        dayNeto += +(base - com).toFixed(2);
+      });
+
+      // Formato fecha en español
+      const [year, month, day] = dayStr.split('-').map(Number);
+      const dateObj = new Date(year, month - 1, day);
+      const dayName = dateObj.toLocaleDateString('es-EC', { weekday: 'long' });
+      const dayNameCap = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+      const fullDateStr = dateObj.toLocaleDateString('es-EC', { day: 'numeric', month: 'long', year: 'numeric' });
+
+      // Agrupar por sede dentro del día: mapasingue, ceibos, alborada, hospital
+      const clinicKeys = ['mapasingue', 'ceibos', 'alborada', 'hospital'];
+      let clinicCardsHtml = '';
+
+      clinicKeys.forEach(cKey => {
+        const cApts = dayApts.filter(a => (a.clinicId || 'ceibos') === cKey);
+        if (cApts.length === 0) return;
+
+        const clinic = CLINICS[cKey] || { name: cKey, retentionRate: 0.05, color: '#0284c7', basePrice: 20 };
+        const cCount = cApts.length;
+        const cBasePriceSample = cApts[0].basePrice || clinic.basePrice;
+        let cBruto = 0;
+        let cComision = 0;
+        let cNeto = 0;
+
+        // Métodos de pago
+        let countEfectivo = 0, sumEfectivo = 0;
+        let countTarjeta = 0, sumTarjeta = 0, sumTarjetaRecargo = 0;
+        let countTransferencia = 0, sumTransferencia = 0;
+
+        cApts.forEach(apt => {
+          const b = Number(apt.basePrice) || 0;
+          const com = +(b * clinic.retentionRate).toFixed(2);
+          cBruto += b;
+          cComision += com;
+          cNeto += +(b - com).toFixed(2);
+
+          if (apt.paymentMethod === 'tarjeta') {
+            countTarjeta++;
+            sumTarjeta += b;
+            const r = Number(apt.feeAmount) || +(b * 0.0975).toFixed(2);
+            sumTarjetaRecargo += r;
+          } else if (apt.paymentMethod === 'transferencia') {
+            countTransferencia++;
+            sumTransferencia += b;
+          } else {
+            countEfectivo++;
+            sumEfectivo += b;
+          }
+        });
+
+        const isHospital = cKey === 'hospital';
+        const comisionPercentLabel = isHospital ? '0%' : `${(clinic.retentionRate * 100).toFixed(0)}%`;
+
+        let paymentPills = [];
+        if (countEfectivo > 0) {
+          paymentPills.push(`<span class="payment-pill efectivo">💵 Efectivo: ${countEfectivo} ($${sumEfectivo.toFixed(2)})</span>`);
+        }
+        if (countTarjeta > 0) {
+          paymentPills.push(`<span class="payment-pill tarjeta">💳 Tarjeta Datafast: ${countTarjeta} ($${sumTarjeta.toFixed(2)} + $${sumTarjetaRecargo.toFixed(2)} recargo 9.75%)</span>`);
+        }
+        if (countTransferencia > 0) {
+          paymentPills.push(`<span class="payment-pill transferencia">🏦 Transferencia: ${countTransferencia} ($${sumTransferencia.toFixed(2)})</span>`);
+        }
+
+        // Listado detallado de pacientes
+        const patientsListHtml = cApts.map(apt => `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px dashed #e2e8f0;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-family: monospace; font-weight: 700; color: #0284c7;">#${apt.code || apt.id}</span>
+              <span style="font-weight: 600; color: #1e293b;">${apt.patientName}</span>
+              <span style="font-size: 0.7rem; color: #64748b;">⏰ ${apt.time}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 0.72rem; color: #64748b;">${apt.paymentMethod === 'tarjeta' ? '💳 Tarjeta (+9.75%)' : (apt.paymentMethod === 'transferencia' ? '🏦 Transferencia' : '💵 Efectivo')}</span>
+              <strong style="color: #0f172a;">$${(apt.basePrice || 0).toFixed(2)}</strong>
+            </div>
+          </div>
+        `).join('');
+
+        clinicCardsHtml += `
+          <div class="ingresos-clinic-row-card" style="--clinic-border-color: ${clinic.color};">
+            <div class="ingresos-clinic-top-row">
+              <div class="ingresos-clinic-name">
+                <span style="width: 12px; height: 12px; border-radius: 50%; background: ${clinic.color};"></span>
+                <span>${clinic.name} — ${dayNameCap}</span>
+                <span class="badge-sede ${clinic.badgeClass}" style="font-size: 0.68rem; padding: 2px 8px;">
+                  ${isHospital ? '0% Comisión (Convenio Sueldo Fijo)' : `${comisionPercentLabel} Comisión Sede`}
+                </span>
+              </div>
+              <div style="font-size: 0.8rem; font-weight: 700; color: #64748b;">
+                ${dayStr}
+              </div>
+            </div>
+
+            <!-- Flujo de Cálculo Exacto Solicitado por el Usuario -->
+            <div class="ingresos-formula-flow">
+              <div class="formula-step">
+                <span class="formula-step-label">Consultas</span>
+                <span class="formula-step-val" style="color: #0f172a;">${cCount} turno${cCount > 1 ? 's' : ''}</span>
+              </div>
+
+              <span class="formula-arrow">×</span>
+
+              <div class="formula-step">
+                <span class="formula-step-label">Precio Consulta</span>
+                <span class="formula-step-val" style="color: #475569;">$${cBasePriceSample.toFixed(2)}</span>
+              </div>
+
+              <span class="formula-arrow">→</span>
+
+              <div class="formula-step">
+                <span class="formula-step-label">Total Generado</span>
+                <span class="formula-step-val" style="color: #0284c7;">$${cBruto.toFixed(2)}</span>
+              </div>
+
+              <span class="formula-arrow">−</span>
+
+              <div class="formula-step">
+                <span class="formula-step-label">Comisión (${comisionPercentLabel})</span>
+                <span class="formula-step-val" style="color: #dc2626;">-$${cComision.toFixed(2)}</span>
+              </div>
+
+              <span class="formula-arrow">→</span>
+
+              <div class="formula-step">
+                <span class="formula-step-label" style="color: #15803d;">Ingreso Neto Médico</span>
+                <span class="formula-step-val" style="color: #10b981; font-size: 1.05rem;">
+                  $${isHospital ? '0.00 (Sueldo Fijo)' : cNeto.toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            <!-- Desglose de Métodos de Pago -->
+            <div class="ingresos-payment-breakdown">
+              <strong style="color: #334155;">Métodos de Pago:</strong>
+              ${paymentPills.join(' ')}
+            </div>
+
+            <!-- Detalle de Pacientes del Turno -->
+            <details style="margin-top: 4px; cursor: pointer;">
+              <summary style="font-size: 0.74rem; font-weight: 700; color: #0284c7; outline: none;">
+                👁️ Ver desglose de ${cCount} paciente${cCount > 1 ? 's' : ''} (${clinic.name})
+              </summary>
+              <div class="ingresos-patients-detail">
+                ${patientsListHtml}
+              </div>
+            </details>
+          </div>
+        `;
+      });
+
+      htmlDays += `
+        <div class="ingresos-day-card">
+          <div class="ingresos-day-header-bar">
+            <div class="ingresos-day-title">
+              <span>📅 ${dayNameCap}, ${fullDateStr}</span>
+            </div>
+            <div class="ingresos-day-summary-badges">
+              <span class="badge-day-stat" style="background: #eff6ff; color: #1e40af;">${dayApts.length} consultas</span>
+              <span class="badge-day-stat" style="background: #f1f5f9; color: #334155;">$${dayBruto.toFixed(2)} bruto</span>
+              <span class="badge-day-stat" style="background: #fef2f2; color: #b91c1c;">-$${dayComisiones.toFixed(2)} comisiones</span>
+              <span class="badge-day-stat" style="background: #f0fdf4; color: #15803d; font-weight: 800;">$${dayNeto.toFixed(2)} netos</span>
+            </div>
+          </div>
+
+          <div class="ingresos-day-clinics-list">
+            ${clinicCardsHtml}
+          </div>
+        </div>
+      `;
+    });
+
+    daysContainer.innerHTML = htmlDays;
+  }
+
   // Escuchar cuando el médico entra a su portal o cambia el estado para renderizar
   store.subscribe((state) => {
     if (state.activeView === 'doctor') {
@@ -3209,6 +4889,8 @@ function showToast(message, type = 'info') {
     setTimeout(() => toast.remove(), 400);
   }, 4000);
 }
+
+
 
 // Inicialización de la Aplicación
 document.addEventListener('DOMContentLoaded', () => {

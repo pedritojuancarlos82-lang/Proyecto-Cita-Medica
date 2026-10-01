@@ -18,6 +18,8 @@ import {
   consultarSRI
 } from './validaciones-globales.js';
 import { MedicalService } from './services/medical-service.js';
+import { CollisionEngine } from './services/collision-engine.js';
+import { QRTokenService, SlotHoldManager, PatientReconciliator } from './services/qr-token-service.js';
 
 // Utilidades locales para UI de errores
 const showFieldError = (inputEl, message) => {
@@ -268,36 +270,98 @@ export function setupPatientPortal(showToast) {
     });
   }
 
-  // Generar y filtrar horarios según citas existentes
+  // Generar y filtrar horarios según citas existentes y motor de colisiones
   function renderTimeSlots() {
     if (!slotsContainer) return;
 
     const baseSlots = ['08:30', '09:00', '09:45', '10:30', '11:15', '12:00', '13:00', '13:45', '14:30', '15:15', '16:00', '16:45', '17:30'];
+    const state = store.getState();
+
+    let firstAvailable = null;
 
     slotsContainer.innerHTML = baseSlots.map(time => {
-      const isSelected = (time === selectedTimeSlot);
-      let classes = 'slot-pill-btn';
-      if (isSelected) classes += ' selected';
+      const validacion = CollisionEngine.validarDisponibilidadSlot({
+        sedeId: selectedClinicId,
+        fechaStr: selectedDate,
+        horaStr: time,
+        duracionMinutos: 45,
+        citas: state.appointments,
+        travelBuffers: state.travelBuffers
+      });
+
+      const isAvailable = validacion.valido;
+      if (isAvailable && !firstAvailable) {
+        firstAvailable = time;
+      }
+
+      let extraClasses = '';
+      let badgeLabel = '';
+      if (!isAvailable) {
+        if (validacion.codigoError && validacion.codigoError.startsWith('TRASLADO')) {
+          extraClasses = 'disabled transit';
+          badgeLabel = ' 🚗';
+        } else if (validacion.codigoError === 'SALA_OCUPADA') {
+          extraClasses = 'disabled';
+          badgeLabel = ' 🔒';
+        } else {
+          extraClasses = 'disabled';
+          badgeLabel = ' ⏸️';
+        }
+      }
+
+      const isSelected = isAvailable && (time === selectedTimeSlot);
 
       return `
-        <button type="button" class="${classes}" data-time="${time}" title="Disponible">
-          ${time}
+        <button type="button" 
+                class="slot-pill-btn ${extraClasses} ${isSelected ? 'selected' : ''}" 
+                data-time="${time}" 
+                ${!isAvailable ? 'disabled' : ''} 
+                title="${validacion.razonRechazo || 'Horario disponible para consulta'}">
+          ${time}${badgeLabel}
         </button>
       `;
     }).join('');
 
-    slotsContainer.querySelectorAll('.slot-pill-btn').forEach(btn => {
+    // Si el horario seleccionado previamente quedó bloqueado, seleccionar el primero disponible
+    const currentBtnSelected = slotsContainer.querySelector('.slot-pill-btn.selected:not(.disabled)');
+    if (!currentBtnSelected && firstAvailable) {
+      selectedTimeSlot = firstAvailable;
+      const newSel = slotsContainer.querySelector(`.slot-pill-btn[data-time="${firstAvailable}"]`);
+      if (newSel) newSel.classList.add('selected');
+    }
+
+    slotsContainer.querySelectorAll('.slot-pill-btn:not(.disabled)').forEach(btn => {
       btn.addEventListener('click', () => {
         slotsContainer.querySelectorAll('.slot-pill-btn').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
         selectedTimeSlot = btn.dataset.time;
         updateSummaryCard();
+        actualizarAvisoBuffer();
       });
     });
 
-    if (travelNoticeBox) {
-      travelNoticeBox.innerHTML = '';
+    actualizarAvisoBuffer();
+  }
+
+  function actualizarAvisoBuffer() {
+    if (!travelNoticeBox) return;
+    const state = store.getState();
+    const buffersDelDia = state.travelBuffers.filter(t => t.date === selectedDate);
+
+    if (buffersDelDia.length > 0) {
+      travelNoticeBox.style.display = 'flex';
+      travelNoticeBox.innerHTML = `
+        <div style="font-size: 1.25rem;">🚗</div>
+        <div>
+          <strong style="color: #0284c7;">Amortiguamiento Vial Activo (Guayaquil):</strong>
+          <div style="font-size: 0.74rem; color: #475569; margin-top: 2px;">
+            ${buffersDelDia.map(b => `<span><strong>${b.fromClinic.toUpperCase()} → ${b.toClinic.toUpperCase()}:</strong> ${b.bufferLabel} (${b.startTime} - ${b.endTime})</span>`).join('<br/>')}
+          </div>
+        </div>
+      `;
+    } else {
       travelNoticeBox.style.display = 'none';
+      travelNoticeBox.innerHTML = '';
     }
   }
 
@@ -503,13 +567,20 @@ export function setupPatientPortal(showToast) {
     const catalogo = MedicalService.getCatalogo();
     const service = catalogo.find(s => s.id === selectedServiceId) || catalogo[0];
 
-    const baseFee = clinic.basePrice === 0 ? 0 : service.precioBase;
-    let cardFee = 0;
-    let totalDue = baseFee;
+    const isHospital = selectedClinicId === 'hospital';
+    const realCost = isHospital ? 0 : (service.costoReal || service.precioBase || clinic.realCost || 20.00);
+    const listPrice = isHospital ? 0 : (service.precioLista || clinic.listPrice || +(realCost * 1.0975).toFixed(2));
 
-    if (selectedPaymentMethod === 'tarjeta' && baseFee > 0) {
-      cardFee = +(baseFee * CREDIT_CARD_SURCHARGE_RATE).toFixed(2);
-      totalDue = +(baseFee + cardFee).toFixed(2);
+    let discountAmount = 0;
+    let totalDue = listPrice;
+
+    if (selectedPaymentMethod === 'efectivo' || selectedPaymentMethod === 'transferencia') {
+      discountAmount = +(listPrice - realCost).toFixed(2);
+      totalDue = realCost;
+    } else {
+      // Tarjeta: Se cobra el 100% del precio de lista (sin desglosar ni aplicar recargo)
+      discountAmount = 0;
+      totalDue = listPrice;
     }
 
     const sumClinic = document.getElementById('sum-clinic-name');
@@ -540,12 +611,15 @@ export function setupPatientPortal(showToast) {
       }
     }
 
-    if (sumBaseFee) sumBaseFee.textContent = `$${baseFee.toFixed(2)}`;
+    if (sumBaseFee) sumBaseFee.textContent = `$${listPrice.toFixed(2)}`;
 
     if (sumCardFeeRow && sumCardFee) {
-      if (selectedPaymentMethod === 'tarjeta' && baseFee > 0) {
+      if ((selectedPaymentMethod === 'efectivo' || selectedPaymentMethod === 'transferencia') && listPrice > 0) {
         sumCardFeeRow.style.display = 'flex';
-        sumCardFee.textContent = `+$${cardFee.toFixed(2)}`;
+        sumCardFeeRow.innerHTML = `
+          <span>Descuento especial por pago directo (9.75%):</span>
+          <strong id="sum-card-fee-amount" style="color: #15803d;">-$${discountAmount.toFixed(2)}</strong>
+        `;
       } else {
         sumCardFeeRow.style.display = 'none';
       }
@@ -661,8 +735,11 @@ export function setupPatientPortal(showToast) {
     if (ticketId) ticketId.textContent = appointment.patientId;
     if (ticketSede) ticketSede.textContent = `${clinic.name} (${clinic.consultorio})`;
     if (ticketDate) ticketDate.textContent = `${appointment.date} - ${appointment.time}`;
-    if (ticketTotal) ticketTotal.textContent = `$${appointment.totalPaid.toFixed(2)}`;
-    if (ticketMethod) ticketMethod.textContent = appointment.paymentMethod === 'tarjeta' ? 'Tarjeta de Crédito (+9.75%)' : 'Efectivo / Transferencia';
+    if (ticketMethod) {
+      ticketMethod.textContent = appointment.paymentMethod === 'tarjeta'
+        ? 'Tarjeta de Crédito / Débito (100% Precio de Lista)'
+        : 'Efectivo / Transferencia (Descuento especial 9.75% aplicado)';
+    }
 
     // Generar Código QR Oficial de Alta Definición que abre el Comprobante PDF de la Cita Médica
     const qrSection = document.getElementById("ticket-qr-container") || document.querySelector(".qr-code-display-box") || document.querySelector(".ticket-qr-section");
@@ -688,6 +765,9 @@ export function setupPatientPortal(showToast) {
         tot: appointment.totalPaid.toFixed(2),
         m: appointment.paymentMethod
       });
+      if (appointment.tokenSeguro) {
+        params.set('t', appointment.tokenSeguro);
+      }
 
       const pdfUrl = `${protocol}//${baseHost}${port}/comprobante.html?${params.toString()}`;
       const localPdfUrl = `comprobante.html?${params.toString()}`;
@@ -697,6 +777,9 @@ export function setupPatientPortal(showToast) {
           <div id="ticket-qr-canvas-box" style="display: flex; justify-content: center; align-items: center; min-width: 220px; min-height: 220px;"></div>
           <span style="font-size: 0.76rem; font-weight: 800; color: #0284c7; background: #e0f2fe; padding: 4px 12px; border-radius: 9999px; margin-top: 8px;">
             📱 Escanea con tu celular para abrir tu PDF
+          </span>
+          <span style="font-size: 0.70rem; font-weight: 700; color: #059669; background: #ecfdf5; padding: 3px 10px; border-radius: 9999px; margin-top: 6px; border: 1px solid #a7f3d0; display: inline-flex; align-items: center; gap: 4px;">
+            ✓ Token Criptográfico Firmado (Inmutable)
           </span>
         </div>
       `;
@@ -785,7 +868,23 @@ export function setupPatientPortal(showToast) {
 
         const service = MedicalService.getCatalogo().find(s => s.id === selectedServiceId) || MedicalService.getCatalogo()[0];
         const clinic = CLINICS[selectedClinicId];
-        const totalAmount = clinic.basePrice === 0 ? 0 : service.precioBase * (selectedPaymentMethod === 'tarjeta' ? 1 + CREDIT_CARD_SURCHARGE_RATE : 1);
+        const isHospital = selectedClinicId === 'hospital';
+        const realCost = isHospital ? 0 : (service.costoReal || service.precioBase || clinic.realCost || 20.00);
+        const listPrice = isHospital ? 0 : (service.precioLista || clinic.listPrice || +(realCost * 1.0975).toFixed(2));
+        const totalAmount = (selectedPaymentMethod === 'tarjeta') ? listPrice : realCost;
+        const discountAmount = +(listPrice - totalAmount).toFixed(2);
+
+        // Generar Token Criptográfico Firmado (HMAC-SHA256)
+        let tokenSeguro = null;
+        if (typeof QRTokenService !== 'undefined') {
+          tokenSeguro = QRTokenService.generarTokenSeguro(
+            `APT-${Date.now().toString(36).toUpperCase()}`,
+            `MED-${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
+            selectedDate,
+            selectedTimeSlot,
+            selectedClinicId
+          );
+        }
 
         // Crear la cita en el estado central
         createdAppointment = store.addAppointment({
@@ -800,8 +899,19 @@ export function setupPatientPortal(showToast) {
           patientEmail: patEmail,
           reason: patReason,
           paymentMethod: selectedPaymentMethod,
-          totalPaid: totalAmount
+          listPrice: listPrice,
+          discountAmount: discountAmount,
+          discountLabel: (discountAmount > 0) ? 'Descuento especial por pago directo del 9.75%' : null,
+          basePrice: realCost, // Costo real del servicio para comisiones
+          totalPaid: totalAmount,
+          tokenSeguro: tokenSeguro,
+          estado: 'CONFIRMADA'
         });
+
+        // Liberar hold temporal tras confirmación formal
+        if (typeof SlotHoldManager !== 'undefined') {
+          SlotHoldManager.liberarHold();
+        }
 
         MedicalService.registrarAtencionEnHistorial(patId, createdAppointment);
 

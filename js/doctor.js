@@ -59,6 +59,7 @@ export function setupDoctorPortal(showToast) {
     if (activeDoctorTab === 'fichas') renderMedicalRecords();
     if (activeDoctorTab === 'recetas') setupPrescriptionTab();
     if (activeDoctorTab === 'gastos') renderExpensesTab();
+    if (activeDoctorTab === 'ingresos') renderIngresosTab();
   }
 
   bottomNavButtons.forEach(btn => {
@@ -575,6 +576,483 @@ export function setupDoctorPortal(showToast) {
         </div>
       `).join('');
     }
+  }
+
+  // --- 5. MÓDULO DE INGRESOS MÉDICOS POR SEDE Y DÍA ---
+  let ingresosFilter = 'todas'; // 'hoy', 'semana', 'mes', 'todas', 'personalizado'
+  let customDateStart = '';
+  let customDateEnd = '';
+  let isIngresosTabInitialized = false;
+
+  function setupIngresosTabEvents() {
+    if (isIngresosTabInitialized) return;
+    isIngresosTabInitialized = true;
+
+    // Filtros de fecha (Pills)
+    const pillButtons = document.querySelectorAll('#ingresos-filter-pills-group .ingresos-pill-btn');
+    const customBox = document.getElementById('ingresos-custom-range-box');
+    const inputStart = document.getElementById('ingresos-date-start');
+    const inputEnd = document.getElementById('ingresos-date-end');
+    const btnApplyDates = document.getElementById('btn-apply-custom-dates');
+
+    pillButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        pillButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        ingresosFilter = btn.dataset.range;
+
+        if (ingresosFilter === 'personalizado') {
+          if (customBox) customBox.classList.add('active');
+        } else {
+          if (customBox) customBox.classList.remove('active');
+          renderIngresosTab();
+        }
+      });
+    });
+
+    if (btnApplyDates) {
+      btnApplyDates.addEventListener('click', () => {
+        customDateStart = inputStart ? inputStart.value : '';
+        customDateEnd = inputEnd ? inputEnd.value : '';
+        if (!customDateStart || !customDateEnd) {
+          showToast('Selecciona la fecha inicial y final para el rango personalizado.', 'warning');
+          return;
+        }
+        renderIngresosTab();
+      });
+    }
+
+    // Modal de Registro de Consulta / Pago
+    const btnOpenModal = document.getElementById('btn-open-registrar-pago');
+    const modalPago = document.getElementById('modal-registrar-pago');
+    const btnCloseModal = document.getElementById('btn-close-payment-modal');
+    const formPago = document.getElementById('form-registrar-consulta-pago');
+
+    const selSede = document.getElementById('reg-pago-sede');
+    const inpFecha = document.getElementById('reg-pago-fecha');
+    const inpPrecio = document.getElementById('reg-pago-precio');
+    const selMetodo = document.getElementById('reg-pago-metodo');
+    const prevBruto = document.getElementById('prev-bruto');
+    const prevRecargo = document.getElementById('prev-recargo');
+    const prevComPct = document.getElementById('prev-com-pct');
+    const prevComision = document.getElementById('prev-comision');
+    const prevNeto = document.getElementById('prev-neto');
+
+    function updatePaymentPreview() {
+      const sedeKey = selSede ? selSede.value : 'mapasingue';
+      const precio = parseFloat(inpPrecio ? inpPrecio.value : 0) || 0;
+      const metodo = selMetodo ? selMetodo.value : 'efectivo';
+
+      const clinic = CLINICS[sedeKey] || { retentionRate: 0.05, name: 'Sede', realCost: 20.00, basePrice: 21.95 };
+      const retentionRate = clinic.retentionRate;
+
+      const listPrice = precio;
+      let descuentoDirecto = 0;
+      let totalCobrado = listPrice;
+
+      if (metodo === 'efectivo' || metodo === 'transferencia') {
+        const realTarget = (clinic.realCost && Math.abs(listPrice - (clinic.listPrice || clinic.basePrice)) < 0.1)
+          ? clinic.realCost
+          : +(listPrice / 1.0975).toFixed(2);
+        descuentoDirecto = +(listPrice - realTarget).toFixed(2);
+        totalCobrado = realTarget;
+      } else {
+        descuentoDirecto = 0;
+        totalCobrado = listPrice;
+      }
+
+      // Base para calcular la comisión de la sede (sobre costo real / base de la consulta)
+      const comisionBase = (clinic.realCost && Math.abs(listPrice - (clinic.listPrice || clinic.basePrice)) < 0.1) ? clinic.realCost : +(totalCobrado / 1.0975).toFixed(2);
+      const isHospital = sedeKey === 'hospital';
+      const comisionMonto = isHospital ? 0 : +(comisionBase * retentionRate).toFixed(2);
+      const netoDoctor = isHospital ? 0 : +(comisionBase - comisionMonto).toFixed(2);
+
+      if (prevBruto) prevBruto.textContent = `$${listPrice.toFixed(2)}`;
+      if (prevRecargo) {
+        prevRecargo.textContent = (metodo === 'efectivo' || metodo === 'transferencia')
+          ? `-$${descuentoDirecto.toFixed(2)} (9.75% directo)`
+          : '$0.00 (Precio de lista)';
+      }
+      const elCobrado = document.getElementById('prev-cobrado');
+      if (elCobrado) elCobrado.textContent = `$${totalCobrado.toFixed(2)}`;
+      if (prevComPct) prevComPct.textContent = `${(retentionRate * 100).toFixed(0)}%`;
+      if (prevComision) prevComision.textContent = `-$${comisionMonto.toFixed(2)}`;
+      if (prevNeto) prevNeto.textContent = isHospital ? '$0.00 (Sueldo Fijo)' : `$${netoDoctor.toFixed(2)}`;
+    }
+
+    if (selSede) {
+      selSede.addEventListener('change', () => {
+        const cKey = selSede.value;
+        const clinic = CLINICS[cKey] || { basePrice: 21.95 };
+        if (inpPrecio) {
+          inpPrecio.value = clinic.basePrice.toFixed(2);
+        }
+        updatePaymentPreview();
+      });
+    }
+
+    if (inpPrecio) inpPrecio.addEventListener('input', updatePaymentPreview);
+    if (selMetodo) selMetodo.addEventListener('change', updatePaymentPreview);
+
+    if (btnOpenModal && modalPago) {
+      btnOpenModal.addEventListener('click', () => {
+        if (inpFecha) inpFecha.value = activeDate || new Date().toISOString().split('T')[0];
+        updatePaymentPreview();
+        modalPago.classList.add('active');
+      });
+    }
+
+    if (btnCloseModal && modalPago) {
+      btnCloseModal.addEventListener('click', () => {
+        modalPago.classList.remove('active');
+      });
+    }
+
+    if (formPago) {
+      formPago.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const sede = selSede.value;
+        const fecha = inpFecha.value;
+        const nombre = document.getElementById('reg-pago-nombre').value.trim();
+        const cedula = document.getElementById('reg-pago-cedula').value.trim();
+        const precio = parseFloat(inpPrecio.value);
+        const metodo = selMetodo.value;
+        const motivo = document.getElementById('reg-pago-motivo').value.trim();
+
+        if (!sede || !fecha || !nombre || isNaN(precio)) {
+          showToast('Por favor completa todos los campos requeridos.', 'warning');
+          return;
+        }
+
+        const clinic = CLINICS[sede] || { retentionRate: 0.05, realCost: 20.00, basePrice: 21.95 };
+        const realTarget = (clinic.realCost && Math.abs(precio - (clinic.listPrice || clinic.basePrice)) < 0.1)
+          ? clinic.realCost
+          : +(precio / 1.0975).toFixed(2);
+        const totalCobrado = (metodo === 'tarjeta') ? precio : realTarget;
+        const discountAmount = +(precio - totalCobrado).toFixed(2);
+
+        store.addAppointment({
+          patientName: nombre,
+          patientId: cedula || '0000000000',
+          clinicId: sede,
+          date: fecha,
+          time: new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit', hour12: false }) || '11:00',
+          basePrice: realTarget,
+          listPrice: precio,
+          discountAmount: discountAmount,
+          discountLabel: (discountAmount > 0) ? 'Descuento especial por pago directo del 9.75%' : null,
+          paymentMethod: metodo,
+          totalPaid: totalCobrado,
+          reason: motivo || 'Consulta médica general'
+        });
+
+        showToast(`Consulta registrada para ${nombre} en ${CLINICS[sede]?.name}. Guardada en Supabase.`, 'success');
+        modalPago.classList.remove('active');
+        formPago.reset();
+        renderIngresosTab();
+      });
+    }
+  }
+
+  function renderIngresosTab() {
+    setupIngresosTabEvents();
+
+    const kpisRoot = document.getElementById('ingresos-kpis-root');
+    const daysContainer = document.getElementById('ingresos-days-container');
+    if (!kpisRoot || !daysContainer) return;
+
+    const state = store.getState();
+    const allAppointments = state.appointments.filter(a => a.status !== 'cancelada');
+
+    // Filtrar citas según el rango de fechas seleccionado
+    const refDate = activeDate || '2026-09-19';
+    let filteredAppointments = allAppointments;
+
+    if (ingresosFilter === 'hoy') {
+      filteredAppointments = allAppointments.filter(a => a.date === refDate);
+    } else if (ingresosFilter === 'semana') {
+      // Semana activa: 7 días de la semana en curso
+      const dRef = new Date(refDate);
+      const dayOfWeek = (dRef.getDay() + 6) % 7; // Lunes = 0
+      const monday = new Date(dRef);
+      monday.setDate(dRef.getDate() - dayOfWeek);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+
+      const monStr = monday.toISOString().split('T')[0];
+      const sunStr = sunday.toISOString().split('T')[0];
+      filteredAppointments = allAppointments.filter(a => a.date >= monStr && a.date <= sunStr);
+    } else if (ingresosFilter === 'mes') {
+      const monthPrefix = refDate.substring(0, 7); // ej '2026-09'
+      filteredAppointments = allAppointments.filter(a => a.date && a.date.startsWith(monthPrefix));
+    } else if (ingresosFilter === 'personalizado') {
+      if (customDateStart && customDateEnd) {
+        filteredAppointments = allAppointments.filter(a => a.date >= customDateStart && a.date <= customDateEnd);
+      }
+    }
+
+    // 1. Cálculos de Totales Globales
+    let totalConsultas = filteredAppointments.length;
+    let totalBruto = 0;
+    let totalComisiones = 0;
+    let totalRecargoTarjeta = 0;
+    let totalNeto = 0;
+    let hospitalConsultas = 0;
+
+    filteredAppointments.forEach(apt => {
+      const clinic = CLINICS[apt.clinicId] || { retentionRate: 0.05 };
+      const base = Number(apt.basePrice) || 0;
+      const rate = clinic.retentionRate;
+      const comision = +(base * rate).toFixed(2);
+      const neto = +(base - comision).toFixed(2);
+      const cardFee = (apt.paymentMethod === 'tarjeta' && base > 0) ? (Number(apt.feeAmount) || +(base * 0.0975).toFixed(2)) : 0;
+
+      totalBruto += base;
+      totalComisiones += comision;
+      totalRecargoTarjeta += cardFee;
+      totalNeto += neto;
+      if (apt.clinicId === 'hospital') {
+        hospitalConsultas++;
+      }
+    });
+
+    // Renderizar KPIs Globales
+    kpisRoot.innerHTML = `
+      <div class="ingresos-kpi-box" style="--kpi-border: #0284c7;">
+        <span class="ingresos-kpi-label">Total Consultas</span>
+        <div class="ingresos-kpi-val">${totalConsultas} <span style="font-size: 0.85rem; font-weight: 500; color: #64748b;">turnos</span></div>
+        <span class="ingresos-kpi-sub">${hospitalConsultas > 0 ? `${hospitalConsultas} en Hospital Público (0% com.)` : 'En sedes privadas activas'}</span>
+      </div>
+
+      <div class="ingresos-kpi-box" style="--kpi-border: #3b82f6;">
+        <span class="ingresos-kpi-label">Total Bruto Generado</span>
+        <div class="ingresos-kpi-val">$${totalBruto.toFixed(2)}</div>
+        <span class="ingresos-kpi-sub">Consultas × Tarifa base</span>
+      </div>
+
+      <div class="ingresos-kpi-box" style="--kpi-border: #ef4444;">
+        <span class="ingresos-kpi-label">Comisiones Retenidas</span>
+        <div class="ingresos-kpi-val" style="color: #dc2626;">-$${totalComisiones.toFixed(2)}</div>
+        <span class="ingresos-kpi-sub">Descuento de sedes (5%, 25%, 10%)</span>
+      </div>
+
+      <div class="ingresos-kpi-box" style="--kpi-border: #f59e0b;">
+        <span class="ingresos-kpi-label">Recargos Tarjeta Datafast</span>
+        <div class="ingresos-kpi-val" style="color: #b45309;">+$${totalRecargoTarjeta.toFixed(2)}</div>
+        <span class="ingresos-kpi-sub">9.75% bancario • No afecta comisión sede</span>
+      </div>
+
+      <div class="ingresos-kpi-box" style="--kpi-border: #10b981; background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%);">
+        <span class="ingresos-kpi-label" style="color: #15803d;">Ingreso Neto del Médico</span>
+        <div class="ingresos-kpi-val" style="color: #10b981;">$${totalNeto.toFixed(2)}</div>
+        <span class="ingresos-kpi-sub" style="color: #166534; font-weight: 600;">+ $1,200.00 sueldo fijo hospitalario</span>
+      </div>
+    `;
+
+    // 2. Agrupación por Días y por Sedes
+    if (filteredAppointments.length === 0) {
+      daysContainer.innerHTML = `
+        <div style="background: #ffffff; border: 1px dashed #cbd5e1; border-radius: 12px; padding: 32px 16px; text-align: center; color: #64748b;">
+          <div style="font-size: 2.2rem; margin-bottom: 8px;">📊</div>
+          <h4 style="color: #0f172a; margin-bottom: 4px;">No se encontraron consultas en este rango</h4>
+          <p style="font-size: 0.82rem; margin-bottom: 14px;">Cambia el filtro de fechas o registra un nuevo turno con el botón superior.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Días únicos ordenados desc
+    const uniqueDays = [...new Set(filteredAppointments.map(a => a.date))].sort((a, b) => b.localeCompare(a));
+
+    let htmlDays = '';
+
+    uniqueDays.forEach(dayStr => {
+      const dayApts = filteredAppointments.filter(a => a.date === dayStr);
+
+      let dayBruto = 0;
+      let dayComisiones = 0;
+      let dayNeto = 0;
+
+      dayApts.forEach(a => {
+        const c = CLINICS[a.clinicId] || { retentionRate: 0.05 };
+        const base = Number(a.basePrice) || 0;
+        const com = +(base * c.retentionRate).toFixed(2);
+        dayBruto += base;
+        dayComisiones += com;
+        dayNeto += +(base - com).toFixed(2);
+      });
+
+      // Formato fecha en español
+      const [year, month, day] = dayStr.split('-').map(Number);
+      const dateObj = new Date(year, month - 1, day);
+      const dayName = dateObj.toLocaleDateString('es-EC', { weekday: 'long' });
+      const dayNameCap = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+      const fullDateStr = dateObj.toLocaleDateString('es-EC', { day: 'numeric', month: 'long', year: 'numeric' });
+
+      // Agrupar por sede dentro del día: mapasingue, ceibos, alborada, hospital
+      const clinicKeys = ['mapasingue', 'ceibos', 'alborada', 'hospital'];
+      let clinicCardsHtml = '';
+
+      clinicKeys.forEach(cKey => {
+        const cApts = dayApts.filter(a => (a.clinicId || 'ceibos') === cKey);
+        if (cApts.length === 0) return;
+
+        const clinic = CLINICS[cKey] || { name: cKey, retentionRate: 0.05, color: '#0284c7', basePrice: 20 };
+        const cCount = cApts.length;
+        const cBasePriceSample = cApts[0].basePrice || clinic.basePrice;
+        let cBruto = 0;
+        let cComision = 0;
+        let cNeto = 0;
+
+        // Métodos de pago
+        let countEfectivo = 0, sumEfectivo = 0;
+        let countTarjeta = 0, sumTarjeta = 0, sumTarjetaRecargo = 0;
+        let countTransferencia = 0, sumTransferencia = 0;
+
+        cApts.forEach(apt => {
+          const b = Number(apt.basePrice) || 0;
+          const com = +(b * clinic.retentionRate).toFixed(2);
+          cBruto += b;
+          cComision += com;
+          cNeto += +(b - com).toFixed(2);
+
+          if (apt.paymentMethod === 'tarjeta') {
+            countTarjeta++;
+            sumTarjeta += b;
+            const r = Number(apt.feeAmount) || +(b * 0.0975).toFixed(2);
+            sumTarjetaRecargo += r;
+          } else if (apt.paymentMethod === 'transferencia') {
+            countTransferencia++;
+            sumTransferencia += b;
+          } else {
+            countEfectivo++;
+            sumEfectivo += b;
+          }
+        });
+
+        const isHospital = cKey === 'hospital';
+        const comisionPercentLabel = isHospital ? '0%' : `${(clinic.retentionRate * 100).toFixed(0)}%`;
+
+        let paymentPills = [];
+        if (countEfectivo > 0) {
+          paymentPills.push(`<span class="payment-pill efectivo">💵 Efectivo: ${countEfectivo} ($${sumEfectivo.toFixed(2)})</span>`);
+        }
+        if (countTarjeta > 0) {
+          paymentPills.push(`<span class="payment-pill tarjeta">💳 Tarjeta Datafast: ${countTarjeta} ($${sumTarjeta.toFixed(2)} + $${sumTarjetaRecargo.toFixed(2)} recargo 9.75%)</span>`);
+        }
+        if (countTransferencia > 0) {
+          paymentPills.push(`<span class="payment-pill transferencia">🏦 Transferencia: ${countTransferencia} ($${sumTransferencia.toFixed(2)})</span>`);
+        }
+
+        // Listado detallado de pacientes
+        const patientsListHtml = cApts.map(apt => `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px dashed #e2e8f0;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-family: monospace; font-weight: 700; color: #0284c7;">#${apt.code || apt.id}</span>
+              <span style="font-weight: 600; color: #1e293b;">${apt.patientName}</span>
+              <span style="font-size: 0.7rem; color: #64748b;">⏰ ${apt.time}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 0.72rem; color: #64748b;">${apt.paymentMethod === 'tarjeta' ? '💳 Tarjeta (+9.75%)' : (apt.paymentMethod === 'transferencia' ? '🏦 Transferencia' : '💵 Efectivo')}</span>
+              <strong style="color: #0f172a;">$${(apt.basePrice || 0).toFixed(2)}</strong>
+            </div>
+          </div>
+        `).join('');
+
+        clinicCardsHtml += `
+          <div class="ingresos-clinic-row-card" style="--clinic-border-color: ${clinic.color};">
+            <div class="ingresos-clinic-top-row">
+              <div class="ingresos-clinic-name">
+                <span style="width: 12px; height: 12px; border-radius: 50%; background: ${clinic.color};"></span>
+                <span>${clinic.name} — ${dayNameCap}</span>
+                <span class="badge-sede ${clinic.badgeClass}" style="font-size: 0.68rem; padding: 2px 8px;">
+                  ${isHospital ? '0% Comisión (Convenio Sueldo Fijo)' : `${comisionPercentLabel} Comisión Sede`}
+                </span>
+              </div>
+              <div style="font-size: 0.8rem; font-weight: 700; color: #64748b;">
+                ${dayStr}
+              </div>
+            </div>
+
+            <!-- Flujo de Cálculo Exacto Solicitado por el Usuario -->
+            <div class="ingresos-formula-flow">
+              <div class="formula-step">
+                <span class="formula-step-label">Consultas</span>
+                <span class="formula-step-val" style="color: #0f172a;">${cCount} turno${cCount > 1 ? 's' : ''}</span>
+              </div>
+
+              <span class="formula-arrow">×</span>
+
+              <div class="formula-step">
+                <span class="formula-step-label">Precio Consulta</span>
+                <span class="formula-step-val" style="color: #475569;">$${cBasePriceSample.toFixed(2)}</span>
+              </div>
+
+              <span class="formula-arrow">→</span>
+
+              <div class="formula-step">
+                <span class="formula-step-label">Total Generado</span>
+                <span class="formula-step-val" style="color: #0284c7;">$${cBruto.toFixed(2)}</span>
+              </div>
+
+              <span class="formula-arrow">−</span>
+
+              <div class="formula-step">
+                <span class="formula-step-label">Comisión (${comisionPercentLabel})</span>
+                <span class="formula-step-val" style="color: #dc2626;">-$${cComision.toFixed(2)}</span>
+              </div>
+
+              <span class="formula-arrow">→</span>
+
+              <div class="formula-step">
+                <span class="formula-step-label" style="color: #15803d;">Ingreso Neto Médico</span>
+                <span class="formula-step-val" style="color: #10b981; font-size: 1.05rem;">
+                  $${isHospital ? '0.00 (Sueldo Fijo)' : cNeto.toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            <!-- Desglose de Métodos de Pago -->
+            <div class="ingresos-payment-breakdown">
+              <strong style="color: #334155;">Métodos de Pago:</strong>
+              ${paymentPills.join(' ')}
+            </div>
+
+            <!-- Detalle de Pacientes del Turno -->
+            <details style="margin-top: 4px; cursor: pointer;">
+              <summary style="font-size: 0.74rem; font-weight: 700; color: #0284c7; outline: none;">
+                👁️ Ver desglose de ${cCount} paciente${cCount > 1 ? 's' : ''} (${clinic.name})
+              </summary>
+              <div class="ingresos-patients-detail">
+                ${patientsListHtml}
+              </div>
+            </details>
+          </div>
+        `;
+      });
+
+      htmlDays += `
+        <div class="ingresos-day-card">
+          <div class="ingresos-day-header-bar">
+            <div class="ingresos-day-title">
+              <span>📅 ${dayNameCap}, ${fullDateStr}</span>
+            </div>
+            <div class="ingresos-day-summary-badges">
+              <span class="badge-day-stat" style="background: #eff6ff; color: #1e40af;">${dayApts.length} consultas</span>
+              <span class="badge-day-stat" style="background: #f1f5f9; color: #334155;">$${dayBruto.toFixed(2)} bruto</span>
+              <span class="badge-day-stat" style="background: #fef2f2; color: #b91c1c;">-$${dayComisiones.toFixed(2)} comisiones</span>
+              <span class="badge-day-stat" style="background: #f0fdf4; color: #15803d; font-weight: 800;">$${dayNeto.toFixed(2)} netos</span>
+            </div>
+          </div>
+
+          <div class="ingresos-day-clinics-list">
+            ${clinicCardsHtml}
+          </div>
+        </div>
+      `;
+    });
+
+    daysContainer.innerHTML = htmlDays;
   }
 
   // Escuchar cuando el médico entra a su portal o cambia el estado para renderizar

@@ -1,10 +1,14 @@
 import re
 
 files = [
+    'js/supabase-config.js',
+    'js/supabase-client.js',
     'js/qr-generator.js',
     'js/data/consultation-catalog.js',
     'js/models/patient-record.js',
     'js/services/medical-service.js',
+    'js/services/collision-engine.js',
+    'js/services/qr-token-service.js',
     'js/validaciones-globales.js',
     'js/state.js',
     'js/auth.js',

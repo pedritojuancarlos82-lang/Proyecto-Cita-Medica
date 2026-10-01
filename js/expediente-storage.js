@@ -3,7 +3,14 @@
  * Encapsula la lógica CRUD usando localStorage de forma defensiva y persistencia ultra liviana.
  */
 
+import { SupabaseDB } from './supabase-client.js';
+
 const STORAGE_KEY_PACIENTES = 'cita_medica_pacientes';
+
+// Limpiar base de datos local previa
+try {
+  localStorage.removeItem(STORAGE_KEY_PACIENTES);
+} catch (e) {}
 
 /**
  * Validar la estructura básica requerida del paciente.
@@ -23,45 +30,22 @@ const validarConsulta = (consulta) => {
   }
 };
 
-/**
- * Inicializa el storage si está vacío.
- */
-const inicializarStorage = () => {
-  try {
-    if (!localStorage.getItem(STORAGE_KEY_PACIENTES)) {
-      localStorage.setItem(STORAGE_KEY_PACIENTES, JSON.stringify([]));
-    }
-  } catch (error) {
-    console.error('Error inicializando el storage. Posible modo incógnito o cuota excedida:', error);
-  }
-};
+let memoriaPacientes = [];
 
 /**
- * Obtiene todos los pacientes del localStorage.
+ * Obtiene todos los pacientes.
  * @returns {Array<Object>} Lista de pacientes.
  */
 export const obtenerTodosLosPacientes = () => {
-  try {
-    inicializarStorage();
-    const data = localStorage.getItem(STORAGE_KEY_PACIENTES);
-    return JSON.parse(data) || [];
-  } catch (error) {
-    console.error('Error obteniendo pacientes:', error);
-    return [];
-  }
+  return memoriaPacientes;
 };
 
 /**
- * Guarda el arreglo completo de pacientes en el localStorage.
+ * Guarda el arreglo completo de pacientes en memoria y Supabase.
  * @param {Array<Object>} pacientes - Arreglo de pacientes a guardar.
  */
 const guardarTodosLosPacientes = (pacientes) => {
-  try {
-    localStorage.setItem(STORAGE_KEY_PACIENTES, JSON.stringify(pacientes));
-  } catch (error) {
-    console.error('Error guardando en localStorage (¿cuota excedida?):', error);
-    throw new Error('No se pudo guardar la información. Espacio insuficiente en el dispositivo.');
-  }
+  memoriaPacientes = pacientes;
 };
 
 /**

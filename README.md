@@ -72,8 +72,26 @@ Para levantar el proyecto en un entorno local:
 
 ```bash
 # Con Python:
-python -m http.server 8080
+py server.py
+# o bien: py -m http.server 8080
 
 # Abrir en el navegador:
 http://localhost:8080/
 ```
+
+---
+
+## ⚡ Base de Datos Supabase (PostgreSQL en la Nube)
+
+El proyecto ha sido completamente migrado de almacenamiento local a **Supabase**.
+
+- **Archivo de Migración SQL**: [`supabase/schema_and_seed.sql`](file:///c:/Users/campo/Desktop/Montepiedra/Proyectos/Proyecto%20-%20Cita%20medica/supabase/schema_and_seed.sql)
+- **Configuración de Conexión**: [`js/supabase-config.js`](file:///c:/Users/campo/Desktop/Montepiedra/Proyectos/Proyecto%20-%20Cita%20medica/js/supabase-config.js)
+- **Cliente y CRUD**: [`js/supabase-client.js`](file:///c:/Users/campo/Desktop/Montepiedra/Proyectos/Proyecto%20-%20Cita%20medica/js/supabase-client.js)
+- **Script de Migración REST**: [`migrate_to_supabase.py`](file:///c:/Users/campo/Desktop/Montepiedra/Proyectos/Proyecto%20-%20Cita%20medica/migrate_to_supabase.py)
+
+### Pasos para Activar tu Base de Datos en Supabase:
+1. Abre tu panel en [supabase.com](https://supabase.com/dashboard) y ve a **SQL Editor**.
+2. Pega y ejecuta el contenido de [`supabase/schema_and_seed.sql`](file:///c:/Users/campo/Desktop/Montepiedra/Proyectos/Proyecto%20-%20Cita%20medica/supabase/schema_and_seed.sql). Esto creará todas las 10 tablas, relaciones, políticas de seguridad RLS y cargará los datos migrados (sedes, usuarios, citas, recetas, fichas médicas y gastos).
+3. En la esquina superior de la web, haz clic en **⚡ Supabase DB** e introduce la **Project URL** de tu proyecto (obtenida en *Project Settings > API*).
+
