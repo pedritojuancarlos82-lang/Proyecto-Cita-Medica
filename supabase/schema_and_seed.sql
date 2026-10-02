@@ -109,17 +109,48 @@ CREATE TABLE IF NOT EXISTS public.prescriptions (
     created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
 );
 
--- 8. TABLA: expenses (Gastos Operativos y de Ruta)
+-- 8. TABLA: expenses (Gastos Operativos, Clasificación Contable y Auditoría)
 CREATE TABLE IF NOT EXISTS public.expenses (
     id TEXT PRIMARY KEY,
     date DATE NOT NULL,
     category TEXT NOT NULL CHECK (category IN ('Transporte', 'Mantenimiento', 'Suministros Hospital', 'Activos')),
+    accounting_category TEXT DEFAULT 'Gastos' CHECK (accounting_category IN ('Ingresos', 'Egresos', 'Costos', 'Gastos', 'Activos', 'Patrimonio')),
     description TEXT NOT NULL,
     amount NUMERIC(10, 2) NOT NULL,
     payment_method TEXT DEFAULT 'Efectivo',
+    voucher_type TEXT DEFAULT 'Factura Electrónica',
+    voucher_number TEXT,
+    provider_name TEXT,
+    provider_ruc TEXT,
+    audit_status TEXT DEFAULT 'Aprobado' CHECK (audit_status IN ('Aprobado', 'Pendiente', 'Observado')),
+    cost_center TEXT DEFAULT 'General Movilidad',
+    audit_notes TEXT,
     quick_logged BOOLEAN DEFAULT FALSE,
     deductible_sri BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- 9. TABLA: patient_profiles (Perfiles Completos de Pacientes y Ficha Personal)
+CREATE TABLE IF NOT EXISTS public.patient_profiles (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    cedula TEXT UNIQUE NOT NULL,
+    nombres TEXT NOT NULL,
+    apellidos TEXT,
+    fecha_nacimiento DATE,
+    edad INTEGER,
+    genero TEXT DEFAULT 'No especificado',
+    telefono TEXT,
+    email TEXT,
+    direccion TEXT,
+    contacto_emergencia_nombre TEXT,
+    contacto_emergencia_telefono TEXT,
+    tipo_sangre TEXT DEFAULT 'O+',
+    alergias TEXT DEFAULT 'Sin alergias declaradas',
+    enfermedades_cronicas TEXT DEFAULT 'Ninguna reportada',
+    medicacion_habitual TEXT DEFAULT 'Ninguna',
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()),
+    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
 );
 
 -- 9. TABLA: emergency_guard (Estado de Guardia Médica de Emergencia)
@@ -166,6 +197,7 @@ ALTER TABLE public.travel_buffers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.medical_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.prescriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.patient_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.emergency_guard ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.consultation_catalog ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.diagnosis_catalog ENABLE ROW LEVEL SECURITY;
@@ -178,6 +210,7 @@ CREATE POLICY "Permitir acceso publico travel_buffers" ON public.travel_buffers 
 CREATE POLICY "Permitir acceso publico medical_records" ON public.medical_records FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Permitir acceso publico prescriptions" ON public.prescriptions FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Permitir acceso publico expenses" ON public.expenses FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir acceso publico patient_profiles" ON public.patient_profiles FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Permitir acceso publico emergency_guard" ON public.emergency_guard FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Permitir acceso publico consultation_catalog" ON public.consultation_catalog FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Permitir acceso publico diagnosis_catalog" ON public.diagnosis_catalog FOR ALL USING (true) WITH CHECK (true);
@@ -248,14 +281,29 @@ VALUES
    'Disminuir consumo de sal y grasas saturadas. Realizar caminata 30 min diarios. Control de PA en 1 mes.')
 ON CONFLICT (id) DO NOTHING;
 
--- 7. Gastos Operativos y Diarios
-INSERT INTO public.expenses (id, date, category, description, amount, payment_method, quick_logged, deductible_sri)
+-- 7. Gastos Operativos, Clasificación Contable y Auditoría
+INSERT INTO public.expenses (
+  id, date, category, accounting_category, description, amount, payment_method,
+  voucher_type, voucher_number, provider_name, provider_ruc, audit_status, cost_center, audit_notes, quick_logged, deductible_sri
+)
 VALUES
-  ('EXP-101', '2026-09-19', 'Transporte', 'Gasolina Super para traslados entre clínicas', 15.00, 'Efectivo', true, true),
-  ('EXP-102', '2026-09-19', 'Transporte', 'Carrera de Taxi hacia Hospital Público Ceibos', 4.00, 'Efectivo', true, true),
-  ('EXP-103', '2026-09-19', 'Suministros Hospital', 'Insumos médicos de emergencia (Guantes de nitrilo, gasas estériles y antiséptico)', 12.00, 'Efectivo', true, true),
-  ('EXP-104', '2026-09-18', 'Mantenimiento', 'Desinfección y calibración de tensiómetro aneroide', 25.00, 'Transferencia', false, true),
-  ('EXP-105', '2026-09-15', 'Transporte', 'Peajes urbanos Vía a la Costa y combustible', 18.50, 'Efectivo', false, true)
+  ('EXP-101', '2026-09-19', 'Transporte', 'Gastos', 'Gasolina Super para traslados entre clínicas', 15.00, 'Efectivo', 'Factura Electrónica', '001-002-000847291', 'Estación Primax Ceibos', '0992384756001', 'Aprobado', 'General Movilidad', 'Comprobante cotejado con ruta Alborada-Ceibos.', true, true),
+  ('EXP-102', '2026-09-19', 'Transporte', 'Gastos', 'Carrera de Taxi hacia Hospital Público Ceibos', 4.00, 'Efectivo', 'Recibo / Vale', 'VAL-2026-042', 'Cooperativa Taxi Ceibos', '0991122334001', 'Aprobado', 'Hospital Ceibos', 'Movilización por emergencia de guardia hospitalaria.', true, true),
+  ('EXP-103', '2026-09-19', 'Suministros Hospital', 'Costos', 'Insumos médicos de emergencia (Guantes de nitrilo, gasas estériles y antiséptico)', 12.00, 'Efectivo', 'Factura Electrónica', '002-005-001294812', 'Distribuidora Farmacéutica Difare', '0990011223001', 'Aprobado', 'Hospital Ceibos', 'Insumos para atención de choque hospitalario.', true, true),
+  ('EXP-104', '2026-09-18', 'Mantenimiento', 'Costos', 'Desinfección y calibración de tensiómetro aneroide', 25.00, 'Transferencia', 'Factura Electrónica', '001-010-000004921', 'Biomédica del Litoral S.A.', '0991928374001', 'Aprobado', 'Sede Mapasingue', 'Mantenimiento preventivo de equipo instrumental.', false, true),
+  ('EXP-105', '2026-09-15', 'Transporte', 'Gastos', 'Peajes urbanos Vía a la Costa y combustible', 18.50, 'Efectivo', 'Factura Electrónica', '003-001-000994821', 'Gasolinera Mobil Vía a la Costa', '0990887766001', 'Aprobado', 'Sede Ceibos', 'Desplazamiento para turno extendido.', false, true)
+ON CONFLICT (id) DO NOTHING;
+
+-- 8. Perfiles Completos de Pacientes
+INSERT INTO public.patient_profiles (
+  id, user_id, cedula, nombres, apellidos, fecha_nacimiento, edad, genero, telefono, email,
+  direccion, contacto_emergencia_nombre, contacto_emergencia_telefono, tipo_sangre, alergias,
+  enfermedades_cronicas, medicacion_habitual
+)
+VALUES
+  ('PAT-PROF-01', 'USR-PAT', '0987654321', 'Carlos', 'Mendoza Moreira', '1982-05-14', 44, 'Masculino', '+593 98 765 4321', 'paciente@gmail.com', 'Cdla. Alborada 8va Etapa, Mz 812 Villa 4', 'Laura Moreira (Cónyuge)', '+593 99 223 3445', 'O+', 'Penicilina, Sulfamidas', 'Hipertensión Arterial Primaria Grado 1', 'Losartán 50mg cada 24h'),
+  ('PAT-PROF-02', NULL, '0918237465', 'Mariana', 'Vera Loor', '1994-08-22', 32, 'Femenino', '+593 99 123 4567', 'mariana.vera@yahoo.com', 'Urdesa Central, Calle 4ta y Guayacanes', 'Roberto Vera (Padre)', '+593 98 112 2334', 'A+', 'AINES (Ibuprofeno)', 'Asma Bronquial Intermitente', 'Salbutamol inhalador a demanda'),
+  ('PAT-PROF-03', NULL, '0922883344', 'Javier', 'Andrade Romero', '1975-11-03', 51, 'Masculino', '+593 98 456 1230', 'jandrade@gmail.com', 'Ceibos Norte Mz 14 Solar 2', 'Patricia Romero (Hermana)', '+593 97 665 5443', 'B+', 'Sin alergias declaradas', 'Hernia Discal L4-L5', 'Complejo B y Paracetamol 500mg SOS')
 ON CONFLICT (id) DO NOTHING;
 
 -- 8. Guardia Médica

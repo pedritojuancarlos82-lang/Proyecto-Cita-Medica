@@ -10,6 +10,7 @@ files = [
     'js/services/collision-engine.js',
     'js/services/qr-token-service.js',
     'js/validaciones-globales.js',
+    'js/ambient-background.js',
     'js/state.js',
     'js/auth.js',
     'js/patient.js',

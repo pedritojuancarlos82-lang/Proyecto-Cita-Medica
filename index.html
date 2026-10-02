@@ -6,15 +6,29 @@
   <title>Montepiedra Salud | Red de Consultorios y Atención Médica Integral</title>
   <meta name="description" content="Centro Médico Montepiedra: Red integral de atención médica general y preventiva en Guayaquil. Agenda tu cita en 4 sencillos pasos, recibe tu pase con código QR y obtén recetas médicas oficiales.">
 
+  <!-- Tipografía Moderna Premium: Outfit (Títulos), Space Grotesk (Subtítulos), Inter (Cuerpo), JetBrains Mono (Métricas/Códigos) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+
   <!-- Hojas de Estilo del Sistema de Diseño -->
-  <link rel="stylesheet" href="css/main.css">
-  <link rel="stylesheet" href="css/landing.css">
-  <link rel="stylesheet" href="css/patient.css">
-  <link rel="stylesheet" href="css/doctor.css">
-  <link rel="stylesheet" href="css/accountant.css">
-  <link rel="stylesheet" href="css/print.css">
+  <link rel="stylesheet" href="css/main.css?v=20261001_difuminado_v5">
+  <link rel="stylesheet" href="css/landing.css?v=20261001_difuminado_v5">
+  <link rel="stylesheet" href="css/patient.css?v=20261001_difuminado_v5">
+  <link rel="stylesheet" href="css/doctor.css?v=20261001_difuminado_v5">
+  <link rel="stylesheet" href="css/accountant.css?v=20261001_difuminado_v5">
+  <link rel="stylesheet" href="css/print.css?v=20261001_difuminado_v5">
 </head>
 <body>
+
+  <!-- Fondo de Decoloración Difuminada CSS entre Tonos Neutros (Efecto Continuo 24/7) -->
+  <div class="ambient-mesh-background" id="ambient-mesh-bg"></div>
+
+  <!-- Lienzo de Fondo Interactivo Minimalista Sensible al Mouse -->
+  <canvas id="ambient-canvas" class="ambient-interactive-canvas"></canvas>
+
+  <!-- Script Autónomo del Fondo Interactivo (Arranque Inmediato sin Dependencias) -->
+  <script src="js/ambient-background.js?v=20261001_difuminado_v5"></script>
 
   <!-- Contenedor Principal Responsivo de la Aplicación -->
   <main class="app-main-layout" id="main-app-layout">
@@ -483,6 +497,11 @@
                     <button type="submit" class="btn-primary btn-login-submit">
                       <span>Ingresar a la Plataforma</span> →
                     </button>
+
+                    <!-- Botón para Crear Cuenta de Paciente -->
+                    <button type="button" class="btn-create-account-prompt" id="btn-open-register-modal">
+                      <span>➕ ¿No tienes cuenta? Crear una cuenta de Paciente</span>
+                    </button>
                   </form>
 
                   <!-- Insignias de Confianza -->
@@ -567,65 +586,308 @@
              ================================================================ -->
         <section id="view-patient" class="patient-portal-wrapper" style="display: none;">
 
-          <!-- Barra de Navegación Exclusiva para la Página del Paciente (Portal de Citas) -->
-          <header class="page-custom-navbar page-custom-navbar-patient" id="patient-custom-navbar">
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <button type="button" class="btn-navbar-back" id="btn-nav-patient-back">
-                <span>← Volver al Inicio</span>
-              </button>
-              <div class="navbar-brand-group" style="cursor: default;">
-                <div class="brand-icon-box" style="background: linear-gradient(135deg, #0284c7, #0ea5e9);">🩺</div>
-                <div style="display: flex; flex-direction: column;">
-                  <span class="brand-title-text">Portal de Pacientes</span>
-                  <span class="brand-subtitle-text">Montepiedra Salud • Agendamiento Multisede</span>
-                </div>
+          <!-- Barra de Navegación Exclusiva y Limpia del Portal del Paciente -->
+          <header class="patient-portal-nav" id="patient-custom-navbar">
+            <div class="patient-nav-brand" id="patient-nav-brand-btn" style="cursor: pointer;" title="Volver al Sitio Web">
+              <div class="patient-brand-icon">🩺</div>
+              <div>
+                <h3 class="patient-brand-title">Montepiedra Salud</h3>
+                <span class="patient-brand-sub" id="patient-brand-subtitle">Portal del Paciente</span>
               </div>
             </div>
 
-            <!-- Menú Stepper de Pasos Exclusivo del Portal de Citas -->
-            <nav class="navbar-menu-view" id="nav-menu-patient">
-              <button type="button" class="nav-step-btn active" id="nav-btn-pat-step1" data-step="1">
-                <span>🏢 1. Sedes</span>
+            <!-- Pestañas de Navegación del Portal de Paciente (SOLO visibles cuando el usuario ha iniciado sesión) -->
+            <nav class="patient-nav-tabs" id="patient-portal-tab-bar" style="display: none;">
+              <button type="button" class="patient-tab-btn active" data-tab="resumen" id="nav-btn-pat-resumen">
+                <span>🏠 Resumen</span>
               </button>
-              <button type="button" class="nav-step-btn" id="nav-btn-pat-step2" data-step="2">
-                <span>⏰ 2. Horarios</span>
+              <button type="button" class="patient-tab-btn" data-tab="mis-citas" id="nav-btn-pat-citas">
+                <span>📅 Mis Citas</span>
               </button>
-              <button type="button" class="nav-step-btn" id="nav-btn-pat-step3" data-step="3">
-                <span>📋 3. Datos y Pago</span>
+              <button type="button" class="patient-tab-btn" data-tab="mis-datos" id="nav-btn-pat-datos">
+                <span>👤 Mis Datos</span>
               </button>
-              <button type="button" class="nav-step-btn" id="nav-btn-pat-step4" data-step="4">
-                <span>🎫 4. Mi Ticket QR</span>
+              <button type="button" class="patient-tab-btn" data-tab="agendar" id="nav-btn-pat-agendar">
+                <span>➕ Agendar Cita</span>
               </button>
             </nav>
 
-            <div class="navbar-actions-view" id="nav-actions-patient">
-              <div class="navbar-user-card" id="patient-logged-card" style="display: none;">
-                <img src="" alt="Avatar" class="navbar-avatar" id="pat-navbar-avatar" />
-                <div class="navbar-user-info">
-                  <span class="navbar-user-name" id="pat-navbar-name">Paciente</span>
-                  <span class="brand-badge badge-alborada">PACIENTE</span>
+            <div class="patient-nav-user" id="patient-nav-user-container">
+              <!-- Tarjeta de usuario cuando HA INICIADO SESIÓN -->
+              <div class="patient-user-pill" id="patient-logged-card" style="display: none;">
+                <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80" alt="Avatar" class="patient-avatar-img" id="pat-navbar-avatar" />
+                <div class="patient-meta-info">
+                  <span class="patient-display-name" id="pat-navbar-name">Carlos Mendoza</span>
+                  <span class="patient-role-tag">PACIENTE</span>
                 </div>
                 <button type="button" class="btn-logout" id="btn-patient-logout" title="Cerrar sesión">Salir ✕</button>
               </div>
-              <a href="#portal-acceso" class="btn-navbar-outline" id="btn-nav-patient-open-login" style="display: inline-flex;">
-                <span>🔐 Iniciar Sesión</span>
-              </a>
+
+              <!-- Botones para Usuario Nuevo / Sin Iniciar Sesión (Regresar o Iniciar Sesión) -->
+              <div class="patient-guest-nav-actions" id="patient-guest-nav-actions" style="display: flex;">
+                <button type="button" class="btn-patient-nav-back" id="btn-patient-back-to-web">
+                  ← Volver al Sitio Web
+                </button>
+                <button type="button" class="btn-patient-nav-login" id="btn-patient-open-login">
+                  🔐 Iniciar Sesión
+                </button>
+              </div>
             </div>
           </header>
 
-          <!-- Cabecera -->
-          <div class="patient-portal-header">
-            <div class="patient-header-left">
-              <span style="font-size: 1.6rem;">📅</span>
-              <div class="patient-header-title">
-                <h2>Reserva de Cita - Medicina General</h2>
-                <p>Agendamiento ágil multisede sin registro engorroso</p>
+          <div class="patient-portal-body">
+
+            <!-- PESTAÑA 1: RESUMEN / VENTANA PRINCIPAL (Aparece SIEMPRE al iniciar sesión) -->
+            <div class="patient-portal-pane" id="pat-pane-resumen" data-pane="resumen">
+              <!-- Banner de Bienvenida -->
+              <div class="patient-welcome-banner">
+                <div class="patient-welcome-text">
+                  <h2 id="pat-welcome-name">¡Hola, Carlos Mendoza! 👋</h2>
+                  <p>Bienvenido a tu portal de salud integral en Montepiedra Salud. Consulta tus citas, historial y datos personales.</p>
+                </div>
+                <div>
+                  <button type="button" class="btn-primary" id="btn-dash-quick-book" style="background: #ffffff; color: var(--primary-blue); font-weight: 800; border: none; padding: 12px 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    ➕ Agendar Nueva Cita
+                  </button>
+                </div>
+              </div>
+
+              <!-- Fila de Tarjetas Resumen KPIs -->
+              <div class="patient-summary-kpis">
+                <div class="patient-summary-card">
+                  <div class="patient-card-heading">
+                    <span>Próxima Cita</span>
+                    <span>⏰</span>
+                  </div>
+                  <div class="patient-card-main-val" id="pat-kpi-next-date">Cargando...</div>
+                  <div class="patient-card-sub-info" id="pat-kpi-next-clinic">Sede Alborada • Cons. 4</div>
+                </div>
+
+                <div class="patient-summary-card">
+                  <div class="patient-card-heading">
+                    <span>Historial de Consultas</span>
+                    <span>📋</span>
+                  </div>
+                  <div class="patient-card-main-val" id="pat-kpi-total-citas">3 Citas</div>
+                  <div class="patient-card-sub-info">Registradas en el sistema</div>
+                </div>
+
+                <div class="patient-summary-card">
+                  <div class="patient-card-heading">
+                    <span>Ficha y Antecedentes</span>
+                    <span>🛡️</span>
+                  </div>
+                  <div class="patient-card-main-val" style="color: #10b981; font-size: 1.15rem;">✓ Verificada MSP</div>
+                  <div class="patient-card-sub-info">Cédula y datos actualizados</div>
+                </div>
+
+                <div class="patient-summary-card">
+                  <div class="patient-card-heading">
+                    <span>Alertas Clínicas</span>
+                    <span>⚠️</span>
+                  </div>
+                  <div class="patient-card-main-val" id="pat-kpi-allergies" style="font-size: 0.95rem; color: #dc2626;">Penicilina, Sulfas</div>
+                  <div class="patient-card-sub-info">Alergias notificadas al doctor</div>
+                </div>
+              </div>
+
+              <!-- Tarjeta de Próxima Cita con Acceso Inmediato a Ticket QR -->
+              <div class="patient-next-apt-card" id="pat-next-apt-box">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                  <div style="font-size: 2.2rem; background: #eff6ff; width: 56px; height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center;">
+                    🎫
+                  </div>
+                  <div>
+                    <span class="badge-sede badge-alborada" id="pat-next-badge">CONFIRMADA</span>
+                    <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--dark-navy); margin: 4px 0;" id="pat-next-title">
+                      Consulta de Medicina General
+                    </h3>
+                    <p style="font-size: 0.82rem; color: #475569; margin: 0;" id="pat-next-details">
+                      📍 Consultorio Alborada (Cons. 4) • Dr. Carlos Campoverde • 09:00 AM
+                    </p>
+                  </div>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                  <button type="button" class="btn-primary" id="btn-pat-view-ticket-direct" style="padding: 10px 18px; font-size: 0.85rem;">
+                    📱 Ver Ticket y Pase QR
+                  </button>
+                </div>
+              </div>
+
+              <!-- Accesos Rápidos y Resumen de Perfil -->
+              <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px;">
+                <div class="patient-summary-card">
+                  <div class="patient-card-heading" style="margin-bottom: 8px;">
+                    <span>Últimas Indicaciones Médicas</span>
+                    <span>🩺</span>
+                  </div>
+                  <div style="font-size: 0.84rem; color: #334155; line-height: 1.5;" id="pat-summary-indications">
+                    <strong>Diagnóstico previo:</strong> Hipertensión Arterial Primaria (CIE-10: I10).<br>
+                    <strong>Posología:</strong> Losartán Potásico 50mg cada 24 horas por la mañana. Disminuir sal y grasas saturadas. Control regular de presión arterial.
+                  </div>
+                </div>
+
+                <div class="patient-summary-card">
+                  <div class="patient-card-heading" style="margin-bottom: 8px;">
+                    <span>Mis Accesos</span>
+                    <span>⚡</span>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <button type="button" class="btn-secondary" id="btn-dash-goto-citas" style="padding: 8px 12px; font-size: 0.8rem; text-align: left;">
+                      📅 Ver Todas Mis Citas
+                    </button>
+                    <button type="button" class="btn-secondary" id="btn-dash-goto-datos" style="padding: 8px 12px; font-size: 0.8rem; text-align: left;">
+                      👤 Actualizar Mis Datos
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
-            <button type="button" class="btn-secondary btn-patient-exit" id="btn-patient-exit-inline">
-              ← Volver al Inicio
-            </button>
-          </div>
+
+            <!-- PESTAÑA 2: MIS CITAS (Historial y Próximas Citas) -->
+            <div class="patient-portal-pane" id="pat-pane-citas" data-pane="mis-citas" style="display: none;">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                  <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--dark-navy); margin: 0;">Historial y Próximas Citas</h3>
+                  <p style="font-size: 0.82rem; color: #64748b; margin-top: 2px;">Consulta el estado de todas tus atenciones médicas y pases digitales QR.</p>
+                </div>
+                <button type="button" class="btn-primary" id="btn-citas-book-new" style="padding: 8px 16px; font-size: 0.84rem;">
+                  ➕ Nueva Cita
+                </button>
+              </div>
+
+              <div class="patient-appointments-wrapper">
+                <table class="patient-table">
+                  <thead>
+                    <tr>
+                      <th>Código</th>
+                      <th>Fecha y Hora</th>
+                      <th>Sede y Consultorio</th>
+                      <th>Motivo de Consulta</th>
+                      <th>Médico</th>
+                      <th>Total</th>
+                      <th>Estado</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="patient-appointments-table-body">
+                    <!-- Se llena dinámicamente desde patient.js -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- PESTAÑA 3: MIS DATOS (Ficha Personal, Contacto y Salud) -->
+            <div class="patient-portal-pane" id="pat-pane-datos" data-pane="mis-datos" style="display: none;">
+              <div>
+                <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--dark-navy); margin: 0;">Datos del Paciente y Ficha Personal</h3>
+                <p style="font-size: 0.82rem; color: #64748b; margin-top: 2px;">Información registrada y almacenada en Supabase y expediente clínico.</p>
+              </div>
+
+              <form id="form-patient-profile">
+                <div class="patient-profile-grid">
+                  <!-- Bloque 1: Identificación y Contacto -->
+                  <div class="patient-profile-section">
+                    <div class="patient-profile-title">
+                      <span>👤</span> Datos de Identidad y Contacto
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                      <label class="form-label">Cédula de Identidad</label>
+                      <input type="text" class="form-input" id="pat-prof-id" readonly style="background: #f1f5f9; cursor: not-allowed;" />
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                      <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Nombres</label>
+                        <input type="text" class="form-input" id="pat-prof-nombres" required />
+                      </div>
+                      <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Apellidos</label>
+                        <input type="text" class="form-input" id="pat-prof-apellidos" required />
+                      </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                      <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Teléfono Celular</label>
+                        <input type="tel" class="form-input" id="pat-prof-phone" required />
+                      </div>
+                      <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Correo Electrónico</label>
+                        <input type="email" class="form-input" id="pat-prof-email" required />
+                      </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                      <label class="form-label">Dirección Domiciliaria</label>
+                      <input type="text" class="form-input" id="pat-prof-address" placeholder="Ej: Cdla. Alborada 8va Etapa" />
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                      <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Contacto de Emergencia</label>
+                        <input type="text" class="form-input" id="pat-prof-emer-name" placeholder="Familiar o contacto" />
+                      </div>
+                      <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Teléfono Emergencia</label>
+                        <input type="tel" class="form-input" id="pat-prof-emer-phone" placeholder="098..." />
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Bloque 2: Ficha Médica y Antecedentes -->
+                  <div class="patient-profile-section">
+                    <div class="patient-profile-title">
+                      <span>🩺</span> Ficha Clínica y Antecedentes
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                      <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Tipo de Sangre</label>
+                        <select class="form-input" id="pat-prof-blood">
+                          <option value="O+">O Positivo (O+)</option>
+                          <option value="O-">O Negativo (O-)</option>
+                          <option value="A+">A Positivo (A+)</option>
+                          <option value="A-">A Negativo (A-)</option>
+                          <option value="B+">B Positivo (B+)</option>
+                          <option value="B-">B Negativo (B-)</option>
+                          <option value="AB+">AB Positivo (AB+)</option>
+                          <option value="AB-">AB Negativo (AB-)</option>
+                        </select>
+                      </div>
+                      <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Edad (Años)</label>
+                        <input type="number" class="form-input" id="pat-prof-age" min="1" max="120" />
+                      </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                      <label class="form-label">Alergias Conocidas (Medicamentos y Alimentos)</label>
+                      <input type="text" class="form-input" id="pat-prof-allergies" placeholder="ej. Penicilina, Sulfas, AINES..." />
+                      <span style="font-size: 0.72rem; color: #dc2626; margin-top: 2px;">* Alerta visible para el médico al emitir recetas.</span>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                      <label class="form-label">Enfermedades Crónicas / Diagnósticos</label>
+                      <textarea class="form-input" id="pat-prof-chronic" rows="2" placeholder="ej. Hipertensión Arterial, Asma, Diabetes..."></textarea>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                      <label class="form-label">Medicación Habitual</label>
+                      <textarea class="form-input" id="pat-prof-meds" rows="2" placeholder="ej. Losartán 50mg cada 24h, Aspirina 100mg..."></textarea>
+                    </div>
+
+                    <button type="submit" class="btn-primary" style="margin-top: 10px;">
+                      💾 Guardar Cambios en Ficha y Supabase
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            <!-- PESTAÑA 4: AGENDAR UNA CITA (Asistente en 4 Pasos) -->
+            <div class="patient-portal-pane" id="pat-pane-agendar" data-pane="agendar" style="display: none;">
 
           <!-- Stepper de Progreso (4 Pasos) -->
           <div class="wizard-stepper-container">
@@ -713,7 +975,7 @@
             <div class="wizard-step-pane" data-step="3" style="display: none;">
               <div class="step-section-header">
                 <h3 class="step-section-title">Paso 3: Datos Personales y Método de Pago</h3>
-                <p class="step-section-desc">Validación matemática oficial de cédula (Módulo 10), detección automática en SRI y desglose transparente.</p>
+                <p class="step-section-desc">Validación de cédula y desglose de honorarios médicos transparente.</p>
               </div>
 
               <div class="patient-checkout-grid">
@@ -727,7 +989,6 @@
                     </div>
                     <input type="text" class="form-input" id="pat-input-id" placeholder="Ej: 0925916074" maxlength="10" inputmode="numeric" required />
                     <div class="input-error-msg" id="pat-id-error"></div>
-                    <div class="sri-status-box" id="sri-lookup-status" style="display: none;"></div>
                   </div>
                   <div class="form-group">
                     <label class="form-label" for="pat-input-name">Nombre y Apellido Completo *</label>
@@ -882,7 +1143,8 @@
               </button>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
         <!-- ================================================================
              VISTA 2: PORTAL MÉDICO (MOBILE-FIRST / REDMI NOTE 390x844px)
@@ -997,16 +1259,8 @@
           <div class="doctor-tab-content">
             <!-- PESTAÑA 1: Agenda (Timeline de Pacientes y Rutas Protegidas) -->
             <div class="doctor-pane-view" data-pane="agenda" style="display: flex; flex-direction: column; gap: 12px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <span style="font-size: 0.88rem; font-weight: 800; color: var(--dark-navy);">📅 Sábado, 19 Septiembre 2026</span>
-                  <span class="active-clinic-pill" style="font-size: 0.72rem; padding: 3px 10px;">📍 Ceibos - Cons. 2</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span style="font-size: 0.78rem; font-weight: 700; color: #64748b;">RUTAS PROGRAMADAS</span>
-                  <span class="badge-sede badge-ceibos">5 Citas</span>
-                </div>
-              </div>
+              <!-- Barra interactiva de Navegación de Fechas (Anterior, Hoy, Siguiente y Datepicker) -->
+              <div id="doctor-agenda-header-toolbar"></div>
               <div class="timeline-container" id="doctor-timeline-list">
                 <!-- Se llena desde doctor.js -->
               </div>
@@ -1236,17 +1490,20 @@
 
             <!-- Menú de Auditoría y Liquidación Exclusivo de Contabilidad -->
             <nav class="navbar-menu-view" id="nav-menu-accountant">
-              <button type="button" class="nav-tab-btn active" data-target="kpis" id="nav-btn-acc-kpis">
-                <span>📊 Resumen KPIs</span>
+              <button type="button" class="nav-tab-btn active" data-target="flujo" id="nav-btn-acc-flujo">
+                <span>💵 Flujo & Liquidación</span>
               </button>
-              <button type="button" class="nav-tab-btn" data-target="settlement" id="nav-btn-acc-settlement">
-                <span>📅 Liquidación Viernes</span>
+              <button type="button" class="nav-tab-btn" data-target="clasificar" id="nav-btn-acc-clasificar">
+                <span>📂 Clasificar Gastos</span>
               </button>
-              <button type="button" class="nav-tab-btn" data-target="profitability" id="nav-btn-acc-profitability">
-                <span>🏢 Rentabilidad Sedes</span>
+              <button type="button" class="nav-tab-btn" data-target="auditoria" id="nav-btn-acc-auditoria">
+                <span>🧾 Auditar Facturas</span>
               </button>
-              <button type="button" class="nav-tab-btn" data-target="taxreport" id="nav-btn-acc-taxreport">
-                <span>📑 Informe SRI</span>
+              <button type="button" class="nav-tab-btn" data-target="rentabilidad" id="nav-btn-acc-rentabilidad">
+                <span>🏢 Rentabilidad & Rutas</span>
+              </button>
+              <button type="button" class="nav-tab-btn" data-target="tributario" id="nav-btn-acc-tributario">
+                <span>📑 Reporte SRI</span>
               </button>
             </nav>
 
@@ -1326,48 +1583,146 @@
 
           <!-- Cuerpo del Dashboard Contable -->
           <div class="accountant-dashboard-body">
-            <div class="accountant-split-grid">
-              <!-- MÓDULO 1: Liquidación de los Viernes (Tabla de Corte de Caja) -->
+
+            <!-- PANE 1: Flujo de Caja & Liquidación Semanal (Comisiones 5%, 25%, 10%) -->
+            <div class="accountant-tab-pane" id="acc-pane-flujo" data-pane="flujo">
+              <div class="accountant-split-grid">
+                <!-- MÓDULO 1: Liquidación de los Viernes (Tabla de Corte de Caja) -->
+                <div class="accounting-card">
+                  <div class="accounting-card-header">
+                    <div>
+                      <h3 class="card-heading-title">💵 Flujo de Caja & Liquidación Semanal (Corte Viernes)</h3>
+                      <p class="card-heading-desc">Supervisión de consultas atendidas, retenciones automáticas por sede y neto a transferir al médico</p>
+                    </div>
+                    <span class="badge-sede badge-alborada">Cierre de Semana Activo</span>
+                  </div>
+
+                  <div class="settlement-table-wrapper">
+                    <table class="settlement-table">
+                      <thead>
+                        <tr>
+                          <th>Sede / Consultorio</th>
+                          <th>Pacientes</th>
+                          <th>Facturado</th>
+                          <th>Retención Clínica</th>
+                          <th>Neto a Transferir</th>
+                          <th>Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody id="friday-settlement-table-body">
+                        <!-- Se llena desde accountant.js -->
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div style="background: #f8fafc; border-radius: 8px; padding: 12px; font-size: 0.78rem; color: #64748b;">
+                    💡 <strong>Tip de Auditoría:</strong> Puedes hacer clic sobre las etiquetas de estado (<em>Liquidado / Pendiente</em>) para conmutar la confirmación de transferencia interbancaria semanal.
+                  </div>
+                </div>
+
+                <!-- Resumen de Honorarios y Consultas Atendidas Recientes -->
+                <div class="accounting-card">
+                  <div class="accounting-card-header">
+                    <div>
+                      <h4 class="card-heading-title">Últimas Consultas Atendidas</h4>
+                      <p class="card-heading-desc">Detalle de cobros y comisiones aplicadas</p>
+                    </div>
+                  </div>
+                  <div id="acc-recent-consultations-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 380px; overflow-y: auto;">
+                    <!-- Se inyecta desde accountant.js -->
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- PANE 2: Revisar y Clasificar Gastos Operativos (Ingresos, Egresos, Costos, Gastos, Activos, Patrimonio) -->
+            <div class="accountant-tab-pane" id="acc-pane-clasificar" data-pane="clasificar" style="display: none;">
               <div class="accounting-card">
                 <div class="accounting-card-header">
                   <div>
-                    <h3 class="card-heading-title">Liquidación de los Viernes (Corte Automático)</h3>
-                    <p class="card-heading-desc">Agrupación por clínica, cálculo de comisiones retenidas y neto a pagar al médico</p>
+                    <h3 class="card-heading-title">📂 Revisión y Clasificación Contable de Gastos Operativos</h3>
+                    <p class="card-heading-desc">
+                      Accede a todos los gastos cargados por el médico (taxis, combustible, insumos hospitalarios) y organízalos contablemente.
+                    </p>
                   </div>
-                  <span class="badge-sede badge-alborada">Cierre de Semana Activo</span>
+                  <span class="badge-sede badge-ceibos">Normativa NEC / NIIF</span>
+                </div>
+
+                <!-- Chips de Resumen de Clasificación Contable -->
+                <div class="accounting-cat-chips-grid" id="acc-classification-summary-chips" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 12px;">
+                  <!-- Inyectado desde accountant.js -->
                 </div>
 
                 <div class="settlement-table-wrapper">
                   <table class="settlement-table">
                     <thead>
                       <tr>
-                        <th>Sede / Consultorio</th>
-                        <th>Pacientes</th>
-                        <th>Facturado</th>
-                        <th>Retención Clínica</th>
-                        <th>Neto a Transferir</th>
-                        <th>Estado</th>
+                        <th>Fecha</th>
+                        <th>Concepto / Detalle</th>
+                        <th>Centro de Costo / Sede</th>
+                        <th>Monto ($)</th>
+                        <th>Categoría Operativa</th>
+                        <th>Clasificación Contable Oficial</th>
                       </tr>
                     </thead>
-                    <tbody id="friday-settlement-table-body">
-                      <!-- Se llena desde accountant.js -->
+                    <tbody id="acc-expenses-classification-table-body">
+                      <!-- Inyectado desde accountant.js con selectores interactivos -->
                     </tbody>
                   </table>
                 </div>
 
-                <div style="background: #f8fafc; border-radius: 8px; padding: 12px; font-size: 0.78rem; color: #64748b;">
-                  💡 <strong>Tip de Auditoría:</strong> Puedes hacer clic sobre las etiquetas de estado (<em>Liquidado / Pendiente</em>) para conmutar la confirmación de transferencia interbancaria semanal.
+                <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px; font-size: 0.8rem; color: #1e40af;">
+                  📌 <strong>Nota del Auditor:</strong> Cambia la clasificación contable en el selector de cada fila. Los cambios se guardan y actualizan automáticamente el balance general.
                 </div>
               </div>
+            </div>
 
-              <!-- MÓDULO 2: Rentabilidad Real por Sede y Clasificador de Egresos -->
-              <div style="display: flex; flex-direction: column; gap: 24px;">
-                <!-- Rentabilidad Comparativa -->
+            <!-- PANE 3: Auditar Comprobantes y Facturas SRI -->
+            <div class="accountant-tab-pane" id="acc-pane-auditoria" data-pane="auditoria" style="display: none;">
+              <div class="accounting-card">
+                <div class="accounting-card-header">
+                  <div>
+                    <h3 class="card-heading-title">🧾 Auditoría de Comprobantes y Facturas Físicas / Electrónicas SRI</h3>
+                    <p class="card-heading-desc">
+                      Cotejo de facturas de compras de suministros médicos, insumos hospitalarios y gastos de movilización justificables.
+                    </p>
+                  </div>
+                  <div style="display: flex; gap: 8px;" id="acc-audit-badges-count">
+                    <!-- Conteo de Aprobados, Pendientes, Observados -->
+                  </div>
+                </div>
+
+                <div class="settlement-table-wrapper">
+                  <table class="settlement-table">
+                    <thead>
+                      <tr>
+                        <th>ID Gasto</th>
+                        <th>Tipo Comprobante</th>
+                        <th>N° Comprobante / Aut.</th>
+                        <th>Proveedor / RUC</th>
+                        <th>Detalle Justificado</th>
+                        <th>Monto</th>
+                        <th>Estado Auditoría</th>
+                        <th>Acción / Observación</th>
+                      </tr>
+                    </thead>
+                    <tbody id="acc-audit-vouchers-table-body">
+                      <!-- Inyectado desde accountant.js -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- PANE 4: Analizar Rentabilidad, Centros de Costo y Rutas -->
+            <div class="accountant-tab-pane" id="acc-pane-rentabilidad" data-pane="rentabilidad" style="display: none;">
+              <div class="accountant-split-grid">
+                <!-- Tarjeta 1: Centros de Costo y Rentabilidad por Sede -->
                 <div class="accounting-card">
                   <div class="accounting-card-header">
                     <div>
-                      <h4 class="card-heading-title">Rentabilidad Real por Sede</h4>
-                      <p class="card-heading-desc">Margen neto generado por cada consultorio</p>
+                      <h3 class="card-heading-title">🏢 Rentabilidad por Sedes & Centros de Costo</h3>
+                      <p class="card-heading-desc">Evaluación económica de ingresos netos vs. gastos asociados por consultorio</p>
                     </div>
                   </div>
                   <div class="clinic-profitability-list" id="clinic-profitability-container">
@@ -1375,20 +1730,48 @@
                   </div>
                 </div>
 
-                <!-- Clasificador Contable de Egresos -->
+                <!-- Tarjeta 2: Optimización de Rutas y Ahorro Operativo -->
                 <div class="accounting-card">
                   <div class="accounting-card-header">
                     <div>
-                      <h4 class="card-heading-title">Clasificador Contable de Egresos</h4>
-                      <p class="card-heading-desc">Gastos catalogados para deducción tributaria SRI</p>
+                      <h4 class="card-heading-title">🚗 Análisis y Optimización de Rutas</h4>
+                      <p class="card-heading-desc">Recomendaciones de movilidad para reducir costos operativos del médico</p>
                     </div>
+                    <span class="badge-sede badge-hospital">Ahorro Estimado: $45/semana</span>
                   </div>
-                  <div class="expense-category-chips" id="expense-categories-grid">
+                  <div id="acc-route-optimizations-list" style="display: flex; flex-direction: column; gap: 12px;">
                     <!-- Se llena desde accountant.js -->
                   </div>
                 </div>
               </div>
             </div>
+
+            <!-- PANE 5: Reportes para Declaraciones Tributarias SRI -->
+            <div class="accountant-tab-pane" id="acc-pane-tributario" data-pane="tributario" style="display: none;">
+              <div class="accounting-card">
+                <div class="accounting-card-header">
+                  <div>
+                    <h3 class="card-heading-title">📑 Reporte para Declaraciones Tributarias (Formulario SRI 102)</h3>
+                    <p class="card-heading-desc">
+                      Extracción automática de balances, flujos e informes financieros consolidados sin requerir datos manuales al médico.
+                    </p>
+                  </div>
+                  <div style="display: flex; gap: 8px;">
+                    <button type="button" class="btn-secondary" id="btn-acc-print-sri-direct" style="padding: 8px 14px; font-size: 0.8rem;">
+                      🖨️ Imprimir Formulario
+                    </button>
+                    <button type="button" class="btn-primary" id="btn-acc-export-tax-direct" style="padding: 8px 14px; font-size: 0.8rem;">
+                      📄 Abrir Modal SRI
+                    </button>
+                  </div>
+                </div>
+
+                <div id="acc-tax-report-preview-container">
+                  <!-- Inyectado desde accountant.js -->
+                </div>
+              </div>
+            </div>
+
           </div>
         </section>
 
@@ -1550,8 +1933,144 @@
     </div>
   </div>
 
+  <!-- Modal 7: Registrar Cuenta de Paciente -->
+  <div class="modal-overlay" id="modal-register-patient">
+    <div class="modal-card" style="max-width: 480px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.3rem;">👤</span>
+          <div>
+            <h3 class="modal-title" style="margin: 0;">Crear Cuenta de Paciente</h3>
+            <span style="font-size: 0.74rem; color: #64748b;">Regístrate para agendar citas, ver historial y recibir tus recetas</span>
+          </div>
+        </div>
+        <button type="button" class="modal-close-btn" id="btn-close-register-modal">✕</button>
+      </div>
 
+      <form id="form-register-patient" style="display: flex; flex-direction: column; gap: 12px; margin-top: 10px;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label">Cédula de Identidad *</label>
+          <input type="text" class="form-input" id="reg-pat-cedula" placeholder="10 dígitos numéricos" maxlength="10" required />
+          <div class="input-error-msg" id="reg-pat-cedula-error"></div>
+        </div>
 
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Nombres *</label>
+            <input type="text" class="form-input" id="reg-pat-nombres" placeholder="Ej. Carlos Eduardo" required />
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Apellidos *</label>
+            <input type="text" class="form-input" id="reg-pat-apellidos" placeholder="Ej. Mendoza Vera" required />
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Teléfono Móvil *</label>
+            <input type="tel" class="form-input" id="reg-pat-phone" placeholder="099..." maxlength="10" required />
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Correo Electrónico *</label>
+            <input type="email" class="form-input" id="reg-pat-email" placeholder="nombre@correo.com" required />
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label">Contraseña de Acceso *</label>
+          <input type="password" class="form-input" id="reg-pat-password" placeholder="Mínimo 6 caracteres" required />
+        </div>
+
+        <div style="margin-top: 6px;">
+          <button type="submit" class="btn-primary" style="width: 100%; padding: 12px;">
+            ✨ Crear Mi Cuenta e Ingresar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 8: Visualizador In-Situ de Ticket / Pase QR / PDF del Paciente -->
+  <div class="modal-overlay" id="modal-patient-ticket-view">
+    <div class="modal-card" style="max-width: 560px; width: 95%; max-height: 92vh; overflow-y: auto;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 36px; height: 36px; border-radius: 8px; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+            🎫
+          </div>
+          <div>
+            <h3 class="modal-title" style="margin: 0; font-size: 1.05rem;">Comprobante de Cita y Pase QR</h3>
+            <span style="font-size: 0.74rem; color: #64748b;">Ticket oficial de atención médica presencial</span>
+          </div>
+        </div>
+        <button type="button" class="modal-close-btn" id="btn-close-ticket-modal" title="Cerrar comprobante">✕</button>
+      </div>
+
+      <div class="modal-body" style="padding: 14px 4px 6px;">
+        <!-- Tarjeta del Ticket Renderizado -->
+        <div class="ticket-card-printable" id="modal-printable-ticket" style="margin: 0 auto; box-shadow: none; border: 1px solid #e2e8f0; background: #ffffff; padding: 20px; border-radius: 14px;">
+          <div class="ticket-header" style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px dashed #e2e8f0; padding-bottom: 12px;">
+            <div>
+              <h3 style="font-size: 1.05rem; color: var(--dark-navy); font-weight: 800; margin: 0;">TICKET OFICIAL DE CITA</h3>
+              <p style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;" id="modal-ticket-service-name">Servicio de Medicina General - Dr. Carlos Campoverde</p>
+            </div>
+            <div class="ticket-code-group" style="text-align: right;">
+              <div class="ticket-code-label" style="font-size: 0.68rem; color: #64748b; font-weight: 700;">Código de Turno</div>
+              <div class="ticket-code-value" id="modal-ticket-code" style="font-size: 1.05rem; font-weight: 800; color: var(--primary-blue);">#MED-84920</div>
+            </div>
+          </div>
+
+          <!-- Código QR Dinámico en Modal -->
+          <div class="qr-code-display-box" id="modal-ticket-qr-container" style="background: #f8fafc; padding: 14px; border-radius: 12px; display: flex; justify-content: center; align-items: center; margin: 14px 0;">
+            <!-- QR Canvas inyectado dinámicamente -->
+          </div>
+
+          <div class="ticket-details-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; background: #f8fafc; padding: 12px; border-radius: 10px;">
+            <div class="ticket-detail-item">
+              <div class="label" style="font-size: 0.7rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Paciente</div>
+              <div class="value" id="modal-ticket-patient-name" style="font-size: 0.85rem; font-weight: 700; color: #0f172a;">Carlos Mendoza Moreira</div>
+            </div>
+            <div class="ticket-detail-item">
+              <div class="label" style="font-size: 0.7rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Cédula de Identidad</div>
+              <div class="value" id="modal-ticket-patient-id" style="font-size: 0.85rem; font-weight: 700; color: #0f172a;">0987654321</div>
+            </div>
+            <div class="ticket-detail-item">
+              <div class="label" style="font-size: 0.7rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Sede / Consultorio</div>
+              <div class="value" id="modal-ticket-clinic" style="font-size: 0.85rem; font-weight: 700; color: #0f172a;">Clínica Ceibos (Consultorio 2)</div>
+            </div>
+            <div class="ticket-detail-item">
+              <div class="label" style="font-size: 0.7rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Fecha y Hora Asignada</div>
+              <div class="value" id="modal-ticket-datetime" style="font-size: 0.85rem; font-weight: 700; color: #0f172a;">2026-09-19 - 10:30</div>
+            </div>
+            <div class="ticket-detail-item">
+              <div class="label" style="font-size: 0.7rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Método de Pago</div>
+              <div class="value" id="modal-ticket-method" style="font-size: 0.82rem; font-weight: 700; color: #0f172a;">Efectivo</div>
+            </div>
+            <div class="ticket-detail-item">
+              <div class="label" style="font-size: 0.7rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Total Abonado</div>
+              <div class="value" id="modal-ticket-total" style="color: var(--primary-blue); font-size: 1.05rem; font-weight: 800;">$20.00</div>
+            </div>
+          </div>
+
+          <p style="font-size: 0.73rem; color: #64748b; line-height: 1.35; margin-top: 12px; background: #e0f2fe; color: #0369a1; padding: 8px 12px; border-radius: 8px; font-weight: 600;">
+            📱 Presenta este código QR desde tu pantalla o impreso al ingresar al consultorio para atención sin demoras.
+          </p>
+
+          <div class="ticket-actions-group" id="modal-ticket-actions" style="margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="#" target="_blank" class="btn-primary" id="btn-modal-open-pdf" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; padding: 10px 16px; font-weight: 700; font-size: 0.84rem; border-radius: 8px; flex: 1; text-align: center;">
+              📄 Ver / Descargar Documento PDF
+            </a>
+            <button type="button" class="btn-secondary" id="btn-modal-print-ticket" style="padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 0.84rem; cursor: pointer;">
+              🖨️ Imprimir
+            </button>
+            <button type="button" class="btn-secondary" id="btn-modal-close-ticket-footer" style="padding: 10px 16px; border-radius: 8px; font-weight: 600; font-size: 0.84rem; cursor: pointer;">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Raíz de Notificaciones Toast -->
   <div class="toast-container" id="toast-notifications-root"></div>
@@ -1563,6 +2082,6 @@
   <script src="js/qrcode.min.js"></script>
 
   <!-- Script Principal de la Aplicación (Compatible con file:/// y http://) -->
-  <script src="js/app.bundle.js?v=20260930_supabase"></script>
+  <script src="js/app.bundle.js?v=20261001_morphing_gradient"></script>
 </body>
 </html>

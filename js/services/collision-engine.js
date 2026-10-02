@@ -22,6 +22,19 @@ export const MATRIZ_DISTANCIAS_TRASLADO = {
   'hospital-alborada': { tiempoMinutos: 40, margenTrafico: 25, totalBuffer: 65 }
 };
 
+// Parámetros Operativos de Slot Clínico vs Slot Administrativo
+export const DURACION_NOMINAL_CONSULTA_DEFAULT = 30;
+export const MARGEN_ADMINISTRATIVO_RECETA_DEFAULT = 15;
+export const SLOT_REAL_RESERVA_DEFAULT = 45;
+export const TIEMPO_DESALOJO_SANITIZACION_DEFAULT = 10;
+
+// Franjas de Hora Pico en Guayaquil
+export const FRANJAS_HORA_PICO = [
+  { inicio: '07:00', fin: '09:30' },
+  { inicio: '12:30', fin: '14:00' },
+  { inicio: '17:00', fin: '19:45' }
+];
+
 // 2. Salas de Consultorio Físicas (Recursos Compartidos)
 export const SALAS_CONSULTORIO = {
   ceibos: [
@@ -71,7 +84,8 @@ export const CollisionEngine = {
     horaStr,
     duracionMinutos = 45,
     citas = [],
-    travelBuffers = []
+    travelBuffers = [],
+    tiempoSanitizacionMinutos = 0
   }) => {
     // Resolver sala física por defecto si no se pasa explícitamente
     const salaEfectiva = salaId || (SALAS_CONSULTORIO[sedeId] && SALAS_CONSULTORIO[sedeId][0]?.id) || `SALA-${sedeId.toUpperCase()}`;
@@ -128,7 +142,7 @@ export const CollisionEngine = {
         const cIni = ch * 60 + cm;
         const cFin = cIni + (c.durationMinutes || 45);
 
-        // Solapamiento: max(ini1, ini2) < min(fin1, fin2)
+        // 2.A Solapamiento directo: max(ini1, ini2) < min(fin1, fin2)
         if (Math.max(inicioSlotMin, cIni) < Math.min(finSlotMin, cFin)) {
           return {
             valido: false,
@@ -136,6 +150,26 @@ export const CollisionEngine = {
             tiempoBufferRequerido: null,
             codigoError: 'SALA_OCUPADA'
           };
+        }
+
+        // 2.B Sanitización entre pacientes
+        if (tiempoSanitizacionMinutos > 0) {
+          if (cFin <= inicioSlotMin && inicioSlotMin < cFin + tiempoSanitizacionMinutos) {
+            return {
+              valido: false,
+              razonRechazo: `La sala física requiere ${tiempoSanitizacionMinutos} min de sanitización/desalojo tras la atención previa.`,
+              tiempoBufferRequerido: tiempoSanitizacionMinutos,
+              codigoError: 'SALA_SANITIZACION_PENDIENTE'
+            };
+          }
+          if (finSlotMin <= cIni && cIni < finSlotMin + tiempoSanitizacionMinutos) {
+            return {
+              valido: false,
+              razonRechazo: `La sala física requiere ${tiempoSanitizacionMinutos} min de sanitización previa a la siguiente atención.`,
+              tiempoBufferRequerido: tiempoSanitizacionMinutos,
+              codigoError: 'SALA_SANITIZACION_PENDIENTE'
+            };
+          }
         }
       }
     }
@@ -228,10 +262,144 @@ export const CollisionEngine = {
     // PASO 4: Aprobación Integral
     // ========================================================================
     return {
+      permitido: true,
       valido: true,
+      codigoError: null,
       razonRechazo: null,
-      tiempoBufferRequerido: 0
+      mensaje: null,
+      tiempoBufferRequerido: 0,
+      bufferMinutosAplicado: 0
     };
+  },
+
+  /**
+   * Retorna la ventana de amortiguamiento en minutos según la matriz aprobada
+   */
+  calcularMatrizTraslado: (sedeOrigenId, sedeDestinoId, horaStr = null) => {
+    const key = `${sedeOrigenId.toLowerCase()}-${sedeDestinoId.toLowerCase()}`;
+    const item = MATRIZ_DISTANCIAS_TRASLADO[key];
+    if (!item) return 30;
+    return item.totalBuffer;
+  },
+
+  /**
+   * Verifica disponibilidad de sala física en intervalo semiabierto [inicio, fin)
+   */
+  verificarConflictoSalaFisica: ({ salaId, fechaStr, inicioMin, finMin, citas = [], tiempoSanitizacionMinutos = 0 }) => {
+    const citasMismaFecha = citas.filter(
+      c => c.date === fechaStr && c.status !== 'cancelada' && c.status !== 'reagendada'
+    );
+    for (const c of citasMismaFecha) {
+      const cSala = c.salaId || (SALAS_CONSULTORIO[c.clinicId] && SALAS_CONSULTORIO[c.clinicId][0]?.id);
+      if (cSala === salaId) {
+        const [ch, cm] = c.time.split(':').map(Number);
+        const cIni = ch * 60 + cm;
+        const cFin = cIni + (c.durationMinutes || 45);
+
+        if (Math.max(inicioMin, cIni) < Math.min(finMin, cFin)) {
+          return {
+            permitido: false,
+            valido: false,
+            codigoError: 'SALA_OCUPADA',
+            mensaje: `La sala física está ocupada por otra atención médica (#${c.code || c.id}).`
+          };
+        }
+      }
+    }
+    return { permitido: true, valido: true, codigoError: null, mensaje: null };
+  },
+
+  /**
+   * Pipeline de validación integral según especificación formal
+   */
+  validarDisponibilidadMedico: ({
+    medicoId = 'doctor',
+    sedeId,
+    salaId = null,
+    fechaStr,
+    horaStr,
+    duracionMinutos = 30,
+    citas = [],
+    travelBuffers = [],
+    tiempoSanitizacionMinutos = 0
+  }) => {
+    return CollisionEngine.validarDisponibilidadSlot({
+      medicoId,
+      sedeId,
+      salaId,
+      fechaStr,
+      horaStr,
+      duracionMinutos,
+      citas,
+      travelBuffers,
+      tiempoSanitizacionMinutos
+    });
+  },
+
+  /**
+   * Generador de Slots Libres (Motor de Búsqueda de Citas)
+   */
+  generarSlotsDisponibles: ({
+    medicoId = 'doctor',
+    sedeId,
+    fechaStr,
+    duracionMinutos = 30,
+    citas = [],
+    horarios = null,
+    salaId = null,
+    pasoMinutos = 30
+  }) => {
+    const [y, mes, d] = fechaStr.split('-').map(Number);
+    const dateObj = new Date(y, mes - 1, d);
+    const diasMap = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
+    const diaSemanaNombre = diasMap[dateObj.getDay()];
+
+    const rotaciones = (horarios || HORARIOS_ROTATIVOS).filter(
+      r => r.diaSemana === diaSemanaNombre && r.sedeId.toLowerCase() === sedeId.toLowerCase()
+    );
+
+    const turnos = rotaciones.length > 0 ? rotaciones : [{ horaInicio: '08:00', horaFin: '13:00' }];
+    const slots = [];
+
+    for (const turno of turnos) {
+      const [iniH, iniM] = turno.horaInicio.split(':').map(Number);
+      const [finH, finM] = turno.horaFin.split(':').map(Number);
+      let cursorMin = iniH * 60 + iniM;
+      const limiteMin = finH * 60 + finM;
+
+      while (cursorMin + duracionMinutos <= limiteMin) {
+        const h = String(Math.floor(cursorMin / 60)).padStart(2, '0');
+        const m = String(cursorMin % 60).padStart(2, '0');
+        const slotHora = `${h}:${m}`;
+
+        const validacion = CollisionEngine.validarDisponibilidadSlot({
+          medicoId,
+          sedeId,
+          salaId,
+          fechaStr,
+          horaStr: slotHora,
+          duracionMinutos,
+          citas
+        });
+
+        if (validacion.valido) {
+          const slotFinMin = cursorMin + duracionMinutos;
+          const finH = String(Math.floor(slotFinMin / 60)).padStart(2, '0');
+          const finM = String(slotFinMin % 60).padStart(2, '0');
+          slots.push({
+            horaInicio: slotHora,
+            horaFin: `${finH}:${finM}`,
+            duracionMinutos,
+            sedeId,
+            salaId: salaId || `SALA-${sedeId.toUpperCase()}`
+          });
+        }
+
+        cursorMin += pasoMinutos;
+      }
+    }
+
+    return slots;
   },
 
   /**
@@ -276,6 +444,62 @@ export const CollisionEngine = {
       montoComisionSede: comisionSede,
       ingresoNetoMedico: netoMedico,
       esHospitalSueldoFijo: esHospital
+    };
+  },
+
+  /**
+   * Protocolo de Activación de Emergencia 'Modo Guardia' (Frontend)
+   */
+  activarModoGuardia: ({
+    medicoId = 'doctor',
+    fechaStr,
+    horaInicioStr,
+    horaFinStr,
+    citas = [],
+    motivo = 'Guardia de relevo hospitalaria imprevista MSP'
+  }) => {
+    const [hIni, mIni] = horaInicioStr.split(':').map(Number);
+    const [hFin, mFin] = horaFinStr.split(':').map(Number);
+    const inicioGuardiaMin = hIni * 60 + mIni;
+    const finGuardiaMin = hFin * 60 + mFin;
+
+    const citasAfectadas = [];
+    const citasMismaFecha = citas.filter(
+      c => c.date === fechaStr && c.status !== 'cancelada' && c.status !== 'reagendada'
+    );
+
+    for (const c of citasMismaFecha) {
+      if (c.clinicId === 'hospital') continue;
+
+      const rutaKey = `${c.clinicId}-hospital`;
+      const buffer = (MATRIZ_DISTANCIAS_TRASLADO[rutaKey] && MATRIZ_DISTANCIAS_TRASLADO[rutaKey].totalBuffer) || 30;
+
+      const [ch, cm] = c.time.split(':').map(Number);
+      const cIni = ch * 60 + cm;
+      const cFin = cIni + (c.durationMinutes || 45);
+
+      // Ventana expandida de afectación
+      const ventanaIni = inicioGuardiaMin - buffer;
+      const ventanaFin = finGuardiaMin + buffer;
+
+      if (Math.max(cIni, ventanaIni) < Math.min(cFin, ventanaFin)) {
+        citasAfectadas.push({
+          ...c,
+          status: 'reagendamiento_pendiente_guardia',
+          prioridadReubicacion: 1,
+          motivoBloqueo: motivo
+        });
+      }
+    }
+
+    return {
+      modoGuardiaActivo: true,
+      medicoId,
+      fecha: fechaStr,
+      inicioGuardia: horaInicioStr,
+      finGuardia: horaFinStr,
+      totalAfectadas: citasAfectadas.length,
+      citasAfectadas
     };
   }
 };

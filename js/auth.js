@@ -5,6 +5,11 @@
  */
 
 import { DEMO_USERS, store } from './state.js';
+import {
+  validarCedulaEcuatorianaDetallada,
+  validarCelularDetallado,
+  validarEmailDetallado
+} from './validaciones-globales.js';
 
 export function setupAuth(showToast) {
   const roleTabs = document.querySelectorAll('.role-tab-btn');
@@ -22,9 +27,14 @@ export function setupAuth(showToast) {
       tab.classList.add('active');
       currentSelectedRole = tab.dataset.role;
 
-      // Mantener texto de ejemplo solicitado: Cedula o Usuario
       if (loginInput) {
-        loginInput.placeholder = 'Cedula o Usuario';
+        if (currentSelectedRole === 'doctor') {
+          loginInput.placeholder = 'Cédula o Usuario del Doctor';
+        } else if (currentSelectedRole === 'paciente') {
+          loginInput.placeholder = 'Cédula o Usuario del Paciente';
+        } else {
+          loginInput.placeholder = 'Cédula o Usuario Contable';
+        }
       }
     });
   });
@@ -35,7 +45,6 @@ export function setupAuth(showToast) {
 
   // Mostrar / Ocultar contraseña con icono gráfico dinámico
   if (passwordToggleBtn && passwordInput) {
-    // Estado inicial: contraseña oculta -> icono de ojo tapado / tachado
     passwordToggleBtn.innerHTML = eyeClosedSvg;
     passwordToggleBtn.setAttribute('title', 'Mostrar contraseña (hacer visible)');
     passwordToggleBtn.setAttribute('aria-label', 'Mostrar contraseña');
@@ -44,13 +53,11 @@ export function setupAuth(showToast) {
       e.preventDefault();
       const isPassword = passwordInput.getAttribute('type') === 'password';
       if (isPassword) {
-        // Cambiar a texto visible: Ojo sin nada (abierto)
         passwordInput.setAttribute('type', 'text');
         passwordToggleBtn.innerHTML = eyeOpenSvg;
         passwordToggleBtn.setAttribute('title', 'Ocultar contraseña (hacer invisible)');
         passwordToggleBtn.setAttribute('aria-label', 'Ocultar contraseña');
       } else {
-        // Cambiar a oculto: Ojo tapado / tachado
         passwordInput.setAttribute('type', 'password');
         passwordToggleBtn.innerHTML = eyeClosedSvg;
         passwordToggleBtn.setAttribute('title', 'Mostrar contraseña (hacer visible)');
@@ -59,7 +66,7 @@ export function setupAuth(showToast) {
     });
   }
 
-  // Procesar envío del formulario: Validación flexible y segura
+  // Procesar envío del formulario: Validación estricta por rol
   if (loginForm) {
     loginForm.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -90,8 +97,8 @@ export function setupAuth(showToast) {
         (currentSelectedRole === 'doctor' && (enteredUser === 'doctor' || enteredUser === 'admin'))
       );
       const isDoctorPass = (
-        enteredPass === doc.password || // 'admin123'
-        enteredPass === doc.alternativePassword || // 'doctor123'
+        enteredPass === doc.password ||
+        enteredPass === doc.alternativePassword ||
         enteredPass === 'admin123' ||
         enteredPass === 'doctor123'
       );
@@ -128,7 +135,7 @@ export function setupAuth(showToast) {
         }
       }
 
-      // 4. Si aún no coincide, buscar en bucle general
+      // 4. Si aún no coincide, buscar en bucle general (incluye usuarios recién creados)
       if (!matchedUser) {
         for (const key in DEMO_USERS) {
           const u = DEMO_USERS[key];
@@ -145,6 +152,21 @@ export function setupAuth(showToast) {
       }
 
       if (matchedUser) {
+        // Validación estricta del rol seleccionado:
+        // Si el usuario seleccionó "Doctor" pero ingresó datos de paciente o contador, o viceversa, se bloquea.
+        const roleLabelMap = {
+          doctor: 'Médico',
+          paciente: 'Paciente',
+          contador: 'Contador(a)'
+        };
+
+        if (matchedUser.role !== currentSelectedRole) {
+          const userRoleName = roleLabelMap[matchedUser.role] || matchedUser.role;
+          const selectedRoleName = roleLabelMap[currentSelectedRole] || currentSelectedRole;
+          showToast(`Acceso bloqueado: Esta cuenta pertenece al perfil de ${userRoleName}. Por favor seleccione la pestaña de "${selectedRoleName}" adecuada o ingrese con las credenciales correspondientes.`, 'danger');
+          return;
+        }
+
         // Autenticación exitosa
         store.setCurrentUser(matchedUser);
         store.setActiveView(matchedUser.role);
@@ -164,6 +186,142 @@ export function setupAuth(showToast) {
       } else {
         showToast('Credenciales incorrectas. Verifique su usuario o cédula y contraseña ingresada.', 'danger');
       }
+    });
+  }
+
+  // --- MÓDULO DE CREACIÓN DE CUENTA (REGISTRO DE PACIENTE) ---
+  setupPatientRegistration(showToast);
+}
+
+function setupPatientRegistration(showToast) {
+  const registerModal = document.getElementById('modal-register-patient');
+  const btnOpenRegister = document.getElementById('btn-open-register-modal');
+  const btnCloseRegister = document.getElementById('btn-close-register-modal');
+  const registerForm = document.getElementById('form-register-patient');
+
+  if (btnOpenRegister && registerModal) {
+    btnOpenRegister.addEventListener('click', (e) => {
+      e.preventDefault();
+      registerModal.classList.add('active');
+    });
+  }
+
+  if (btnCloseRegister && registerModal) {
+    btnCloseRegister.addEventListener('click', () => {
+      registerModal.classList.remove('active');
+    });
+  }
+
+  if (registerForm) {
+    registerForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const nameInput = document.getElementById('reg-pat-name');
+      const idInput = document.getElementById('reg-pat-id');
+      const phoneInput = document.getElementById('reg-pat-phone');
+      const emailInput = document.getElementById('reg-pat-email');
+      const passInput = document.getElementById('reg-pat-password');
+      const passConfirmInput = document.getElementById('reg-pat-password-confirm');
+
+      const nameVal = nameInput ? nameInput.value.trim() : '';
+      const idVal = idInput ? idInput.value.trim() : '';
+      const phoneVal = phoneInput ? phoneInput.value.trim() : '';
+      const emailVal = emailInput ? emailInput.value.trim() : '';
+      const passVal = passInput ? passInput.value.trim() : '';
+      const passConfirmVal = passConfirmInput ? passConfirmInput.value.trim() : '';
+
+      if (!nameVal || !idVal || !phoneVal || !emailVal || !passVal) {
+        showToast('Por favor complete todos los campos obligatorios.', 'warning');
+        return;
+      }
+
+      // Validar Cédula (Mensaje estricto: 'Cédula incorrecta.')
+      const cedulaCheck = validarCedulaEcuatorianaDetallada(idVal);
+      if (!cedulaCheck.isValid) {
+        showToast('Cédula incorrecta. Verifique los 10 dígitos ingresados.', 'danger');
+        if (idInput) idInput.focus();
+        return;
+      }
+
+      // Validar Celular (10 dígitos oficiales)
+      const phoneCheck = validarCelularDetallado(phoneVal);
+      if (!phoneCheck.isValid) {
+        showToast(phoneCheck.message, 'warning');
+        if (phoneInput) phoneInput.focus();
+        return;
+      }
+
+      // Validar Email
+      const emailCheck = validarEmailDetallado(emailVal);
+      if (!emailCheck.isValid) {
+        showToast(emailCheck.message, 'warning');
+        if (emailInput) emailInput.focus();
+        return;
+      }
+
+      // Validar contraseña
+      if (passVal.length < 4) {
+        showToast('La clave de acceso debe contener al menos 4 caracteres.', 'warning');
+        if (passInput) passInput.focus();
+        return;
+      }
+
+      if (passVal !== passConfirmVal) {
+        showToast('Las contraseñas ingresadas no coinciden. Por favor verifique.', 'danger');
+        if (passConfirmInput) passConfirmInput.focus();
+        return;
+      }
+
+      // Comprobar si ya existe un usuario con esa cédula
+      for (const k in DEMO_USERS) {
+        if (DEMO_USERS[k].idNumber === idVal || DEMO_USERS[k].email.toLowerCase() === emailVal.toLowerCase()) {
+          showToast('Ya existe una cuenta registrada con esta cédula o correo electrónico.', 'warning');
+          return;
+        }
+      }
+
+      // Crear nuevo usuario de Paciente
+      const userKey = `paciente_${idVal}`;
+      const newPatientUser = {
+        role: 'paciente',
+        name: nameVal,
+        email: emailVal,
+        username: idVal,
+        idNumber: idVal,
+        password: passVal,
+        phone: phoneVal,
+        allergies: 'Sin alergias declaradas',
+        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
+      };
+
+      DEMO_USERS[userKey] = newPatientUser;
+
+      // Registrar o actualizar perfil del paciente en el store
+      if (store.savePatientProfile) {
+        store.savePatientProfile({
+          cedula: idVal,
+          nombres: nameVal.split(' ')[0] || nameVal,
+          apellidos: nameVal.split(' ').slice(1).join(' ') || '',
+          telefono: phoneVal,
+          email: emailVal,
+          direccion: 'Guayaquil, Ecuador',
+          tipo_sangre: 'O+',
+          alergias: 'Sin alergias declaradas',
+          enfermedades_cronicas: 'Ninguna reportada',
+          medicacion_habitual: 'Ninguna'
+        });
+      }
+
+      // Limpiar formulario y cerrar modal
+      registerForm.reset();
+      if (registerModal) registerModal.classList.remove('active');
+
+      // Iniciar sesión inmediatamente con la nueva cuenta
+      store.setCurrentUser(newPatientUser);
+      store.setActiveView('paciente');
+      showToast(`¡Cuenta creada con éxito! Bienvenido(a) al Portal del Paciente, ${nameVal}.`, 'success');
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   }
 }

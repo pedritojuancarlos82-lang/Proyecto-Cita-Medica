@@ -14,8 +14,7 @@ import {
   validarCelularDetallado,
   validarTelefono,
   validarEmailDetallado,
-  validarEmail,
-  consultarSRI
+  validarEmail
 } from './validaciones-globales.js';
 import { MedicalService } from './services/medical-service.js';
 import { CollisionEngine } from './services/collision-engine.js';
@@ -378,81 +377,23 @@ export function setupPatientPortal(showToast) {
     });
   });
 
-  // Conexión reactiva con la API del SRI y Validación Matemática de Cédula
-  async function handleCedulaCheckAndSRI(cedula) {
-    if (!cedula || cedula.length < 10) {
-      if (sriStatusBox) {
-        sriStatusBox.style.display = 'none';
-        sriStatusBox.innerHTML = '';
-      }
+  // Validación de Cédula (Sin conexión al SRI, con mensaje estricto 'Cédula incorrecta.')
+  function handleCedulaCheck(cedula) {
+    if (!cedula) return;
+    if (cedula.length < 10) {
+      clearFieldError(idInput);
       return;
     }
 
     const check = validarCedulaEcuatorianaDetallada(cedula);
     if (!check.isValid) {
-      showFieldError(idInput, check.message);
-      if (sriStatusBox) {
-        sriStatusBox.style.display = 'none';
-        sriStatusBox.innerHTML = '';
-      }
+      showFieldError(idInput, 'Cédula incorrecta.');
       return;
     }
 
-    // La cédula es matemáticamente válida (Módulo 10 superado)
+    // La cédula es válida
     clearFieldError(idInput);
     if (idInput) idInput.classList.add('valid');
-
-    if (cedula === lastQueriedCedula) return;
-    lastQueriedCedula = cedula;
-
-    if (sriStatusBox) {
-      sriStatusBox.style.display = 'flex';
-      sriStatusBox.innerHTML = `<span class="sri-badge-loading"><span class="sri-spinner">🔄</span> Consultando identidad en el SRI...</span>`;
-    }
-
-    try {
-      const sriData = await consultarSRI(cedula);
-      if (idInput && idInput.value.trim() !== cedula) return;
-
-      if (sriData && sriData.exito && sriData.nombre) {
-        if (nameInput) {
-          nameInput.value = sriData.nombre;
-          clearFieldError(nameInput);
-          nameInput.classList.add('valid');
-        }
-        if (phoneInput && !phoneInput.value && sriData.telefono) {
-          phoneInput.value = sriData.telefono;
-        }
-        if (emailInput && !emailInput.value && sriData.email) {
-          emailInput.value = sriData.email;
-        }
-
-        if (sriStatusBox) {
-          sriStatusBox.innerHTML = `
-            <span class="sri-badge-success">
-              ✅ Identificado en ${sriData.fuente}: <strong>${sriData.nombre}</strong>
-            </span>
-          `;
-        }
-        showToast(`✅ Identidad detectada en el SRI: ${sriData.nombre}`, 'success');
-      } else {
-        if (sriStatusBox) {
-          sriStatusBox.innerHTML = `
-            <span class="sri-badge-info">
-              ℹ️ Cédula válida (Módulo 10). Ingrese su nombre si no registra RUC en el SRI.
-            </span>
-          `;
-        }
-      }
-    } catch (err) {
-      if (sriStatusBox) {
-        sriStatusBox.innerHTML = `
-          <span class="sri-badge-info">
-            ℹ️ Cédula válida (Módulo 10). Ingrese su nombre manualmente.
-          </span>
-        `;
-      }
-    }
   }
 
   // Escuchadores reactivos de los inputs del Paso 3
@@ -462,24 +403,18 @@ export function setupPatientPortal(showToast) {
       idInput.classList.remove('valid');
       const val = e.target.value.trim();
       if (val.length === 10) {
-        handleCedulaCheckAndSRI(val);
-      } else {
-        if (sriStatusBox) {
-          sriStatusBox.style.display = 'none';
-          sriStatusBox.innerHTML = '';
-        }
+        handleCedulaCheck(val);
       }
     });
 
     idInput.addEventListener('blur', (e) => {
       const val = e.target.value.trim();
-      if (val.length > 0 && val.length < 10) {
-        showFieldError(idInput, 'La cédula debe contener exactamente 10 dígitos numéricos.');
-      } else if (val.length === 10) {
+      if (val.length > 0) {
         const check = validarCedulaEcuatorianaDetallada(val);
         if (!check.isValid) {
-          showFieldError(idInput, check.message);
+          showFieldError(idInput, 'Cédula incorrecta.');
         } else {
+          clearFieldError(idInput);
           idInput.classList.add('valid');
         }
       }
@@ -552,12 +487,12 @@ export function setupPatientPortal(showToast) {
   function prefillPatientData() {
     const user = store.getCurrentUser();
     if (user && user.role === 'paciente') {
-      if (idInput && !idInput.value) idInput.value = user.idNumber || '';
+      if (idInput && !idInput.value) idInput.value = user.idNumber || user.cedula || '';
       if (nameInput && !nameInput.value) nameInput.value = user.name || '';
       if (phoneInput && !phoneInput.value) phoneInput.value = user.phone || '';
       if (emailInput && !emailInput.value) emailInput.value = user.email || '';
       if (idInput && idInput.value.length === 10) {
-        handleCedulaCheckAndSRI(idInput.value);
+        handleCedulaCheck(idInput.value);
       }
     }
   }
@@ -916,6 +851,8 @@ export function setupPatientPortal(showToast) {
         MedicalService.registrarAtencionEnHistorial(patId, createdAppointment);
 
         renderConfirmationTicket(createdAppointment);
+        renderPatientSummary();
+        renderPatientAppointmentsTable();
         currentStep = 4;
         updateStepView();
 
@@ -930,48 +867,349 @@ export function setupPatientPortal(showToast) {
     });
   }
 
-  // Navegación por pasos desde los botones de la barra superior con Bloqueo de Pasos no Completados
-  const setupStepNavButtons = () => {
-    document.querySelectorAll('.nav-step-btn').forEach(btn => {
+  // --- GESTIÓN DEL PORTAL DEL PACIENTE (Pestañas: Resumen, Mis Citas, Mis Datos, Agendar Cita) ---
+  const patientTabs = document.querySelectorAll('.patient-tab-btn');
+  const patientPanes = document.querySelectorAll('.patient-portal-pane');
+
+  function switchPatientTab(tabName) {
+    patientTabs.forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.tab === tabName);
+    });
+    patientPanes.forEach(pane => {
+      pane.style.display = (pane.dataset.pane === tabName) ? 'block' : 'none';
+    });
+
+    if (tabName === 'resumen') {
+      renderPatientSummary();
+    } else if (tabName === 'mis-citas') {
+      renderPatientAppointmentsTable();
+    } else if (tabName === 'mis-datos') {
+      renderPatientProfileForm();
+    } else if (tabName === 'agendar') {
+      currentStep = 1;
+      selectedDate = getTodayDateStr();
+      renderCalendar();
+      renderTimeSlots();
+      updateSummaryCard();
+      updateStepView();
+    }
+  }
+
+  patientTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      switchPatientTab(tab.dataset.tab);
+    });
+  });
+
+  // --- MODAL DE VISUALIZACIÓN DE TICKET / PDF IN-SITU (Sin redirigir a agendar cita) ---
+  function openTicketModal(apt) {
+    if (!apt) return;
+    const modal = document.getElementById('modal-patient-ticket-view');
+    if (!modal) return;
+
+    const clinic = CLINICS[apt.clinicId] || { name: 'Sede Médica', consultorio: 'Consultorio Principal' };
+    const codeEl = document.getElementById('modal-ticket-code');
+    const patNameEl = document.getElementById('modal-ticket-patient-name');
+    const patIdEl = document.getElementById('modal-ticket-patient-id');
+    const clinicEl = document.getElementById('modal-ticket-clinic');
+    const datetimeEl = document.getElementById('modal-ticket-datetime');
+    const methodEl = document.getElementById('modal-ticket-method');
+    const totalEl = document.getElementById('modal-ticket-total');
+    const serviceNameEl = document.getElementById('modal-ticket-service-name');
+    const qrContainer = document.getElementById('modal-ticket-qr-container');
+    const btnPdf = document.getElementById('btn-modal-open-pdf');
+
+    const user = store.getCurrentUser();
+    const patName = apt.patientName || (user ? user.name : 'Carlos Mendoza Moreira');
+    const patId = apt.patientId || (user ? (user.idNumber || user.cedula) : '0987654321');
+    const totalAmount = apt.totalPaid ? Number(apt.totalPaid).toFixed(2) : (apt.basePrice ? Number(apt.basePrice).toFixed(2) : '20.00');
+
+    if (codeEl) codeEl.textContent = `#${apt.code}`;
+    if (patNameEl) patNameEl.textContent = patName;
+    if (patIdEl) patIdEl.textContent = patId;
+    if (clinicEl) clinicEl.textContent = `${clinic.name} (${clinic.consultorio || 'Cons. 1'})`;
+    if (datetimeEl) datetimeEl.textContent = `${apt.date} - ${apt.time}`;
+    if (methodEl) {
+      methodEl.textContent = apt.paymentMethod === 'tarjeta'
+        ? 'Tarjeta de Crédito / Débito (100% Tarifa)'
+        : 'Efectivo / Transferencia (Descuento 9.75% aplicado)';
+    }
+    if (totalEl) totalEl.textContent = `$${totalAmount}`;
+    if (serviceNameEl) serviceNameEl.textContent = `${apt.serviceName || 'Consulta de Medicina General'} - ${apt.doctor || 'Dr. Carlos Campoverde'}`;
+
+    // Construcción de la URL para el comprobante PDF oficial
+    const host = window.location.hostname;
+    const port = window.location.port ? `:${window.location.port}` : '';
+    const protocol = window.location.protocol;
+    let baseHost = host;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      baseHost = '192.168.7.3';
+    }
+    const params = new URLSearchParams({
+      c: apt.code,
+      p: patName,
+      id: patId,
+      s: clinic.name,
+      f: apt.date,
+      h: apt.time,
+      tot: totalAmount,
+      m: apt.paymentMethod || 'efectivo'
+    });
+    if (apt.tokenSeguro) {
+      params.set('t', apt.tokenSeguro);
+    }
+    const pdfUrl = `${protocol}//${baseHost}${port}/comprobante.html?${params.toString()}`;
+    const localPdfUrl = `comprobante.html?${params.toString()}`;
+
+    if (btnPdf) {
+      btnPdf.href = localPdfUrl;
+    }
+
+    if (qrContainer) {
+      qrContainer.innerHTML = `
+        <div style="background: #ffffff; padding: 12px; border-radius: 14px; display: inline-flex; flex-direction: column; justify-content: center; align-items: center; margin: 0 auto; border: 2px solid #0284c7; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.15);">
+          <div id="modal-ticket-qr-canvas" style="display: flex; justify-content: center; align-items: center; min-width: 190px; min-height: 190px;"></div>
+          <span style="font-size: 0.74rem; font-weight: 800; color: #0284c7; background: #e0f2fe; padding: 3px 12px; border-radius: 9999px; margin-top: 8px;">
+            📱 Escanea con tu celular para abrir tu PDF
+          </span>
+          <span style="font-size: 0.68rem; font-weight: 700; color: #059669; background: #ecfdf5; padding: 2px 10px; border-radius: 9999px; margin-top: 5px; border: 1px solid #a7f3d0; display: inline-flex; align-items: center; gap: 4px;">
+            ✓ Token Criptográfico Firmado (Inmutable)
+          </span>
+        </div>
+      `;
+
+      setTimeout(() => {
+        renderizarCodigoQR('modal-ticket-qr-canvas', pdfUrl, {
+          size: 190,
+          correctLevel: (typeof QRCode !== 'undefined' && QRCode.CorrectLevel) ? QRCode.CorrectLevel.L : null
+        });
+      }, 50);
+    }
+
+    modal.classList.add('active');
+  }
+
+  // Configuración de botones del modal de ticket
+  const modalTicketView = document.getElementById('modal-patient-ticket-view');
+  const btnCloseTicketModal = document.getElementById('btn-close-ticket-modal');
+  const btnModalCloseTicketFooter = document.getElementById('btn-modal-close-ticket-footer');
+  const btnModalPrintTicket = document.getElementById('btn-modal-print-ticket');
+
+  const closeTicketModal = () => {
+    if (modalTicketView) modalTicketView.classList.remove('active');
+  };
+
+  if (btnCloseTicketModal) btnCloseTicketModal.addEventListener('click', closeTicketModal);
+  if (btnModalCloseTicketFooter) btnModalCloseTicketFooter.addEventListener('click', closeTicketModal);
+  if (btnModalPrintTicket) {
+    btnModalPrintTicket.addEventListener('click', () => {
+      window.print();
+    });
+  }
+
+  window.openTicketModal = openTicketModal;
+
+  // 1. Renderizar Resumen / Ventana Principal (Dashboard del Paciente)
+  function renderPatientSummary() {
+    const user = store.getCurrentUser();
+    const patId = user ? (user.idNumber || user.cedula || '0987654321') : '0987654321';
+    const profile = store.getPatientProfile(patId) || store.getState().patientProfiles[0] || {
+      nombres: user ? user.name.split(' ')[0] : 'Carlos',
+      apellidos: user ? user.name.split(' ').slice(1).join(' ') : 'Mendoza',
+      allergies: 'Penicilina, Sulfas',
+      chronicConditions: 'Hipertensión Arterial Primaria (I10)'
+    };
+
+    const fullName = `${profile.nombres} ${profile.apellidos}`.trim();
+
+    // Actualizar saludo y navbar
+    const welcomeNameEl = document.getElementById('pat-welcome-name');
+    if (welcomeNameEl) welcomeNameEl.textContent = `¡Hola, ${fullName || 'Carlos Mendoza'}! 👋`;
+
+    const navNameEl = document.getElementById('pat-navbar-name');
+    if (navNameEl) navNameEl.textContent = profile.nombres || fullName.split(' ')[0] || 'Carlos';
+
+    // Obtener citas del paciente
+    const apts = store.getPatientAppointments(patId);
+    const totalCitasEl = document.getElementById('pat-kpi-total-citas');
+    if (totalCitasEl) totalCitasEl.textContent = `${apts.length} Cita${apts.length === 1 ? '' : 's'}`;
+
+    const allergiesEl = document.getElementById('pat-kpi-allergies');
+    if (allergiesEl) allergiesEl.textContent = profile.allergies || 'Ninguna registrada';
+
+    // Próxima Cita
+    const nextDateEl = document.getElementById('pat-kpi-next-date');
+    const nextClinicEl = document.getElementById('pat-kpi-next-clinic');
+    const nextTitleEl = document.getElementById('pat-next-title');
+    const nextDetailsEl = document.getElementById('pat-next-details');
+    const nextBadgeEl = document.getElementById('pat-next-badge');
+
+    if (apts.length > 0) {
+      const nextApt = apts[0];
+      const clinic = CLINICS[nextApt.clinicId] || { name: 'Sede Médica' };
+
+      if (nextDateEl) nextDateEl.textContent = `${nextApt.date} - ${nextApt.time}`;
+      if (nextClinicEl) nextClinicEl.textContent = `${clinic.name} (${clinic.consultorio || 'Cons. 4'})`;
+      if (nextTitleEl) nextTitleEl.textContent = nextApt.serviceName || 'Consulta de Medicina General';
+      if (nextDetailsEl) nextDetailsEl.textContent = `📍 ${clinic.name} • Dr. Carlos Campoverde • ${nextApt.time}`;
+      if (nextBadgeEl) nextBadgeEl.textContent = nextApt.estado || 'CONFIRMADA';
+
+      const btnViewTicket = document.getElementById('btn-pat-view-ticket-direct');
+      if (btnViewTicket) {
+        btnViewTicket.onclick = () => {
+          openTicketModal(nextApt);
+        };
+      }
+    } else {
+      if (nextDateEl) nextDateEl.textContent = 'Sin citas pendientes';
+      if (nextClinicEl) nextClinicEl.textContent = 'Agenda tu turno hoy';
+      if (nextTitleEl) nextTitleEl.textContent = 'No tienes turnos próximos programados';
+      if (nextDetailsEl) nextDetailsEl.textContent = 'Reserva tu atención presencial con el Dr. Carlos Campoverde.';
+      if (nextBadgeEl) nextBadgeEl.textContent = 'DISPONIBLE';
+    }
+  }
+
+  // 2. Renderizar Historial de Citas del Paciente
+  function renderPatientAppointmentsTable() {
+    const user = store.getCurrentUser();
+    const patId = user ? (user.idNumber || user.cedula || '0987654321') : '0987654321';
+    const apts = store.getPatientAppointments(patId);
+    const tbody = document.getElementById('patient-appointments-table-body');
+    if (!tbody) return;
+
+    if (apts.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" style="text-align: center; padding: 24px; color: #64748b;">
+            Aún no registras citas médicas anteriores. Haz clic en <strong>➕ Agendar Nueva Cita</strong> para reservar tu primer turno.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = apts.map(apt => {
+      const clinic = CLINICS[apt.clinicId] || { name: 'Sede Médica', consultorio: 'Cons.' };
+      const totalAmount = apt.totalPaid ? apt.totalPaid.toFixed(2) : (apt.basePrice ? apt.basePrice.toFixed(2) : '20.00');
+
+      return `
+        <tr>
+          <td><strong style="color: var(--primary-blue);">#${apt.code}</strong></td>
+          <td>
+            <div style="font-weight: 700; color: #0f172a;">${clinic.name}</div>
+            <div style="font-size: 0.72rem; color: #64748b;">${clinic.consultorio}</div>
+          </td>
+          <td>${apt.doctor || 'Dr. Carlos Campoverde'}</td>
+          <td>
+            <div style="font-weight: 600; color: #1e293b;">${apt.date}</div>
+            <div style="font-size: 0.72rem; color: #64748b;">${apt.time}</div>
+          </td>
+          <td style="font-weight: 800; color: #0f172a;">$${totalAmount}</td>
+          <td>
+            <span class="badge-sede badge-alborada" style="font-size: 0.72rem; padding: 2px 8px;">
+              ${apt.estado || 'CONFIRMADA'}
+            </span>
+          </td>
+          <td>
+            <button type="button" class="btn-secondary btn-view-single-ticket" data-code="${apt.code}" style="padding: 4px 10px; font-size: 0.76rem;">
+              🎫 Ver Ticket / PDF
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    // Escuchar clics en los botones de ver ticket
+    tbody.querySelectorAll('.btn-view-single-ticket').forEach(btn => {
       btn.addEventListener('click', () => {
-        const targetStep = parseInt(btn.dataset.step, 10);
-        if (targetStep === currentStep) return;
-
-        if (targetStep > currentStep) {
-          // Validar los pasos intermedios antes de permitir avanzar
-          for (let s = currentStep; s < targetStep; s++) {
-            if (!validateStepData(s)) {
-              return;
-            }
-          }
-        }
-
-        if (targetStep === 1) {
-          currentStep = 1;
-          updateStepView();
-        } else if (targetStep === 2) {
-          currentStep = 2;
-          renderCalendar();
-          renderTimeSlots();
-          updateSummaryCard();
-          updateStepView();
-        } else if (targetStep === 3) {
-          prefillPatientData();
-          updateSummaryCard();
-          currentStep = 3;
-          updateStepView();
-        } else if (targetStep === 4) {
-          if (createdAppointment) {
-            currentStep = 4;
-            updateStepView();
-          } else {
-            showToast('Primero completa los datos y confirma en el Paso 3 para generar tu comprobante QR.', 'info');
-          }
+        const code = btn.dataset.code;
+        const targetApt = apts.find(a => a.code === code);
+        if (targetApt) {
+          openTicketModal(targetApt);
         }
       });
     });
-  };
-  setupStepNavButtons();
+  }
+
+  // 3. Renderizar Formulario de Ficha Personal y Datos
+  function renderPatientProfileForm() {
+    const user = store.getCurrentUser();
+    const patId = user ? (user.idNumber || user.cedula || '0987654321') : '0987654321';
+    const profile = store.getPatientProfile(patId) || store.getState().patientProfiles[0] || {};
+
+    const idField = document.getElementById('pat-prof-id');
+    const nomField = document.getElementById('pat-prof-nombres');
+    const apeField = document.getElementById('pat-prof-apellidos');
+    const phoneField = document.getElementById('pat-prof-phone');
+    const emailField = document.getElementById('pat-prof-email');
+    const addrField = document.getElementById('pat-prof-address');
+    const emerNameField = document.getElementById('pat-prof-emer-name');
+    const emerPhoneField = document.getElementById('pat-prof-emer-phone');
+    const bloodField = document.getElementById('pat-prof-blood');
+    const ageField = document.getElementById('pat-prof-age');
+    const allergiesField = document.getElementById('pat-prof-allergies');
+    const chronicField = document.getElementById('pat-prof-chronic');
+    const medsField = document.getElementById('pat-prof-meds');
+
+    if (idField) idField.value = profile.cedula || patId;
+    if (nomField) nomField.value = profile.nombres || (user ? user.name.split(' ')[0] : 'Carlos');
+    if (apeField) apeField.value = profile.apellidos || (user ? user.name.split(' ').slice(1).join(' ') : 'Mendoza');
+    if (phoneField) phoneField.value = profile.phone || (user ? user.phone : '0987654321');
+    if (emailField) emailField.value = profile.email || (user ? user.email : 'carlos.mendoza@gmail.com');
+    if (addrField) addrField.value = profile.address || 'Cdla. Alborada 8va Etapa, Mz 812 Sl 14';
+    if (emerNameField) emerNameField.value = profile.emergencyContact || 'María Mendoza (Hermana)';
+    if (emerPhoneField) emerPhoneField.value = profile.emergencyPhone || '0991234567';
+    if (bloodField) bloodField.value = profile.bloodType || 'O+';
+    if (ageField) ageField.value = profile.age || 42;
+    if (allergiesField) allergiesField.value = profile.allergies || 'Penicilina, Sulfas';
+    if (chronicField) chronicField.value = profile.chronicConditions || 'Hipertensión Arterial Primaria (I10)';
+    if (medsField) medsField.value = profile.currentMedications || 'Losartán 50mg cada 24h';
+  }
+
+  // Guardar perfil y actualizar Supabase
+  const formProfile = document.getElementById('form-patient-profile');
+  if (formProfile) {
+    formProfile.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const user = store.getCurrentUser();
+      const patId = document.getElementById('pat-prof-id')?.value.trim() || (user ? user.idNumber : '0987654321');
+
+      const updatedProfile = {
+        cedula: patId,
+        nombres: document.getElementById('pat-prof-nombres')?.value.trim(),
+        apellidos: document.getElementById('pat-prof-apellidos')?.value.trim(),
+        phone: document.getElementById('pat-prof-phone')?.value.trim(),
+        email: document.getElementById('pat-prof-email')?.value.trim(),
+        address: document.getElementById('pat-prof-address')?.value.trim(),
+        emergencyContact: document.getElementById('pat-prof-emer-name')?.value.trim(),
+        emergencyPhone: document.getElementById('pat-prof-emer-phone')?.value.trim(),
+        bloodType: document.getElementById('pat-prof-blood')?.value,
+        age: parseInt(document.getElementById('pat-prof-age')?.value, 10) || 0,
+        allergies: document.getElementById('pat-prof-allergies')?.value.trim(),
+        chronicConditions: document.getElementById('pat-prof-chronic')?.value.trim(),
+        currentMedications: document.getElementById('pat-prof-meds')?.value.trim()
+      };
+
+      store.savePatientProfile(updatedProfile);
+      showToast('✅ Ficha clínica del paciente guardada y sincronizada en Supabase.', 'success');
+      renderPatientSummary();
+    });
+  }
+
+  // Accesos rápidos desde la ventana de Resumen
+  const btnDashQuickBook = document.getElementById('btn-dash-quick-book');
+  if (btnDashQuickBook) {
+    btnDashQuickBook.addEventListener('click', () => {
+      switchPatientTab('agendar');
+    });
+  }
+
+  const btnDashGotoCitas = document.getElementById('btn-dash-goto-citas');
+  if (btnDashGotoCitas) {
+    btnDashGotoCitas.addEventListener('click', () => {
+      switchPatientTab('mis-citas');
+    });
+  }
 
   // Botón volver al inicio dentro de la página del portal paciente
   const btnPatientExitInline = document.getElementById('btn-patient-exit-inline');
@@ -981,9 +1219,17 @@ export function setupPatientPortal(showToast) {
     });
   }
 
+  // Inicializar portal con la ventana de Resumen SIEMPRE al abrirse
+  window.renderPatientPortal = function() {
+    switchPatientTab('resumen');
+  };
+  window.switchPatientTab = switchPatientTab;
+
   // Inicializar vistas con la fecha de hoy
   renderCalendar();
   renderTimeSlots();
   updateSummaryCard();
   updateStepView();
+  renderPatientSummary();
 }
+

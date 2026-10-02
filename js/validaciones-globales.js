@@ -14,26 +14,26 @@
  */
 export const validarCedulaEcuatorianaDetallada = (cedula) => {
   if (!cedula || typeof cedula !== 'string') {
-    return { isValid: false, message: 'La cédula de identidad es requerida.' };
+    return { isValid: false, message: 'Cédula incorrecta.' };
   }
 
   const limpia = cedula.trim();
 
   // Solo dígitos enteros positivos
   if (!/^\d{10}$/.test(limpia)) {
-    return { isValid: false, message: 'La cédula debe contener exactamente 10 dígitos enteros positivos (sin signos ni letras).' };
+    return { isValid: false, message: 'Cédula incorrecta.' };
   }
 
   // Validación de provincia (01 a 24, o 30)
   const provincia = parseInt(limpia.substring(0, 2), 10);
   if ((provincia < 1 || provincia > 24) && provincia !== 30) {
-    return { isValid: false, message: `Código de provincia '${limpia.substring(0, 2)}' no válido en Ecuador (debe ser 01-24 o 30).` };
+    return { isValid: false, message: 'Cédula incorrecta.' };
   }
 
   // Tercer dígito menor a 6 para personas naturales
   const tercerDigito = parseInt(limpia.charAt(2), 10);
   if (tercerDigito >= 6) {
-    return { isValid: false, message: 'El tercer dígito debe ser menor a 6 para cédula de persona natural.' };
+    return { isValid: false, message: 'Cédula incorrecta.' };
   }
 
   // Algoritmo matemático Módulo 10
@@ -54,11 +54,11 @@ export const validarCedulaEcuatorianaDetallada = (cedula) => {
   if (digitoVerificadorCalculado !== digitoVerificadorReal) {
     return {
       isValid: false,
-      message: `Dígito verificador inválido: la cédula no supera la comprobación matemática (esperado: ${digitoVerificadorCalculado}, ingresado: ${digitoVerificadorReal}).`
+      message: 'Cédula incorrecta.'
     };
   }
 
-  return { isValid: true, message: 'Cédula de identidad ecuatoriana válida.' };
+  return { isValid: true, message: 'Cédula válida.' };
 };
 
 export const validarCedulaEcuatoriana = (cedula) => {

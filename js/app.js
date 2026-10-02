@@ -12,6 +12,7 @@ import { setupPatientPortal } from './patient.js';
 import { setupDoctorPortal } from './doctor.js';
 import { setupAccountantPortal } from './accountant.js';
 import { aplicarMascaraInputs } from './validaciones-globales.js';
+import { initAmbientBackground } from './ambient-background.js';
 
 // Sistema de Notificaciones Toast
 export function showToast(message, type = 'info') {
@@ -50,6 +51,9 @@ export function showToast(message, type = 'info') {
 
 // Inicialización de la Aplicación
 document.addEventListener('DOMContentLoaded', () => {
+  // Inicialización del motor dinámico de fondo interactivo (Canvas + Mouse physics)
+  initAmbientBackground();
+
   // Vistas / Pantallas Principales
   const viewLanding = document.getElementById('view-landing');
   const viewPatient = document.getElementById('view-patient');
@@ -72,14 +76,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const navbarBrandHome = document.getElementById('navbar-brand-home');
   const navbarBrandSubtitle = document.getElementById('navbar-brand-subtitle');
 
-  // Elementos de Usuario en la Barra
+  // Elementos de la Barra Superior y del Portal del Paciente
+  const patientPortalTabBar = document.getElementById('patient-portal-tab-bar');
+  const patientGuestNavActions = document.getElementById('patient-guest-nav-actions');
   const patientLoggedCard = document.getElementById('patient-logged-card');
   const patNavbarAvatar = document.getElementById('pat-navbar-avatar');
   const patNavbarName = document.getElementById('pat-navbar-name');
-  const btnNavPatientOpenLogin = document.getElementById('btn-nav-patient-open-login');
+  const patientBrandSubtitle = document.getElementById('patient-brand-subtitle');
+  const patientNavBrandBtn = document.getElementById('patient-nav-brand-btn');
+  const btnPatientBackToWeb = document.getElementById('btn-patient-back-to-web');
+  const btnPatientOpenLogin = document.getElementById('btn-patient-open-login');
 
   // Botones de Salir / Regreso
-  const btnNavPatientBack = document.getElementById('btn-nav-patient-back');
   const btnPatientLogout = document.getElementById('btn-patient-logout');
   const btnDoctorLogout = document.getElementById('btn-doctor-logout');
   const btnAccountantLogout = document.getElementById('btn-accountant-logout');
@@ -126,19 +134,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
     } else if (activeView === 'paciente' || activeView === 'patient') {
       if (viewPatient) viewPatient.style.display = 'block';
-      if (navMenuPatient) navMenuPatient.style.display = 'flex';
-      if (navActionsPatient) navActionsPatient.style.display = 'flex';
-      if (navbarBrandSubtitle) navbarBrandSubtitle.textContent = 'Portal de Pacientes & Citas';
 
-      // Estado de usuario en la barra del paciente
+      // Estado de la barra según si el usuario ha iniciado sesión como paciente o es nuevo/invitado
       if (currentUser && currentUser.role === 'paciente') {
+        // === USUARIO PACIENTE CON SESIÓN INICIADA ===
+        // 1. Mostrar barra con las pestañas completas: Resumen, Mis Citas, Mis Datos, Agendar Cita
+        if (patientPortalTabBar) patientPortalTabBar.style.display = 'flex';
+        // 2. Mostrar tarjeta con el nombre del paciente y botón de salir
         if (patientLoggedCard) patientLoggedCard.style.display = 'flex';
-        if (patNavbarName) patNavbarName.textContent = currentUser.name.split(' ')[0];
-        if (patNavbarAvatar) patNavbarAvatar.src = currentUser.avatar;
-        if (btnNavPatientOpenLogin) btnNavPatientOpenLogin.style.display = 'none';
+        // 3. Ocultar los botones de invitado
+        if (patientGuestNavActions) patientGuestNavActions.style.display = 'none';
+
+        if (patNavbarName) patNavbarName.textContent = (currentUser.name || 'Carlos').split(' ')[0];
+        if (patNavbarAvatar && currentUser.avatar) patNavbarAvatar.src = currentUser.avatar;
+        if (patientBrandSubtitle) patientBrandSubtitle.textContent = 'Portal del Paciente';
+
+        // Al iniciar sesión siempre abre la ventana de Resumen
+        if (typeof window.renderPatientPortal === 'function') {
+          window.renderPatientPortal();
+        }
       } else {
+        // === USUARIO NUEVO SIN INICIAR SESIÓN (AGENDAR CITA) ===
+        // 1. Ocultar completamente los botones de pestañas (Resumen, Mis Citas, Mis Datos, Agendar Cita)
+        if (patientPortalTabBar) patientPortalTabBar.style.display = 'none';
+        // 2. Ocultar tarjeta de usuario logueado
         if (patientLoggedCard) patientLoggedCard.style.display = 'none';
-        if (btnNavPatientOpenLogin) btnNavPatientOpenLogin.style.display = 'inline-flex';
+        // 3. Mostrar en la barra los botones de regresar al sitio web o iniciar sesión
+        if (patientGuestNavActions) patientGuestNavActions.style.display = 'flex';
+
+        if (patientBrandSubtitle) patientBrandSubtitle.textContent = 'Agendamiento de Citas';
+
+        // Mostrar directamente el panel para agendar cita
+        if (typeof window.switchPatientTab === 'function') {
+          window.switchPatientTab('agendar');
+        } else {
+          const patientPanes = document.querySelectorAll('.patient-portal-pane');
+          patientPanes.forEach(pane => {
+            pane.style.display = (pane.dataset.pane === 'agendar') ? 'block' : 'none';
+          });
+        }
       }
 
     } else if (activeView === 'doctor') {
@@ -158,10 +192,41 @@ document.addEventListener('DOMContentLoaded', () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  // --- BOTONES DE CIERRE DE SESIÓN Y RETORNO ---
-  if (btnNavPatientBack) {
-    btnNavPatientBack.addEventListener('click', () => {
+  // --- BOTONES DE LA BARRA DEL PACIENTE PARA USUARIOS NUEVOS / INVITADOS Y LOGOUT ---
+  if (btnPatientBackToWeb) {
+    btnPatientBackToWeb.addEventListener('click', (e) => {
+      e.preventDefault();
       store.setActiveView('landing');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+
+  if (patientNavBrandBtn) {
+    patientNavBrandBtn.addEventListener('click', () => {
+      store.setActiveView('landing');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+
+  if (btnPatientOpenLogin) {
+    btnPatientOpenLogin.addEventListener('click', (e) => {
+      e.preventDefault();
+      store.setActiveView('landing');
+      setTimeout(() => {
+        // Activar la pestaña de Paciente en el formulario de acceso
+        const patRoleTab = document.querySelector('.role-tab-btn[data-role="paciente"]');
+        if (patRoleTab) {
+          patRoleTab.click();
+        }
+        const portalAcceso = document.getElementById('portal-acceso');
+        if (portalAcceso) {
+          portalAcceso.scrollIntoView({ behavior: 'smooth' });
+        }
+        const loginInput = document.getElementById('login-username');
+        if (loginInput) {
+          loginInput.focus();
+        }
+      }, 80);
     });
   }
 
@@ -169,18 +234,8 @@ document.addEventListener('DOMContentLoaded', () => {
     btnPatientLogout.addEventListener('click', () => {
       store.setCurrentUser(null);
       showToast('Sesión de paciente cerrada. Regresando a la página principal.', 'info');
-      renderActiveView();
-    });
-  }
-
-  if (btnNavPatientOpenLogin) {
-    btnNavPatientOpenLogin.addEventListener('click', (e) => {
-      e.preventDefault();
       store.setActiveView('landing');
-      setTimeout(() => {
-        const portalAcceso = document.getElementById('portal-acceso');
-        if (portalAcceso) portalAcceso.scrollIntoView({ behavior: 'smooth' });
-      }, 50);
+      renderActiveView();
     });
   }
 
@@ -252,14 +307,21 @@ document.addEventListener('DOMContentLoaded', () => {
     store.setActiveView('paciente');
     renderActiveView();
 
-    if (clinicId) {
-      setTimeout(() => {
+    setTimeout(() => {
+      if (typeof window.switchPatientTab === 'function') {
+        window.switchPatientTab('agendar');
+      } else {
+        const agendarTabBtn = document.getElementById('nav-btn-pat-agendar');
+        if (agendarTabBtn) agendarTabBtn.click();
+      }
+
+      if (clinicId) {
         const targetClinicCard = document.querySelector(`.clinic-selection-card[data-clinic-id="${clinicId}"]`);
         if (targetClinicCard) {
           targetClinicCard.click();
         }
-      }, 50);
-    }
+      }
+    }, 50);
     showToast('Ingresando al portal de reserva de citas.', 'info');
   }
 

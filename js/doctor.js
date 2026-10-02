@@ -6,11 +6,11 @@
  * buscador reactivo de fichas clínicas, recetario digital y registro de gastos en 2 toques.
  */
 
-import { CLINICS, DEMO_USERS, store } from './state.js';
+import { CLINICS, DEMO_USERS, getTodayDateStr, store } from './state.js';
 
 export function setupDoctorPortal(showToast) {
-  let activeDoctorTab = 'agenda'; // 'agenda', 'fichas', 'recetas', 'gastos'
-  let activeDate = '2026-09-19';  // Sábado, 19 Septiembre 2026
+  let activeDoctorTab = 'agenda'; // 'agenda', 'fichas', 'recetas', 'gastos', 'ingresos'
+  let activeDate = getTodayDateStr(); // Inicializar SIEMPRE con la fecha de hoy automáticamente
 
   // Elementos de la barra de navegación (Móvil, Pestañas Superiores y Bottom Nav)
   const bottomNavButtons = document.querySelectorAll('.doctor-bottom-nav .bottom-nav-item');
@@ -25,6 +25,33 @@ export function setupDoctorPortal(showToast) {
   const btnCloseEmergencyModal = document.getElementById('btn-close-emergency-modal');
   const emergencyActionsList = document.getElementById('emergency-affected-list');
   const emergencyBanner = document.getElementById('doctor-emergency-active-banner');
+
+  // Funciones de navegación de fecha (Día anterior, Hoy, Día siguiente)
+  function shiftActiveDate(days) {
+    const parts = activeDate.split('-');
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    d.setDate(d.getDate() + days);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    activeDate = `${y}-${m}-${day}`;
+    renderTimeline();
+  }
+
+  function setTodayDate() {
+    activeDate = getTodayDateStr();
+    renderTimeline();
+    showToast('Fecha de agenda restablecida al día de hoy.', 'info');
+  }
+
+  function formatSpanishDate(dateStr) {
+    const parts = dateStr.split('-');
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    const isToday = dateStr === getTodayDateStr();
+    return `${days[d.getDay()]}, ${d.getDate()} de ${months[d.getMonth()]} de ${d.getFullYear()}${isToday ? ' (HOY)' : ''}`;
+  }
 
   // Navegación unificada de pestañas (Móvil y Escritorio)
   function switchDoctorTab(tabKey) {
@@ -82,13 +109,13 @@ export function setupDoctorPortal(showToast) {
     });
   }
 
-  // --- 1. CRONOGRAMA DIARIO & RUTAS (Timeline Vertical) ---
+  // --- 1. CRONOGRAMA DIARIO & RUTAS (Timeline Vertical con Navegación de Fechas) ---
   function renderTimeline() {
     const timelineEl = document.getElementById('doctor-timeline-list');
-    if (!timelineEl) return;
-
+    const agendaHeaderContainer = document.getElementById('doctor-agenda-header-toolbar');
     const state = store.getState();
     const isGuardActive = state.emergencyGuard.isActive;
+    const isToday = activeDate === getTodayDateStr();
 
     // Actualizar banner si la guardia está activa
     if (emergencyBanner) {
@@ -100,6 +127,59 @@ export function setupDoctorPortal(showToast) {
       .sort((a, b) => a.time.localeCompare(b.time));
 
     const travelBuffers = state.travelBuffers.filter(t => t.date === activeDate);
+
+    // Actualizar o inyectar la barra de herramientas de fechas del Doctor
+    if (agendaHeaderContainer) {
+      agendaHeaderContainer.innerHTML = `
+        <div class="doctor-date-nav-card" style="background: #ffffff; border: 1px solid var(--border-light); border-radius: 12px; padding: 12px 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.25rem;">📅</span>
+              <div>
+                <strong style="color: var(--dark-navy); font-size: 0.95rem;">${formatSpanishDate(activeDate)}</strong>
+                <div style="font-size: 0.74rem; color: #64748b; margin-top: 1px;">
+                  ${todayAppointments.length} ${todayAppointments.length === 1 ? 'consulta agendada' : 'consultas agendadas'} • ${travelBuffers.length} ${travelBuffers.length === 1 ? 'traslado intersede' : 'traslados intersedes'}
+                </div>
+              </div>
+            </div>
+            
+            <!-- Botones de Navegación de Fecha -->
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <button type="button" class="btn-secondary" id="btn-doc-date-prev" style="padding: 6px 12px; font-size: 0.78rem; font-weight: 700;">
+                ◀ Anterior
+              </button>
+              <button type="button" class="${isToday ? 'btn-primary' : 'btn-secondary'}" id="btn-doc-date-today" style="padding: 6px 14px; font-size: 0.78rem; font-weight: 700;">
+                📅 Hoy
+              </button>
+              <button type="button" class="btn-secondary" id="btn-doc-date-next" style="padding: 6px 12px; font-size: 0.78rem; font-weight: 700;">
+                Siguiente ▶
+              </button>
+              <input type="date" id="input-doc-date-picker" value="${activeDate}" style="padding: 5px 8px; font-size: 0.78rem; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; cursor: pointer;" title="Seleccionar fecha específica" />
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Escuchadores de la barra de navegación de fecha
+      const btnPrev = document.getElementById('btn-doc-date-prev');
+      const btnToday = document.getElementById('btn-doc-date-today');
+      const btnNext = document.getElementById('btn-doc-date-next');
+      const inputPicker = document.getElementById('input-doc-date-picker');
+
+      if (btnPrev) btnPrev.addEventListener('click', () => shiftActiveDate(-1));
+      if (btnToday) btnToday.addEventListener('click', () => setTodayDate());
+      if (btnNext) btnNext.addEventListener('click', () => shiftActiveDate(1));
+      if (inputPicker) {
+        inputPicker.addEventListener('change', (e) => {
+          if (e.target.value) {
+            activeDate = e.target.value;
+            renderTimeline();
+          }
+        });
+      }
+    }
+
+    if (!timelineEl) return;
 
     // Combinar citas y traslados cronológicamente
     const timelineItems = [];
@@ -116,9 +196,10 @@ export function setupDoctorPortal(showToast) {
 
     if (timelineItems.length === 0) {
       timelineEl.innerHTML = `
-        <div style="text-align: center; padding: 40px 20px; color: #64748b;">
+        <div style="text-align: center; padding: 40px 20px; background: #ffffff; border-radius: 12px; border: 1px dashed #cbd5e1; color: #64748b;">
           <span style="font-size: 2.5rem;">📅</span>
-          <p style="margin-top: 10px; font-weight: 600;">No hay citas agendadas para esta fecha.</p>
+          <p style="margin-top: 10px; font-weight: 700; color: #334155; font-size: 1rem;">No hay citas agendadas para esta fecha (${formatSpanishDate(activeDate)}).</p>
+          <p style="font-size: 0.82rem; margin-top: 4px;">Utilice los botones de navegación superiores para consultar otros días o el botón "📅 Hoy" para volver a la fecha actual.</p>
         </div>
       `;
       return;
@@ -1058,6 +1139,7 @@ export function setupDoctorPortal(showToast) {
   // Escuchar cuando el médico entra a su portal o cambia el estado para renderizar
   store.subscribe((state) => {
     if (state.activeView === 'doctor') {
+      activeDate = getTodayDateStr();
       switchDoctorTab(activeDoctorTab);
     }
   });

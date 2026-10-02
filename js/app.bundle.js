@@ -763,6 +763,19 @@ const MATRIZ_DISTANCIAS_TRASLADO = {
   'hospital-alborada': { tiempoMinutos: 40, margenTrafico: 25, totalBuffer: 65 }
 };
 
+// Parámetros Operativos de Slot Clínico vs Slot Administrativo
+const DURACION_NOMINAL_CONSULTA_DEFAULT = 30;
+const MARGEN_ADMINISTRATIVO_RECETA_DEFAULT = 15;
+const SLOT_REAL_RESERVA_DEFAULT = 45;
+const TIEMPO_DESALOJO_SANITIZACION_DEFAULT = 10;
+
+// Franjas de Hora Pico en Guayaquil
+const FRANJAS_HORA_PICO = [
+  { inicio: '07:00', fin: '09:30' },
+  { inicio: '12:30', fin: '14:00' },
+  { inicio: '17:00', fin: '19:45' }
+];
+
 // 2. Salas de Consultorio Físicas (Recursos Compartidos)
 const SALAS_CONSULTORIO = {
   ceibos: [
@@ -812,7 +825,8 @@ const CollisionEngine = {
     horaStr,
     duracionMinutos = 45,
     citas = [],
-    travelBuffers = []
+    travelBuffers = [],
+    tiempoSanitizacionMinutos = 0
   }) => {
     // Resolver sala física por defecto si no se pasa explícitamente
     const salaEfectiva = salaId || (SALAS_CONSULTORIO[sedeId] && SALAS_CONSULTORIO[sedeId][0]?.id) || `SALA-${sedeId.toUpperCase()}`;
@@ -869,7 +883,7 @@ const CollisionEngine = {
         const cIni = ch * 60 + cm;
         const cFin = cIni + (c.durationMinutes || 45);
 
-        // Solapamiento: max(ini1, ini2) < min(fin1, fin2)
+        // 2.A Solapamiento directo: max(ini1, ini2) < min(fin1, fin2)
         if (Math.max(inicioSlotMin, cIni) < Math.min(finSlotMin, cFin)) {
           return {
             valido: false,
@@ -877,6 +891,26 @@ const CollisionEngine = {
             tiempoBufferRequerido: null,
             codigoError: 'SALA_OCUPADA'
           };
+        }
+
+        // 2.B Sanitización entre pacientes
+        if (tiempoSanitizacionMinutos > 0) {
+          if (cFin <= inicioSlotMin && inicioSlotMin < cFin + tiempoSanitizacionMinutos) {
+            return {
+              valido: false,
+              razonRechazo: `La sala física requiere ${tiempoSanitizacionMinutos} min de sanitización/desalojo tras la atención previa.`,
+              tiempoBufferRequerido: tiempoSanitizacionMinutos,
+              codigoError: 'SALA_SANITIZACION_PENDIENTE'
+            };
+          }
+          if (finSlotMin <= cIni && cIni < finSlotMin + tiempoSanitizacionMinutos) {
+            return {
+              valido: false,
+              razonRechazo: `La sala física requiere ${tiempoSanitizacionMinutos} min de sanitización previa a la siguiente atención.`,
+              tiempoBufferRequerido: tiempoSanitizacionMinutos,
+              codigoError: 'SALA_SANITIZACION_PENDIENTE'
+            };
+          }
         }
       }
     }
@@ -969,10 +1003,144 @@ const CollisionEngine = {
     // PASO 4: Aprobación Integral
     // ========================================================================
     return {
+      permitido: true,
       valido: true,
+      codigoError: null,
       razonRechazo: null,
-      tiempoBufferRequerido: 0
+      mensaje: null,
+      tiempoBufferRequerido: 0,
+      bufferMinutosAplicado: 0
     };
+  },
+
+  /**
+   * Retorna la ventana de amortiguamiento en minutos según la matriz aprobada
+   */
+  calcularMatrizTraslado: (sedeOrigenId, sedeDestinoId, horaStr = null) => {
+    const key = `${sedeOrigenId.toLowerCase()}-${sedeDestinoId.toLowerCase()}`;
+    const item = MATRIZ_DISTANCIAS_TRASLADO[key];
+    if (!item) return 30;
+    return item.totalBuffer;
+  },
+
+  /**
+   * Verifica disponibilidad de sala física en intervalo semiabierto [inicio, fin)
+   */
+  verificarConflictoSalaFisica: ({ salaId, fechaStr, inicioMin, finMin, citas = [], tiempoSanitizacionMinutos = 0 }) => {
+    const citasMismaFecha = citas.filter(
+      c => c.date === fechaStr && c.status !== 'cancelada' && c.status !== 'reagendada'
+    );
+    for (const c of citasMismaFecha) {
+      const cSala = c.salaId || (SALAS_CONSULTORIO[c.clinicId] && SALAS_CONSULTORIO[c.clinicId][0]?.id);
+      if (cSala === salaId) {
+        const [ch, cm] = c.time.split(':').map(Number);
+        const cIni = ch * 60 + cm;
+        const cFin = cIni + (c.durationMinutes || 45);
+
+        if (Math.max(inicioMin, cIni) < Math.min(finMin, cFin)) {
+          return {
+            permitido: false,
+            valido: false,
+            codigoError: 'SALA_OCUPADA',
+            mensaje: `La sala física está ocupada por otra atención médica (#${c.code || c.id}).`
+          };
+        }
+      }
+    }
+    return { permitido: true, valido: true, codigoError: null, mensaje: null };
+  },
+
+  /**
+   * Pipeline de validación integral según especificación formal
+   */
+  validarDisponibilidadMedico: ({
+    medicoId = 'doctor',
+    sedeId,
+    salaId = null,
+    fechaStr,
+    horaStr,
+    duracionMinutos = 30,
+    citas = [],
+    travelBuffers = [],
+    tiempoSanitizacionMinutos = 0
+  }) => {
+    return CollisionEngine.validarDisponibilidadSlot({
+      medicoId,
+      sedeId,
+      salaId,
+      fechaStr,
+      horaStr,
+      duracionMinutos,
+      citas,
+      travelBuffers,
+      tiempoSanitizacionMinutos
+    });
+  },
+
+  /**
+   * Generador de Slots Libres (Motor de Búsqueda de Citas)
+   */
+  generarSlotsDisponibles: ({
+    medicoId = 'doctor',
+    sedeId,
+    fechaStr,
+    duracionMinutos = 30,
+    citas = [],
+    horarios = null,
+    salaId = null,
+    pasoMinutos = 30
+  }) => {
+    const [y, mes, d] = fechaStr.split('-').map(Number);
+    const dateObj = new Date(y, mes - 1, d);
+    const diasMap = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
+    const diaSemanaNombre = diasMap[dateObj.getDay()];
+
+    const rotaciones = (horarios || HORARIOS_ROTATIVOS).filter(
+      r => r.diaSemana === diaSemanaNombre && r.sedeId.toLowerCase() === sedeId.toLowerCase()
+    );
+
+    const turnos = rotaciones.length > 0 ? rotaciones : [{ horaInicio: '08:00', horaFin: '13:00' }];
+    const slots = [];
+
+    for (const turno of turnos) {
+      const [iniH, iniM] = turno.horaInicio.split(':').map(Number);
+      const [finH, finM] = turno.horaFin.split(':').map(Number);
+      let cursorMin = iniH * 60 + iniM;
+      const limiteMin = finH * 60 + finM;
+
+      while (cursorMin + duracionMinutos <= limiteMin) {
+        const h = String(Math.floor(cursorMin / 60)).padStart(2, '0');
+        const m = String(cursorMin % 60).padStart(2, '0');
+        const slotHora = `${h}:${m}`;
+
+        const validacion = CollisionEngine.validarDisponibilidadSlot({
+          medicoId,
+          sedeId,
+          salaId,
+          fechaStr,
+          horaStr: slotHora,
+          duracionMinutos,
+          citas
+        });
+
+        if (validacion.valido) {
+          const slotFinMin = cursorMin + duracionMinutos;
+          const finH = String(Math.floor(slotFinMin / 60)).padStart(2, '0');
+          const finM = String(slotFinMin % 60).padStart(2, '0');
+          slots.push({
+            horaInicio: slotHora,
+            horaFin: `${finH}:${finM}`,
+            duracionMinutos,
+            sedeId,
+            salaId: salaId || `SALA-${sedeId.toUpperCase()}`
+          });
+        }
+
+        cursorMin += pasoMinutos;
+      }
+    }
+
+    return slots;
   },
 
   /**
@@ -1017,6 +1185,62 @@ const CollisionEngine = {
       montoComisionSede: comisionSede,
       ingresoNetoMedico: netoMedico,
       esHospitalSueldoFijo: esHospital
+    };
+  },
+
+  /**
+   * Protocolo de Activación de Emergencia 'Modo Guardia' (Frontend)
+   */
+  activarModoGuardia: ({
+    medicoId = 'doctor',
+    fechaStr,
+    horaInicioStr,
+    horaFinStr,
+    citas = [],
+    motivo = 'Guardia de relevo hospitalaria imprevista MSP'
+  }) => {
+    const [hIni, mIni] = horaInicioStr.split(':').map(Number);
+    const [hFin, mFin] = horaFinStr.split(':').map(Number);
+    const inicioGuardiaMin = hIni * 60 + mIni;
+    const finGuardiaMin = hFin * 60 + mFin;
+
+    const citasAfectadas = [];
+    const citasMismaFecha = citas.filter(
+      c => c.date === fechaStr && c.status !== 'cancelada' && c.status !== 'reagendada'
+    );
+
+    for (const c of citasMismaFecha) {
+      if (c.clinicId === 'hospital') continue;
+
+      const rutaKey = `${c.clinicId}-hospital`;
+      const buffer = (MATRIZ_DISTANCIAS_TRASLADO[rutaKey] && MATRIZ_DISTANCIAS_TRASLADO[rutaKey].totalBuffer) || 30;
+
+      const [ch, cm] = c.time.split(':').map(Number);
+      const cIni = ch * 60 + cm;
+      const cFin = cIni + (c.durationMinutes || 45);
+
+      // Ventana expandida de afectación
+      const ventanaIni = inicioGuardiaMin - buffer;
+      const ventanaFin = finGuardiaMin + buffer;
+
+      if (Math.max(cIni, ventanaIni) < Math.min(cFin, ventanaFin)) {
+        citasAfectadas.push({
+          ...c,
+          status: 'reagendamiento_pendiente_guardia',
+          prioridadReubicacion: 1,
+          motivoBloqueo: motivo
+        });
+      }
+    }
+
+    return {
+      modoGuardiaActivo: true,
+      medicoId,
+      fecha: fechaStr,
+      inicioGuardia: horaInicioStr,
+      finGuardia: horaFinStr,
+      totalAfectadas: citasAfectadas.length,
+      citasAfectadas
     };
   }
 };
@@ -1252,26 +1476,26 @@ class PatientReconciliator {
  */
 const validarCedulaEcuatorianaDetallada = (cedula) => {
   if (!cedula || typeof cedula !== 'string') {
-    return { isValid: false, message: 'La cédula de identidad es requerida.' };
+    return { isValid: false, message: 'Cédula incorrecta.' };
   }
 
   const limpia = cedula.trim();
 
   // Solo dígitos enteros positivos
   if (!/^\d{10}$/.test(limpia)) {
-    return { isValid: false, message: 'La cédula debe contener exactamente 10 dígitos enteros positivos (sin signos ni letras).' };
+    return { isValid: false, message: 'Cédula incorrecta.' };
   }
 
   // Validación de provincia (01 a 24, o 30)
   const provincia = parseInt(limpia.substring(0, 2), 10);
   if ((provincia < 1 || provincia > 24) && provincia !== 30) {
-    return { isValid: false, message: `Código de provincia '${limpia.substring(0, 2)}' no válido en Ecuador (debe ser 01-24 o 30).` };
+    return { isValid: false, message: 'Cédula incorrecta.' };
   }
 
   // Tercer dígito menor a 6 para personas naturales
   const tercerDigito = parseInt(limpia.charAt(2), 10);
   if (tercerDigito >= 6) {
-    return { isValid: false, message: 'El tercer dígito debe ser menor a 6 para cédula de persona natural.' };
+    return { isValid: false, message: 'Cédula incorrecta.' };
   }
 
   // Algoritmo matemático Módulo 10
@@ -1292,11 +1516,11 @@ const validarCedulaEcuatorianaDetallada = (cedula) => {
   if (digitoVerificadorCalculado !== digitoVerificadorReal) {
     return {
       isValid: false,
-      message: `Dígito verificador inválido: la cédula no supera la comprobación matemática (esperado: ${digitoVerificadorCalculado}, ingresado: ${digitoVerificadorReal}).`
+      message: 'Cédula incorrecta.'
     };
   }
 
-  return { isValid: true, message: 'Cédula de identidad ecuatoriana válida.' };
+  return { isValid: true, message: 'Cédula válida.' };
 };
 
 const validarCedulaEcuatoriana = (cedula) => {
@@ -1579,6 +1803,238 @@ const aplicarMascaraInputs = () => {
 };
 
 
+// ==================== js/ambient-background.js ====================
+
+/**
+ * Montepiedra Salud - Motor de Fondo Difuminado Neutro con Iluminación Líquida
+ * 
+ * Estética Minimalista:
+ * - Decoloración difuminada continua entre tonos neutros (Obsidian, Pizarra, Titanio, Mineral Teal, Grafito).
+ * - Interacción con el ratón: Haz de luz ambiental fluido (Dynamic Ambient Spotlight)
+ *   que se desliza suavemente con inercia líquida detrás del contenido e ilumina el cristal.
+ * - Sin constelaciones ni líneas molestas, sin tambaleos 3D de textos. Puro lujo visual.
+ */
+
+(function () {
+  'use strict';
+
+  function initAmbientBackground() {
+    const canvas = document.getElementById('ambient-canvas');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    if (canvas.__ambientRunning) return;
+    canvas.__ambientRunning = true;
+
+    let width = 0;
+    let height = 0;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    // Estado del cursor con inercia elástica ultrasuave
+    const mouse = {
+      x: window.innerWidth * 0.5,
+      y: window.innerHeight * 0.35,
+      targetX: window.innerWidth * 0.5,
+      targetY: window.innerHeight * 0.35,
+      vx: 0,
+      vy: 0,
+      intensity: 0.85,
+      targetIntensity: 0.85,
+      radius: 380
+    };
+
+    function resize() {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      canvas.style.width = width + 'px';
+      canvas.style.height = height + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    resize();
+    window.addEventListener('resize', resize, { passive: true });
+
+    // Seguimiento del mouse
+    window.addEventListener('mousemove', function (e) {
+      mouse.targetX = e.clientX;
+      mouse.targetY = e.clientY;
+      mouse.targetIntensity = 1.0;
+
+      // Iluminación dinámica en tarjetas sobrevoladas (Apple/Linear spotlight border)
+      const targetCard = e.target.closest('.featured-clinic-card, .how-step-card, .login-card-container, .patient-summary-card, .doctor-stat-box, .stat-item, .faq-item');
+      if (targetCard) {
+        const rect = targetCard.getBoundingClientRect();
+        targetCard.style.setProperty('--mouse-x', (e.clientX - rect.left) + 'px');
+        targetCard.style.setProperty('--mouse-y', (e.clientY - rect.top) + 'px');
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchmove', function (e) {
+      if (e.touches.length > 0) {
+        mouse.targetX = e.touches[0].clientX;
+        mouse.targetY = e.touches[0].clientY;
+        mouse.targetIntensity = 1.0;
+      }
+    }, { passive: true });
+
+    window.addEventListener('mouseleave', function () {
+      mouse.targetIntensity = 0.5;
+    }, { passive: true });
+
+    // Orbes de colores neutros con movimiento orgánico y difuminado profundo
+    const neutralOrbs = [
+      {
+        baseX: 0.15, baseY: 0.25,
+        radius: 650,
+        speedX: 0.0006, speedY: 0.0008,
+        phase: 0,
+        // Titanio Carbón Pizarra
+        r: 30, g: 41, b: 59, a: 0.55
+      },
+      {
+        baseX: 0.85, baseY: 0.20,
+        radius: 680,
+        speedX: -0.0007, speedY: 0.0006,
+        phase: Math.PI * 0.4,
+        // Mineral Teal Silencioso (Salud y Energía orgánica)
+        r: 13, g: 148, b: 136, a: 0.35
+      },
+      {
+        baseX: 0.50, baseY: 0.65,
+        radius: 720,
+        speedX: 0.0008, speedY: -0.0006,
+        phase: Math.PI * 0.9,
+        // Grafito Acero Profundo
+        r: 15, g: 23, b: 42, a: 0.65
+      },
+      {
+        baseX: 0.18, baseY: 0.80,
+        radius: 600,
+        speedX: -0.0005, speedY: -0.0007,
+        phase: Math.PI * 1.3,
+        // Pizarra Azulada Neutra
+        r: 51, g: 65, b: 85, a: 0.45
+      },
+      {
+        baseX: 0.82, baseY: 0.82,
+        radius: 640,
+        speedX: 0.0006, speedY: 0.0005,
+        phase: Math.PI * 1.7,
+        // Acento Platino Suave
+        r: 71, g: 85, b: 105, a: 0.40
+      }
+    ];
+
+    let time = 0;
+    let animId = null;
+
+    function render() {
+      time += 0.014;
+
+      // Suavizado elástico de la posición del haz de luz (Inercia fluida)
+      mouse.vx = (mouse.targetX - mouse.x) * 0.075;
+      mouse.vy = (mouse.targetY - mouse.y) * 0.075;
+      mouse.x += mouse.vx;
+      mouse.y += mouse.vy;
+
+      mouse.intensity += (mouse.targetIntensity - mouse.intensity) * 0.05;
+
+      ctx.clearRect(0, 0, width, height);
+
+      // CAPA 1: Decoloración difuminada entre orbes neutros
+      for (let i = 0; i < neutralOrbs.length; i++) {
+        const orb = neutralOrbs[i];
+        
+        // Movimiento senoidal orgánico
+        let cx = (orb.baseX + Math.sin(time * 0.6 + orb.phase) * 0.16) * width;
+        let cy = (orb.baseY + Math.cos(time * 0.5 + orb.phase) * 0.16) * height;
+
+        // Atracción magnética sutil hacia el haz de luz del ratón
+        const dx = mouse.x - cx;
+        const dy = mouse.y - cy;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 0 && dist < 600) {
+          const pull = (1 - dist / 600) * 45;
+          cx += (dx / dist) * pull;
+          cy += (dy / dist) * pull;
+        }
+
+        const r = orb.radius + Math.sin(time * 0.8 + orb.phase) * 50;
+
+        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        grad.addColorStop(0, `rgba(${orb.r}, ${orb.g}, ${orb.b}, ${orb.a})`);
+        grad.addColorStop(0.55, `rgba(${orb.r}, ${orb.g}, ${orb.b}, ${orb.a * 0.45})`);
+        grad.addColorStop(1, `rgba(${orb.r}, ${orb.g}, ${orb.b}, 0)`);
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // CAPA 2: Haz de Luz Líquido Interactivo (Dynamic Ambient Mouse Spotlight)
+      // Un resplandor difuminado que sigue al cursor suavemente iluminando el fondo
+      if (mouse.intensity > 0.05) {
+        const speed = Math.hypot(mouse.vx, mouse.vy);
+        const dynamicRadius = mouse.radius + Math.min(speed * 6, 120);
+
+        // Halo Exterior Difuminado (Teal Orgánico + Pizarra)
+        const outerGrad = ctx.createRadialGradient(
+          mouse.x, mouse.y, 0,
+          mouse.x, mouse.y, dynamicRadius
+        );
+        outerGrad.addColorStop(0, `rgba(13, 148, 136, ${0.28 * mouse.intensity})`);
+        outerGrad.addColorStop(0.35, `rgba(45, 212, 191, ${0.12 * mouse.intensity})`);
+        outerGrad.addColorStop(0.70, `rgba(30, 41, 59, ${0.08 * mouse.intensity})`);
+        outerGrad.addColorStop(1, 'rgba(15, 23, 42, 0)');
+
+        ctx.fillStyle = outerGrad;
+        ctx.beginPath();
+        ctx.arc(mouse.x, mouse.y, dynamicRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Núcleo Interior de Luz Platino Suave (Luminescence)
+        const innerRadius = dynamicRadius * 0.42;
+        const innerGrad = ctx.createRadialGradient(
+          mouse.x, mouse.y, 0,
+          mouse.x, mouse.y, innerRadius
+        );
+        innerGrad.addColorStop(0, `rgba(241, 245, 249, ${0.22 * mouse.intensity})`);
+        innerGrad.addColorStop(0.5, `rgba(203, 213, 225, ${0.08 * mouse.intensity})`);
+        innerGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+        ctx.fillStyle = innerGrad;
+        ctx.beginPath();
+        ctx.arc(mouse.x, mouse.y, innerRadius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      animId = requestAnimationFrame(render);
+    }
+
+    render();
+  }
+
+  // Exportar al ámbito global y autoiniciar
+  if (typeof window !== 'undefined') {
+    window.initAmbientBackground = initAmbientBackground;
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initAmbientBackground);
+    } else {
+      initAmbientBackground();
+    }
+  }
+
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { initAmbientBackground };
+  }
+})();
+
+
 // ==================== js/state.js ====================
 
 /**
@@ -1692,13 +2148,147 @@ const DEMO_USERS = {
   }
 };
 
+// Función para obtener la fecha de hoy en formato YYYY-MM-DD
+function getTodayDateStr() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+const TODAY_DATE = getTodayDateStr();
+
 // Datos Semilla Iniciales
 const INITIAL_STATE = {
   currentUser: null,
   activeView: 'landing', // 'landing', 'patient', 'doctor', 'accountant'
   
-  // Citas Iniciales del día Sábado 19 de Septiembre y semana activa
+  // Citas Iniciales (Incluye citas del día de hoy y de la semana para histórico)
   appointments: [
+    // --- CITAS DE HOY (FECHA ACTUAL DINÁMICA) ---
+    {
+      id: 'APT-TODAY-1',
+      code: 'MED-7001',
+      patientName: 'Carlos Mendoza Moreira',
+      patientId: '0987654321',
+      patientPhone: '0987654321',
+      patientEmail: 'paciente@gmail.com',
+      clinicId: 'alborada',
+      date: TODAY_DATE,
+      time: '09:00',
+      durationMinutes: 45,
+      reason: 'Control prioritario de hipertensión y receta Losartán',
+      paymentMethod: 'efectivo',
+      basePrice: 10.00,
+      feePercentage: 0.00,
+      feeAmount: 0.00,
+      totalPaid: 10.00,
+      retentionRate: 0.10,
+      retentionAmount: 1.00,
+      netClinicYield: 9.00,
+      status: 'confirmada',
+      settlementStatus: 'Liquidado',
+      notes: 'Paciente con antecedente de HTA grado 1. Control de rutina programado para hoy.'
+    },
+    {
+      id: 'APT-TODAY-2',
+      code: 'MED-7002',
+      patientName: 'Mariana Vera Loor',
+      patientId: '0918237465',
+      patientPhone: '0991234567',
+      patientEmail: 'mariana.vera@yahoo.com',
+      clinicId: 'alborada',
+      date: TODAY_DATE,
+      time: '10:15',
+      durationMinutes: 45,
+      reason: 'Evaluación respiratoria y chequeo de sibilancias',
+      paymentMethod: 'tarjeta',
+      basePrice: 10.00,
+      feePercentage: 0.0975,
+      feeAmount: 0.98,
+      totalPaid: 10.98,
+      retentionRate: 0.10,
+      retentionAmount: 1.00,
+      netClinicYield: 9.00,
+      status: 'confirmada',
+      settlementStatus: 'Liquidado',
+      notes: 'Requiere auscultación pulmonar y control de asma intermitente.'
+    },
+    {
+      id: 'APT-TODAY-3',
+      code: 'MED-7003',
+      patientName: 'Javier Andrade Romero',
+      patientId: '0922883344',
+      patientPhone: '0984561230',
+      patientEmail: 'jandrade@gmail.com',
+      clinicId: 'ceibos',
+      date: TODAY_DATE,
+      time: '13:00',
+      durationMinutes: 45,
+      reason: 'Dolor articular lumbar y valoración postural',
+      paymentMethod: 'efectivo',
+      basePrice: 20.00,
+      feePercentage: 0.00,
+      feeAmount: 0.00,
+      totalPaid: 20.00,
+      retentionRate: 0.25,
+      retentionAmount: 5.00,
+      netClinicYield: 15.00,
+      status: 'confirmada',
+      settlementStatus: 'Pendiente',
+      notes: 'Chequeo de columna lumbosacra y terapia analgésica.'
+    },
+    {
+      id: 'APT-TODAY-4',
+      code: 'MED-7004',
+      patientName: 'Sofía Carvajal Poveda',
+      patientId: '0933772211',
+      patientPhone: '0978901234',
+      patientEmail: 'sofia.carvajal@outlook.com',
+      clinicId: 'ceibos',
+      date: TODAY_DATE,
+      time: '14:30',
+      durationMinutes: 45,
+      reason: 'Certificado médico de aptitud y control de salud',
+      paymentMethod: 'tarjeta',
+      basePrice: 20.00,
+      feePercentage: 0.0975,
+      feeAmount: 1.95,
+      totalPaid: 21.95,
+      retentionRate: 0.25,
+      retentionAmount: 5.00,
+      netClinicYield: 15.00,
+      status: 'confirmada',
+      settlementStatus: 'Pendiente',
+      notes: 'Certificado de medicina preventiva e ingreso laboral.'
+    },
+    {
+      id: 'APT-TODAY-5',
+      code: 'MED-7005',
+      patientName: 'Elena Guamán Tomalá',
+      patientId: '0944119988',
+      patientPhone: '0967894561',
+      patientEmail: 'elena.guaman@gmail.com',
+      clinicId: 'mapasingue',
+      date: TODAY_DATE,
+      time: '16:30',
+      durationMinutes: 45,
+      reason: 'Control glucémico y revisión de perfil metabólico',
+      paymentMethod: 'efectivo',
+      basePrice: 20.00,
+      feePercentage: 0.00,
+      feeAmount: 0.00,
+      totalPaid: 20.00,
+      retentionRate: 0.05,
+      retentionAmount: 1.00,
+      netClinicYield: 19.00,
+      status: 'confirmada',
+      settlementStatus: 'Liquidado',
+      notes: 'Ajuste de medicación hipoglucemiante.'
+    },
+
+    // --- CITAS HISTÓRICAS (Semana 17-23 Sep 2026 para auditoría contable) ---
     {
       id: 'APT-1001',
       code: 'MED-1001',
@@ -1719,9 +2309,9 @@ const INITIAL_STATE = {
       retentionRate: 0.10,
       retentionAmount: 1.00,
       netClinicYield: 9.00,
-      status: 'confirmada', // confirmada, atendida, en_guardia, cancelada
-      settlementStatus: 'Liquidado', // Liquidado, Pendiente
-      notes: 'Paciente con antecedente de HTA grado 1. Recomienda perfil lipídico.'
+      status: 'confirmada',
+      settlementStatus: 'Liquidado',
+      notes: 'Paciente con antecedente de HTA grado 1.'
     },
     {
       id: 'APT-1002',
@@ -1821,8 +2411,30 @@ const INITIAL_STATE = {
     }
   ],
 
-  // Bloques de Traslado Protegido entre Clínicas (Página 2 y 4)
+  // Bloques de Traslado Protegido entre Clínicas
   travelBuffers: [
+    {
+      id: 'TRV-TODAY-1',
+      date: TODAY_DATE,
+      fromClinic: 'alborada',
+      toClinic: 'ceibos',
+      startTime: '11:15',
+      endTime: '12:45',
+      durationMinutes: 45,
+      bufferLabel: '🚗 Traslado Alborada → Ceibos (45 min + colchón de llegada)',
+      status: 'programado'
+    },
+    {
+      id: 'TRV-TODAY-2',
+      date: TODAY_DATE,
+      fromClinic: 'ceibos',
+      toClinic: 'mapasingue',
+      startTime: '15:30',
+      endTime: '16:15',
+      durationMinutes: 40,
+      bufferLabel: '🚗 En ruta hacia Mapasingue - 40 min buffer',
+      status: 'programado'
+    },
     {
       id: 'TRV-1',
       date: '2026-09-19',
@@ -1844,6 +2456,67 @@ const INITIAL_STATE = {
       durationMinutes: 40,
       bufferLabel: '🚗 En ruta hacia Mapasingue - 40 min buffer',
       status: 'programado'
+    }
+  ],
+
+  // Perfiles Completos de Pacientes (Portal Paciente & Ficha Clínica)
+  patientProfiles: [
+    {
+      id: 'PAT-PROF-01',
+      cedula: '0987654321',
+      nombres: 'Carlos',
+      apellidos: 'Mendoza Moreira',
+      nombreCompleto: 'Carlos Mendoza Moreira',
+      fechaNacimiento: '1982-05-14',
+      edad: 44,
+      genero: 'Masculino',
+      telefono: '+593 98 765 4321',
+      email: 'paciente@gmail.com',
+      direccion: 'Cdla. Alborada 8va Etapa, Mz 812 Villa 4',
+      contactoEmergenciaNombre: 'Laura Moreira (Cónyuge)',
+      contactoEmergenciaTelefono: '+593 99 223 3445',
+      tipoSangre: 'O+',
+      alergias: 'Penicilina, Sulfamidas',
+      enfermedadesCronicas: 'Hipertensión Arterial Primaria Grado 1',
+      medicacionHabitual: 'Losartán 50mg cada 24 horas vía oral'
+    },
+    {
+      id: 'PAT-PROF-02',
+      cedula: '0918237465',
+      nombres: 'Mariana',
+      apellidos: 'Vera Loor',
+      nombreCompleto: 'Mariana Vera Loor',
+      fechaNacimiento: '1994-08-22',
+      edad: 32,
+      genero: 'Femenino',
+      telefono: '+593 99 123 4567',
+      email: 'mariana.vera@yahoo.com',
+      direccion: 'Urdesa Central, Calle 4ta y Guayacanes',
+      contactoEmergenciaNombre: 'Roberto Vera (Padre)',
+      contactoEmergenciaTelefono: '+593 98 112 2334',
+      tipoSangre: 'A+',
+      alergias: 'AINES (Ibuprofeno causa broncoespasmo leve)',
+      enfermedadesCronicas: 'Asma Bronquial Intermitente',
+      medicacionHabitual: 'Salbutamol inhalador 100mcg a demanda'
+    },
+    {
+      id: 'PAT-PROF-03',
+      cedula: '0922883344',
+      nombres: 'Javier',
+      apellidos: 'Andrade Romero',
+      nombreCompleto: 'Javier Andrade Romero',
+      fechaNacimiento: '1975-11-03',
+      edad: 51,
+      genero: 'Masculino',
+      telefono: '+593 98 456 1230',
+      email: 'jandrade@gmail.com',
+      direccion: 'Ceibos Norte Mz 14 Solar 2',
+      contactoEmergenciaNombre: 'Patricia Romero (Hermana)',
+      contactoEmergenciaTelefono: '+593 97 665 5443',
+      tipoSangre: 'B+',
+      alergias: 'Sin alergias conocidas',
+      enfermedadesCronicas: 'Hernia Discal L4-L5',
+      medicacionHabitual: 'Complejo B y Paracetamol 500mg SOS'
     }
   ],
 
@@ -1891,7 +2564,7 @@ const INITIAL_STATE = {
     }
   ],
 
-  // Recetas Digitales Emitidas (Página 4)
+  // Recetas Digitales Emitidas
   prescriptions: [
     {
       id: 'RX-901',
@@ -1910,35 +2583,59 @@ const INITIAL_STATE = {
     }
   ],
 
-  // Registro de Gastos Diarios y Operativos (Página 4 y 5)
+  // Registro de Gastos Diarios y Operativos (Clasificación Contable Oficial y Auditoría)
   expenses: [
     {
       id: 'EXP-101',
-      date: '2026-09-19',
+      date: TODAY_DATE,
       category: 'Transporte',
+      accountingCategory: 'Gastos',
       description: 'Gasolina Super para traslados entre clínicas',
       amount: 15.00,
       paymentMethod: 'Efectivo',
+      voucherType: 'Factura Electrónica',
+      voucherNumber: '001-002-000847291',
+      providerName: 'Estación Primax Ceibos',
+      providerRuc: '0992384756001',
+      auditStatus: 'Aprobado',
+      costCenter: 'General Movilidad',
+      auditNotes: 'Comprobante cotejado con ruta Alborada-Ceibos.',
       quickLogged: true,
       deductibleSRI: true
     },
     {
       id: 'EXP-102',
-      date: '2026-09-19',
+      date: TODAY_DATE,
       category: 'Transporte',
+      accountingCategory: 'Gastos',
       description: 'Carrera de Taxi hacia Hospital Público Ceibos',
       amount: 4.00,
       paymentMethod: 'Efectivo',
+      voucherType: 'Recibo / Vale',
+      voucherNumber: 'VAL-2026-042',
+      providerName: 'Cooperativa Taxi Ceibos',
+      providerRuc: '0991122334001',
+      auditStatus: 'Aprobado',
+      costCenter: 'Hospital Ceibos',
+      auditNotes: 'Movilización por emergencia de guardia hospitalaria.',
       quickLogged: true,
       deductibleSRI: true
     },
     {
       id: 'EXP-103',
-      date: '2026-09-19',
+      date: TODAY_DATE,
       category: 'Suministros Hospital',
+      accountingCategory: 'Costos',
       description: 'Insumos médicos de emergencia (Guantes de nitrilo, gasas estériles y antiséptico)',
       amount: 12.00,
       paymentMethod: 'Efectivo',
+      voucherType: 'Factura Electrónica',
+      voucherNumber: '002-005-001294812',
+      providerName: 'Distribuidora Farmacéutica Difare',
+      providerRuc: '0990011223001',
+      auditStatus: 'Aprobado',
+      costCenter: 'Hospital Ceibos',
+      auditNotes: 'Insumos para atención de choque hospitalario.',
       quickLogged: true,
       deductibleSRI: true
     },
@@ -1946,9 +2643,17 @@ const INITIAL_STATE = {
       id: 'EXP-104',
       date: '2026-09-18',
       category: 'Mantenimiento',
+      accountingCategory: 'Costos',
       description: 'Desinfección y calibración de tensiómetro aneroide',
       amount: 25.00,
       paymentMethod: 'Transferencia',
+      voucherType: 'Factura Electrónica',
+      voucherNumber: '001-010-000004921',
+      providerName: 'Biomédica del Litoral S.A.',
+      providerRuc: '0991928374001',
+      auditStatus: 'Aprobado',
+      costCenter: 'Sede Mapasingue',
+      auditNotes: 'Mantenimiento preventivo de equipo instrumental.',
       quickLogged: false,
       deductibleSRI: true
     },
@@ -1956,9 +2661,17 @@ const INITIAL_STATE = {
       id: 'EXP-105',
       date: '2026-09-15',
       category: 'Transporte',
+      accountingCategory: 'Gastos',
       description: 'Peajes urbanos Vía a la Costa y combustible',
       amount: 18.50,
       paymentMethod: 'Efectivo',
+      voucherType: 'Factura Electrónica',
+      voucherNumber: '003-001-000994821',
+      providerName: 'Gasolinera Mobil Vía a la Costa',
+      providerRuc: '0990887766001',
+      auditStatus: 'Aprobado',
+      costCenter: 'Sede Ceibos',
+      auditNotes: 'Desplazamiento para turno extendido.',
       quickLogged: false,
       deductibleSRI: true
     }
@@ -2288,10 +3001,82 @@ class StateStore {
     this.saveState();
   }
 
-  // --- Cálculos Contables y Financieros (Página 5) ---
+  // --- Gestión de Perfiles de Pacientes ---
+  getPatientProfiles() {
+    return this.state.patientProfiles || [];
+  }
+
+  getPatientProfile(cedula) {
+    if (!cedula) return null;
+    return (this.state.patientProfiles || []).find(p => p.cedula === cedula) || null;
+  }
+
+  savePatientProfile(profileData) {
+    if (!profileData || !profileData.cedula) return null;
+    if (!this.state.patientProfiles) this.state.patientProfiles = [];
+    
+    const index = this.state.patientProfiles.findIndex(p => p.cedula === profileData.cedula);
+    const existing = index >= 0 ? this.state.patientProfiles[index] : {};
+    
+    const updated = {
+      ...existing,
+      ...profileData,
+      nombreCompleto: profileData.nombreCompleto || `${profileData.nombres || ''} ${profileData.apellidos || ''}`.trim(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    if (index >= 0) {
+      this.state.patientProfiles[index] = updated;
+    } else {
+      updated.id = `PAT-PROF-${Math.floor(100 + Math.random() * 900)}`;
+      this.state.patientProfiles.unshift(updated);
+    }
+    
+    // Sincronizar en memoria con medicalRecords si coincide
+    const medRec = (this.state.medicalRecords || []).find(m => m.patientId === profileData.cedula);
+    if (medRec) {
+      if (profileData.alergias) medRec.allergies = profileData.alergias;
+      if (profileData.tipoSangre) medRec.bloodType = profileData.tipoSangre;
+      if (profileData.enfermedadesCronicas) medRec.history = profileData.enfermedadesCronicas;
+    }
+
+    this.saveState();
+    return updated;
+  }
+
+  getPatientAppointments(cedula) {
+    if (!cedula) return [];
+    return (this.state.appointments || []).filter(a => a.patientId === cedula);
+  }
+
+  // --- Clasificación Contable y Auditoría de Gastos ---
+  updateExpenseClassification(expId, accountingCategory, auditStatus, costCenter) {
+    const exp = (this.state.expenses || []).find(e => e.id === expId);
+    if (exp) {
+      if (accountingCategory) exp.accountingCategory = accountingCategory;
+      if (auditStatus) exp.auditStatus = auditStatus;
+      if (costCenter) exp.costCenter = costCenter;
+      this.saveState();
+      return exp;
+    }
+    return null;
+  }
+
+  auditExpenseVoucher(expId, auditStatus, auditNotes) {
+    const exp = (this.state.expenses || []).find(e => e.id === expId);
+    if (exp) {
+      if (auditStatus) exp.auditStatus = auditStatus;
+      if (auditNotes !== undefined) exp.auditNotes = auditNotes;
+      this.saveState();
+      return exp;
+    }
+    return null;
+  }
+
+  // --- Cálculos Contables y Financieros Oficiales (Supervisión Contable & SRI) ---
   getFinancialSummary() {
-    const appointments = this.state.appointments;
-    const expenses = this.state.expenses;
+    const appointments = this.state.appointments || [];
+    const expenses = this.state.expenses || [];
 
     // Ingresos brutos facturados (excluyendo canceladas)
     const activeAppointments = appointments.filter(a => a.status !== 'cancelada');
@@ -2301,10 +3086,10 @@ class StateStore {
     let totalRetentions = 0;
     
     const clinicBreakdown = {
-      ceibos: { name: 'Clínica Ceibos', patientsCount: 0, gross: 0, retentionRate: 0.25, retentions: 0, netDoctor: 0, status: 'Pendiente' },
-      mapasingue: { name: 'Consultorio Mapasingue', patientsCount: 0, gross: 0, retentionRate: 0.05, retentions: 0, netDoctor: 0, status: 'Liquidado' },
-      alborada: { name: 'Consultorio Alborada', patientsCount: 0, gross: 0, retentionRate: 0.10, retentions: 0, netDoctor: 0, status: 'Liquidado' },
-      hospital: { name: 'Hospital Público Ceibos', patientsCount: 0, gross: 0, retentionRate: 0.00, retentions: 0, netDoctor: 0, status: 'Sueldo Fijo' }
+      ceibos: { name: 'Clínica Ceibos', patientsCount: 0, gross: 0, retentionRate: 0.25, retentions: 0, netDoctor: 0, status: 'Pendiente', costCenterExpenses: 0 },
+      mapasingue: { name: 'Consultorio Mapasingue', patientsCount: 0, gross: 0, retentionRate: 0.05, retentions: 0, netDoctor: 0, status: 'Liquidado', costCenterExpenses: 0 },
+      alborada: { name: 'Consultorio Alborada', patientsCount: 0, gross: 0, retentionRate: 0.10, retentions: 0, netDoctor: 0, status: 'Liquidado', costCenterExpenses: 0 },
+      hospital: { name: 'Hospital Público Ceibos', patientsCount: 0, gross: 0, retentionRate: 0.00, retentions: 0, netDoctor: 0, status: 'Sueldo Fijo', costCenterExpenses: 0 }
     };
 
     activeAppointments.forEach(apt => {
@@ -2320,7 +3105,7 @@ class StateStore {
       totalRetentions += apt.retentionAmount || 0;
     });
 
-    // Gastos Operativos Acumulados
+    // Gastos Operativos y Clasificación Contable en 6 Grupos
     let totalExpenses = 0;
     const expensesByCategory = {
       Transporte: 0,
@@ -2329,15 +3114,55 @@ class StateStore {
       Activos: 0
     };
 
+    const accountingCategoriesSummary = {
+      Costos: 0,
+      Gastos: 0,
+      Activos: 0,
+      Patrimonio: 0,
+      Ingresos: totalGrossRevenue + HOSPITAL_FIXED_SALARY,
+      Egresos: 0
+    };
+
     expenses.forEach(exp => {
       totalExpenses += exp.amount;
       const cat = exp.category || 'Transporte';
       expensesByCategory[cat] = (expensesByCategory[cat] || 0) + exp.amount;
+
+      const accCat = exp.accountingCategory || (cat === 'Suministros Hospital' || cat === 'Mantenimiento' ? 'Costos' : 'Gastos');
+      accountingCategoriesSummary[accCat] = (accountingCategoriesSummary[accCat] || 0) + exp.amount;
+
+      // Asignar al centro de costos
+      const cc = exp.costCenter || '';
+      if (cc.includes('Ceibos') && !cc.includes('Hospital')) clinicBreakdown.ceibos.costCenterExpenses += exp.amount;
+      else if (cc.includes('Mapasingue')) clinicBreakdown.mapasingue.costCenterExpenses += exp.amount;
+      else if (cc.includes('Alborada')) clinicBreakdown.alborada.costCenterExpenses += exp.amount;
+      else if (cc.includes('Hospital')) clinicBreakdown.hospital.costCenterExpenses += exp.amount;
     });
+
+    accountingCategoriesSummary.Egresos = totalExpenses + totalRetentions;
 
     // Ingreso Neto Real: (Bruto - Retenciones) + Sueldo Fijo Hospital - Gastos Operativos
     const privateClinicsNet = totalGrossRevenue - totalRetentions;
     const realNetIncome = (privateClinicsNet + HOSPITAL_FIXED_SALARY) - totalExpenses;
+
+    // Indicadores y Consejos de Optimización de Rutas
+    const routeOptimizations = [
+      {
+        sede: 'Mapasingue',
+        consejo: 'Comisión reducida al 5%: Genera el mayor rendimiento neto por hora ($19.00/paciente). Recomendado abrir 2 turnos matutinos adicionales.',
+        impacto: '+ $76.00/semana de ganancia neta'
+      },
+      {
+        sede: 'Ceibos → Hospital',
+        consejo: 'Corredor Vía a la Costa: Traslado agrupado de 40 min evita horas de alta congestión (11:30 - 13:00) y reduce 25% el gasto de combustible.',
+        impacto: 'Ahorro mensual de ~$35.00 en gasolina'
+      },
+      {
+        sede: 'Hospital Público',
+        consejo: 'Los $16.00 asumidos en insumos médicos y traslados de emergencia son deducibles al 100% en la declaración semestral de I.R. del SRI.',
+        impacto: 'Crédito tributario fiscal verificado'
+      }
+    ];
 
     return {
       totalGrossRevenue,
@@ -2348,7 +3173,10 @@ class StateStore {
       privateClinicsNet,
       realNetIncome,
       clinicBreakdown,
-      expensesByCategory
+      expensesByCategory,
+      accountingCategoriesSummary,
+      accountingClassificationTotals: accountingCategoriesSummary,
+      routeOptimizations
     };
   }
 }
@@ -2381,9 +3209,14 @@ function setupAuth(showToast) {
       tab.classList.add('active');
       currentSelectedRole = tab.dataset.role;
 
-      // Mantener texto de ejemplo solicitado: Cedula o Usuario
       if (loginInput) {
-        loginInput.placeholder = 'Cedula o Usuario';
+        if (currentSelectedRole === 'doctor') {
+          loginInput.placeholder = 'Cédula o Usuario del Doctor';
+        } else if (currentSelectedRole === 'paciente') {
+          loginInput.placeholder = 'Cédula o Usuario del Paciente';
+        } else {
+          loginInput.placeholder = 'Cédula o Usuario Contable';
+        }
       }
     });
   });
@@ -2394,7 +3227,6 @@ function setupAuth(showToast) {
 
   // Mostrar / Ocultar contraseña con icono gráfico dinámico
   if (passwordToggleBtn && passwordInput) {
-    // Estado inicial: contraseña oculta -> icono de ojo tapado / tachado
     passwordToggleBtn.innerHTML = eyeClosedSvg;
     passwordToggleBtn.setAttribute('title', 'Mostrar contraseña (hacer visible)');
     passwordToggleBtn.setAttribute('aria-label', 'Mostrar contraseña');
@@ -2403,13 +3235,11 @@ function setupAuth(showToast) {
       e.preventDefault();
       const isPassword = passwordInput.getAttribute('type') === 'password';
       if (isPassword) {
-        // Cambiar a texto visible: Ojo sin nada (abierto)
         passwordInput.setAttribute('type', 'text');
         passwordToggleBtn.innerHTML = eyeOpenSvg;
         passwordToggleBtn.setAttribute('title', 'Ocultar contraseña (hacer invisible)');
         passwordToggleBtn.setAttribute('aria-label', 'Ocultar contraseña');
       } else {
-        // Cambiar a oculto: Ojo tapado / tachado
         passwordInput.setAttribute('type', 'password');
         passwordToggleBtn.innerHTML = eyeClosedSvg;
         passwordToggleBtn.setAttribute('title', 'Mostrar contraseña (hacer visible)');
@@ -2418,7 +3248,7 @@ function setupAuth(showToast) {
     });
   }
 
-  // Procesar envío del formulario: Validación flexible y segura
+  // Procesar envío del formulario: Validación estricta por rol
   if (loginForm) {
     loginForm.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -2449,8 +3279,8 @@ function setupAuth(showToast) {
         (currentSelectedRole === 'doctor' && (enteredUser === 'doctor' || enteredUser === 'admin'))
       );
       const isDoctorPass = (
-        enteredPass === doc.password || // 'admin123'
-        enteredPass === doc.alternativePassword || // 'doctor123'
+        enteredPass === doc.password ||
+        enteredPass === doc.alternativePassword ||
         enteredPass === 'admin123' ||
         enteredPass === 'doctor123'
       );
@@ -2487,7 +3317,7 @@ function setupAuth(showToast) {
         }
       }
 
-      // 4. Si aún no coincide, buscar en bucle general
+      // 4. Si aún no coincide, buscar en bucle general (incluye usuarios recién creados)
       if (!matchedUser) {
         for (const key in DEMO_USERS) {
           const u = DEMO_USERS[key];
@@ -2504,6 +3334,21 @@ function setupAuth(showToast) {
       }
 
       if (matchedUser) {
+        // Validación estricta del rol seleccionado:
+        // Si el usuario seleccionó "Doctor" pero ingresó datos de paciente o contador, o viceversa, se bloquea.
+        const roleLabelMap = {
+          doctor: 'Médico',
+          paciente: 'Paciente',
+          contador: 'Contador(a)'
+        };
+
+        if (matchedUser.role !== currentSelectedRole) {
+          const userRoleName = roleLabelMap[matchedUser.role] || matchedUser.role;
+          const selectedRoleName = roleLabelMap[currentSelectedRole] || currentSelectedRole;
+          showToast(`Acceso bloqueado: Esta cuenta pertenece al perfil de ${userRoleName}. Por favor seleccione la pestaña de "${selectedRoleName}" adecuada o ingrese con las credenciales correspondientes.`, 'danger');
+          return;
+        }
+
         // Autenticación exitosa
         store.setCurrentUser(matchedUser);
         store.setActiveView(matchedUser.role);
@@ -2523,6 +3368,142 @@ function setupAuth(showToast) {
       } else {
         showToast('Credenciales incorrectas. Verifique su usuario o cédula y contraseña ingresada.', 'danger');
       }
+    });
+  }
+
+  // --- MÓDULO DE CREACIÓN DE CUENTA (REGISTRO DE PACIENTE) ---
+  setupPatientRegistration(showToast);
+}
+
+function setupPatientRegistration(showToast) {
+  const registerModal = document.getElementById('modal-register-patient');
+  const btnOpenRegister = document.getElementById('btn-open-register-modal');
+  const btnCloseRegister = document.getElementById('btn-close-register-modal');
+  const registerForm = document.getElementById('form-register-patient');
+
+  if (btnOpenRegister && registerModal) {
+    btnOpenRegister.addEventListener('click', (e) => {
+      e.preventDefault();
+      registerModal.classList.add('active');
+    });
+  }
+
+  if (btnCloseRegister && registerModal) {
+    btnCloseRegister.addEventListener('click', () => {
+      registerModal.classList.remove('active');
+    });
+  }
+
+  if (registerForm) {
+    registerForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const nameInput = document.getElementById('reg-pat-name');
+      const idInput = document.getElementById('reg-pat-id');
+      const phoneInput = document.getElementById('reg-pat-phone');
+      const emailInput = document.getElementById('reg-pat-email');
+      const passInput = document.getElementById('reg-pat-password');
+      const passConfirmInput = document.getElementById('reg-pat-password-confirm');
+
+      const nameVal = nameInput ? nameInput.value.trim() : '';
+      const idVal = idInput ? idInput.value.trim() : '';
+      const phoneVal = phoneInput ? phoneInput.value.trim() : '';
+      const emailVal = emailInput ? emailInput.value.trim() : '';
+      const passVal = passInput ? passInput.value.trim() : '';
+      const passConfirmVal = passConfirmInput ? passConfirmInput.value.trim() : '';
+
+      if (!nameVal || !idVal || !phoneVal || !emailVal || !passVal) {
+        showToast('Por favor complete todos los campos obligatorios.', 'warning');
+        return;
+      }
+
+      // Validar Cédula (Mensaje estricto: 'Cédula incorrecta.')
+      const cedulaCheck = validarCedulaEcuatorianaDetallada(idVal);
+      if (!cedulaCheck.isValid) {
+        showToast('Cédula incorrecta. Verifique los 10 dígitos ingresados.', 'danger');
+        if (idInput) idInput.focus();
+        return;
+      }
+
+      // Validar Celular (10 dígitos oficiales)
+      const phoneCheck = validarCelularDetallado(phoneVal);
+      if (!phoneCheck.isValid) {
+        showToast(phoneCheck.message, 'warning');
+        if (phoneInput) phoneInput.focus();
+        return;
+      }
+
+      // Validar Email
+      const emailCheck = validarEmailDetallado(emailVal);
+      if (!emailCheck.isValid) {
+        showToast(emailCheck.message, 'warning');
+        if (emailInput) emailInput.focus();
+        return;
+      }
+
+      // Validar contraseña
+      if (passVal.length < 4) {
+        showToast('La clave de acceso debe contener al menos 4 caracteres.', 'warning');
+        if (passInput) passInput.focus();
+        return;
+      }
+
+      if (passVal !== passConfirmVal) {
+        showToast('Las contraseñas ingresadas no coinciden. Por favor verifique.', 'danger');
+        if (passConfirmInput) passConfirmInput.focus();
+        return;
+      }
+
+      // Comprobar si ya existe un usuario con esa cédula
+      for (const k in DEMO_USERS) {
+        if (DEMO_USERS[k].idNumber === idVal || DEMO_USERS[k].email.toLowerCase() === emailVal.toLowerCase()) {
+          showToast('Ya existe una cuenta registrada con esta cédula o correo electrónico.', 'warning');
+          return;
+        }
+      }
+
+      // Crear nuevo usuario de Paciente
+      const userKey = `paciente_${idVal}`;
+      const newPatientUser = {
+        role: 'paciente',
+        name: nameVal,
+        email: emailVal,
+        username: idVal,
+        idNumber: idVal,
+        password: passVal,
+        phone: phoneVal,
+        allergies: 'Sin alergias declaradas',
+        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
+      };
+
+      DEMO_USERS[userKey] = newPatientUser;
+
+      // Registrar o actualizar perfil del paciente en el store
+      if (store.savePatientProfile) {
+        store.savePatientProfile({
+          cedula: idVal,
+          nombres: nameVal.split(' ')[0] || nameVal,
+          apellidos: nameVal.split(' ').slice(1).join(' ') || '',
+          telefono: phoneVal,
+          email: emailVal,
+          direccion: 'Guayaquil, Ecuador',
+          tipo_sangre: 'O+',
+          alergias: 'Sin alergias declaradas',
+          enfermedades_cronicas: 'Ninguna reportada',
+          medicacion_habitual: 'Ninguna'
+        });
+      }
+
+      // Limpiar formulario y cerrar modal
+      registerForm.reset();
+      if (registerModal) registerModal.classList.remove('active');
+
+      // Iniciar sesión inmediatamente con la nueva cuenta
+      store.setCurrentUser(newPatientUser);
+      store.setActiveView('paciente');
+      showToast(`¡Cuenta creada con éxito! Bienvenido(a) al Portal del Paciente, ${nameVal}.`, 'success');
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   }
 }
@@ -2896,81 +3877,23 @@ function setupPatientPortal(showToast) {
     });
   });
 
-  // Conexión reactiva con la API del SRI y Validación Matemática de Cédula
-  async function handleCedulaCheckAndSRI(cedula) {
-    if (!cedula || cedula.length < 10) {
-      if (sriStatusBox) {
-        sriStatusBox.style.display = 'none';
-        sriStatusBox.innerHTML = '';
-      }
+  // Validación de Cédula (Sin conexión al SRI, con mensaje estricto 'Cédula incorrecta.')
+  function handleCedulaCheck(cedula) {
+    if (!cedula) return;
+    if (cedula.length < 10) {
+      clearFieldError(idInput);
       return;
     }
 
     const check = validarCedulaEcuatorianaDetallada(cedula);
     if (!check.isValid) {
-      showFieldError(idInput, check.message);
-      if (sriStatusBox) {
-        sriStatusBox.style.display = 'none';
-        sriStatusBox.innerHTML = '';
-      }
+      showFieldError(idInput, 'Cédula incorrecta.');
       return;
     }
 
-    // La cédula es matemáticamente válida (Módulo 10 superado)
+    // La cédula es válida
     clearFieldError(idInput);
     if (idInput) idInput.classList.add('valid');
-
-    if (cedula === lastQueriedCedula) return;
-    lastQueriedCedula = cedula;
-
-    if (sriStatusBox) {
-      sriStatusBox.style.display = 'flex';
-      sriStatusBox.innerHTML = `<span class="sri-badge-loading"><span class="sri-spinner">🔄</span> Consultando identidad en el SRI...</span>`;
-    }
-
-    try {
-      const sriData = await consultarSRI(cedula);
-      if (idInput && idInput.value.trim() !== cedula) return;
-
-      if (sriData && sriData.exito && sriData.nombre) {
-        if (nameInput) {
-          nameInput.value = sriData.nombre;
-          clearFieldError(nameInput);
-          nameInput.classList.add('valid');
-        }
-        if (phoneInput && !phoneInput.value && sriData.telefono) {
-          phoneInput.value = sriData.telefono;
-        }
-        if (emailInput && !emailInput.value && sriData.email) {
-          emailInput.value = sriData.email;
-        }
-
-        if (sriStatusBox) {
-          sriStatusBox.innerHTML = `
-            <span class="sri-badge-success">
-              ✅ Identificado en ${sriData.fuente}: <strong>${sriData.nombre}</strong>
-            </span>
-          `;
-        }
-        showToast(`✅ Identidad detectada en el SRI: ${sriData.nombre}`, 'success');
-      } else {
-        if (sriStatusBox) {
-          sriStatusBox.innerHTML = `
-            <span class="sri-badge-info">
-              ℹ️ Cédula válida (Módulo 10). Ingrese su nombre si no registra RUC en el SRI.
-            </span>
-          `;
-        }
-      }
-    } catch (err) {
-      if (sriStatusBox) {
-        sriStatusBox.innerHTML = `
-          <span class="sri-badge-info">
-            ℹ️ Cédula válida (Módulo 10). Ingrese su nombre manualmente.
-          </span>
-        `;
-      }
-    }
   }
 
   // Escuchadores reactivos de los inputs del Paso 3
@@ -2980,24 +3903,18 @@ function setupPatientPortal(showToast) {
       idInput.classList.remove('valid');
       const val = e.target.value.trim();
       if (val.length === 10) {
-        handleCedulaCheckAndSRI(val);
-      } else {
-        if (sriStatusBox) {
-          sriStatusBox.style.display = 'none';
-          sriStatusBox.innerHTML = '';
-        }
+        handleCedulaCheck(val);
       }
     });
 
     idInput.addEventListener('blur', (e) => {
       const val = e.target.value.trim();
-      if (val.length > 0 && val.length < 10) {
-        showFieldError(idInput, 'La cédula debe contener exactamente 10 dígitos numéricos.');
-      } else if (val.length === 10) {
+      if (val.length > 0) {
         const check = validarCedulaEcuatorianaDetallada(val);
         if (!check.isValid) {
-          showFieldError(idInput, check.message);
+          showFieldError(idInput, 'Cédula incorrecta.');
         } else {
+          clearFieldError(idInput);
           idInput.classList.add('valid');
         }
       }
@@ -3070,12 +3987,12 @@ function setupPatientPortal(showToast) {
   function prefillPatientData() {
     const user = store.getCurrentUser();
     if (user && user.role === 'paciente') {
-      if (idInput && !idInput.value) idInput.value = user.idNumber || '';
+      if (idInput && !idInput.value) idInput.value = user.idNumber || user.cedula || '';
       if (nameInput && !nameInput.value) nameInput.value = user.name || '';
       if (phoneInput && !phoneInput.value) phoneInput.value = user.phone || '';
       if (emailInput && !emailInput.value) emailInput.value = user.email || '';
       if (idInput && idInput.value.length === 10) {
-        handleCedulaCheckAndSRI(idInput.value);
+        handleCedulaCheck(idInput.value);
       }
     }
   }
@@ -3434,6 +4351,8 @@ function setupPatientPortal(showToast) {
         MedicalService.registrarAtencionEnHistorial(patId, createdAppointment);
 
         renderConfirmationTicket(createdAppointment);
+        renderPatientSummary();
+        renderPatientAppointmentsTable();
         currentStep = 4;
         updateStepView();
 
@@ -3448,48 +4367,349 @@ function setupPatientPortal(showToast) {
     });
   }
 
-  // Navegación por pasos desde los botones de la barra superior con Bloqueo de Pasos no Completados
-  const setupStepNavButtons = () => {
-    document.querySelectorAll('.nav-step-btn').forEach(btn => {
+  // --- GESTIÓN DEL PORTAL DEL PACIENTE (Pestañas: Resumen, Mis Citas, Mis Datos, Agendar Cita) ---
+  const patientTabs = document.querySelectorAll('.patient-tab-btn');
+  const patientPanes = document.querySelectorAll('.patient-portal-pane');
+
+  function switchPatientTab(tabName) {
+    patientTabs.forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.tab === tabName);
+    });
+    patientPanes.forEach(pane => {
+      pane.style.display = (pane.dataset.pane === tabName) ? 'block' : 'none';
+    });
+
+    if (tabName === 'resumen') {
+      renderPatientSummary();
+    } else if (tabName === 'mis-citas') {
+      renderPatientAppointmentsTable();
+    } else if (tabName === 'mis-datos') {
+      renderPatientProfileForm();
+    } else if (tabName === 'agendar') {
+      currentStep = 1;
+      selectedDate = getTodayDateStr();
+      renderCalendar();
+      renderTimeSlots();
+      updateSummaryCard();
+      updateStepView();
+    }
+  }
+
+  patientTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      switchPatientTab(tab.dataset.tab);
+    });
+  });
+
+  // --- MODAL DE VISUALIZACIÓN DE TICKET / PDF IN-SITU (Sin redirigir a agendar cita) ---
+  function openTicketModal(apt) {
+    if (!apt) return;
+    const modal = document.getElementById('modal-patient-ticket-view');
+    if (!modal) return;
+
+    const clinic = CLINICS[apt.clinicId] || { name: 'Sede Médica', consultorio: 'Consultorio Principal' };
+    const codeEl = document.getElementById('modal-ticket-code');
+    const patNameEl = document.getElementById('modal-ticket-patient-name');
+    const patIdEl = document.getElementById('modal-ticket-patient-id');
+    const clinicEl = document.getElementById('modal-ticket-clinic');
+    const datetimeEl = document.getElementById('modal-ticket-datetime');
+    const methodEl = document.getElementById('modal-ticket-method');
+    const totalEl = document.getElementById('modal-ticket-total');
+    const serviceNameEl = document.getElementById('modal-ticket-service-name');
+    const qrContainer = document.getElementById('modal-ticket-qr-container');
+    const btnPdf = document.getElementById('btn-modal-open-pdf');
+
+    const user = store.getCurrentUser();
+    const patName = apt.patientName || (user ? user.name : 'Carlos Mendoza Moreira');
+    const patId = apt.patientId || (user ? (user.idNumber || user.cedula) : '0987654321');
+    const totalAmount = apt.totalPaid ? Number(apt.totalPaid).toFixed(2) : (apt.basePrice ? Number(apt.basePrice).toFixed(2) : '20.00');
+
+    if (codeEl) codeEl.textContent = `#${apt.code}`;
+    if (patNameEl) patNameEl.textContent = patName;
+    if (patIdEl) patIdEl.textContent = patId;
+    if (clinicEl) clinicEl.textContent = `${clinic.name} (${clinic.consultorio || 'Cons. 1'})`;
+    if (datetimeEl) datetimeEl.textContent = `${apt.date} - ${apt.time}`;
+    if (methodEl) {
+      methodEl.textContent = apt.paymentMethod === 'tarjeta'
+        ? 'Tarjeta de Crédito / Débito (100% Tarifa)'
+        : 'Efectivo / Transferencia (Descuento 9.75% aplicado)';
+    }
+    if (totalEl) totalEl.textContent = `$${totalAmount}`;
+    if (serviceNameEl) serviceNameEl.textContent = `${apt.serviceName || 'Consulta de Medicina General'} - ${apt.doctor || 'Dr. Carlos Campoverde'}`;
+
+    // Construcción de la URL para el comprobante PDF oficial
+    const host = window.location.hostname;
+    const port = window.location.port ? `:${window.location.port}` : '';
+    const protocol = window.location.protocol;
+    let baseHost = host;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      baseHost = '192.168.7.3';
+    }
+    const params = new URLSearchParams({
+      c: apt.code,
+      p: patName,
+      id: patId,
+      s: clinic.name,
+      f: apt.date,
+      h: apt.time,
+      tot: totalAmount,
+      m: apt.paymentMethod || 'efectivo'
+    });
+    if (apt.tokenSeguro) {
+      params.set('t', apt.tokenSeguro);
+    }
+    const pdfUrl = `${protocol}//${baseHost}${port}/comprobante.html?${params.toString()}`;
+    const localPdfUrl = `comprobante.html?${params.toString()}`;
+
+    if (btnPdf) {
+      btnPdf.href = localPdfUrl;
+    }
+
+    if (qrContainer) {
+      qrContainer.innerHTML = `
+        <div style="background: #ffffff; padding: 12px; border-radius: 14px; display: inline-flex; flex-direction: column; justify-content: center; align-items: center; margin: 0 auto; border: 2px solid #0284c7; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.15);">
+          <div id="modal-ticket-qr-canvas" style="display: flex; justify-content: center; align-items: center; min-width: 190px; min-height: 190px;"></div>
+          <span style="font-size: 0.74rem; font-weight: 800; color: #0284c7; background: #e0f2fe; padding: 3px 12px; border-radius: 9999px; margin-top: 8px;">
+            📱 Escanea con tu celular para abrir tu PDF
+          </span>
+          <span style="font-size: 0.68rem; font-weight: 700; color: #059669; background: #ecfdf5; padding: 2px 10px; border-radius: 9999px; margin-top: 5px; border: 1px solid #a7f3d0; display: inline-flex; align-items: center; gap: 4px;">
+            ✓ Token Criptográfico Firmado (Inmutable)
+          </span>
+        </div>
+      `;
+
+      setTimeout(() => {
+        renderizarCodigoQR('modal-ticket-qr-canvas', pdfUrl, {
+          size: 190,
+          correctLevel: (typeof QRCode !== 'undefined' && QRCode.CorrectLevel) ? QRCode.CorrectLevel.L : null
+        });
+      }, 50);
+    }
+
+    modal.classList.add('active');
+  }
+
+  // Configuración de botones del modal de ticket
+  const modalTicketView = document.getElementById('modal-patient-ticket-view');
+  const btnCloseTicketModal = document.getElementById('btn-close-ticket-modal');
+  const btnModalCloseTicketFooter = document.getElementById('btn-modal-close-ticket-footer');
+  const btnModalPrintTicket = document.getElementById('btn-modal-print-ticket');
+
+  const closeTicketModal = () => {
+    if (modalTicketView) modalTicketView.classList.remove('active');
+  };
+
+  if (btnCloseTicketModal) btnCloseTicketModal.addEventListener('click', closeTicketModal);
+  if (btnModalCloseTicketFooter) btnModalCloseTicketFooter.addEventListener('click', closeTicketModal);
+  if (btnModalPrintTicket) {
+    btnModalPrintTicket.addEventListener('click', () => {
+      window.print();
+    });
+  }
+
+  window.openTicketModal = openTicketModal;
+
+  // 1. Renderizar Resumen / Ventana Principal (Dashboard del Paciente)
+  function renderPatientSummary() {
+    const user = store.getCurrentUser();
+    const patId = user ? (user.idNumber || user.cedula || '0987654321') : '0987654321';
+    const profile = store.getPatientProfile(patId) || store.getState().patientProfiles[0] || {
+      nombres: user ? user.name.split(' ')[0] : 'Carlos',
+      apellidos: user ? user.name.split(' ').slice(1).join(' ') : 'Mendoza',
+      allergies: 'Penicilina, Sulfas',
+      chronicConditions: 'Hipertensión Arterial Primaria (I10)'
+    };
+
+    const fullName = `${profile.nombres} ${profile.apellidos}`.trim();
+
+    // Actualizar saludo y navbar
+    const welcomeNameEl = document.getElementById('pat-welcome-name');
+    if (welcomeNameEl) welcomeNameEl.textContent = `¡Hola, ${fullName || 'Carlos Mendoza'}! 👋`;
+
+    const navNameEl = document.getElementById('pat-navbar-name');
+    if (navNameEl) navNameEl.textContent = profile.nombres || fullName.split(' ')[0] || 'Carlos';
+
+    // Obtener citas del paciente
+    const apts = store.getPatientAppointments(patId);
+    const totalCitasEl = document.getElementById('pat-kpi-total-citas');
+    if (totalCitasEl) totalCitasEl.textContent = `${apts.length} Cita${apts.length === 1 ? '' : 's'}`;
+
+    const allergiesEl = document.getElementById('pat-kpi-allergies');
+    if (allergiesEl) allergiesEl.textContent = profile.allergies || 'Ninguna registrada';
+
+    // Próxima Cita
+    const nextDateEl = document.getElementById('pat-kpi-next-date');
+    const nextClinicEl = document.getElementById('pat-kpi-next-clinic');
+    const nextTitleEl = document.getElementById('pat-next-title');
+    const nextDetailsEl = document.getElementById('pat-next-details');
+    const nextBadgeEl = document.getElementById('pat-next-badge');
+
+    if (apts.length > 0) {
+      const nextApt = apts[0];
+      const clinic = CLINICS[nextApt.clinicId] || { name: 'Sede Médica' };
+
+      if (nextDateEl) nextDateEl.textContent = `${nextApt.date} - ${nextApt.time}`;
+      if (nextClinicEl) nextClinicEl.textContent = `${clinic.name} (${clinic.consultorio || 'Cons. 4'})`;
+      if (nextTitleEl) nextTitleEl.textContent = nextApt.serviceName || 'Consulta de Medicina General';
+      if (nextDetailsEl) nextDetailsEl.textContent = `📍 ${clinic.name} • Dr. Carlos Campoverde • ${nextApt.time}`;
+      if (nextBadgeEl) nextBadgeEl.textContent = nextApt.estado || 'CONFIRMADA';
+
+      const btnViewTicket = document.getElementById('btn-pat-view-ticket-direct');
+      if (btnViewTicket) {
+        btnViewTicket.onclick = () => {
+          openTicketModal(nextApt);
+        };
+      }
+    } else {
+      if (nextDateEl) nextDateEl.textContent = 'Sin citas pendientes';
+      if (nextClinicEl) nextClinicEl.textContent = 'Agenda tu turno hoy';
+      if (nextTitleEl) nextTitleEl.textContent = 'No tienes turnos próximos programados';
+      if (nextDetailsEl) nextDetailsEl.textContent = 'Reserva tu atención presencial con el Dr. Carlos Campoverde.';
+      if (nextBadgeEl) nextBadgeEl.textContent = 'DISPONIBLE';
+    }
+  }
+
+  // 2. Renderizar Historial de Citas del Paciente
+  function renderPatientAppointmentsTable() {
+    const user = store.getCurrentUser();
+    const patId = user ? (user.idNumber || user.cedula || '0987654321') : '0987654321';
+    const apts = store.getPatientAppointments(patId);
+    const tbody = document.getElementById('patient-appointments-table-body');
+    if (!tbody) return;
+
+    if (apts.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" style="text-align: center; padding: 24px; color: #64748b;">
+            Aún no registras citas médicas anteriores. Haz clic en <strong>➕ Agendar Nueva Cita</strong> para reservar tu primer turno.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = apts.map(apt => {
+      const clinic = CLINICS[apt.clinicId] || { name: 'Sede Médica', consultorio: 'Cons.' };
+      const totalAmount = apt.totalPaid ? apt.totalPaid.toFixed(2) : (apt.basePrice ? apt.basePrice.toFixed(2) : '20.00');
+
+      return `
+        <tr>
+          <td><strong style="color: var(--primary-blue);">#${apt.code}</strong></td>
+          <td>
+            <div style="font-weight: 700; color: #0f172a;">${clinic.name}</div>
+            <div style="font-size: 0.72rem; color: #64748b;">${clinic.consultorio}</div>
+          </td>
+          <td>${apt.doctor || 'Dr. Carlos Campoverde'}</td>
+          <td>
+            <div style="font-weight: 600; color: #1e293b;">${apt.date}</div>
+            <div style="font-size: 0.72rem; color: #64748b;">${apt.time}</div>
+          </td>
+          <td style="font-weight: 800; color: #0f172a;">$${totalAmount}</td>
+          <td>
+            <span class="badge-sede badge-alborada" style="font-size: 0.72rem; padding: 2px 8px;">
+              ${apt.estado || 'CONFIRMADA'}
+            </span>
+          </td>
+          <td>
+            <button type="button" class="btn-secondary btn-view-single-ticket" data-code="${apt.code}" style="padding: 4px 10px; font-size: 0.76rem;">
+              🎫 Ver Ticket / PDF
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    // Escuchar clics en los botones de ver ticket
+    tbody.querySelectorAll('.btn-view-single-ticket').forEach(btn => {
       btn.addEventListener('click', () => {
-        const targetStep = parseInt(btn.dataset.step, 10);
-        if (targetStep === currentStep) return;
-
-        if (targetStep > currentStep) {
-          // Validar los pasos intermedios antes de permitir avanzar
-          for (let s = currentStep; s < targetStep; s++) {
-            if (!validateStepData(s)) {
-              return;
-            }
-          }
-        }
-
-        if (targetStep === 1) {
-          currentStep = 1;
-          updateStepView();
-        } else if (targetStep === 2) {
-          currentStep = 2;
-          renderCalendar();
-          renderTimeSlots();
-          updateSummaryCard();
-          updateStepView();
-        } else if (targetStep === 3) {
-          prefillPatientData();
-          updateSummaryCard();
-          currentStep = 3;
-          updateStepView();
-        } else if (targetStep === 4) {
-          if (createdAppointment) {
-            currentStep = 4;
-            updateStepView();
-          } else {
-            showToast('Primero completa los datos y confirma en el Paso 3 para generar tu comprobante QR.', 'info');
-          }
+        const code = btn.dataset.code;
+        const targetApt = apts.find(a => a.code === code);
+        if (targetApt) {
+          openTicketModal(targetApt);
         }
       });
     });
-  };
-  setupStepNavButtons();
+  }
+
+  // 3. Renderizar Formulario de Ficha Personal y Datos
+  function renderPatientProfileForm() {
+    const user = store.getCurrentUser();
+    const patId = user ? (user.idNumber || user.cedula || '0987654321') : '0987654321';
+    const profile = store.getPatientProfile(patId) || store.getState().patientProfiles[0] || {};
+
+    const idField = document.getElementById('pat-prof-id');
+    const nomField = document.getElementById('pat-prof-nombres');
+    const apeField = document.getElementById('pat-prof-apellidos');
+    const phoneField = document.getElementById('pat-prof-phone');
+    const emailField = document.getElementById('pat-prof-email');
+    const addrField = document.getElementById('pat-prof-address');
+    const emerNameField = document.getElementById('pat-prof-emer-name');
+    const emerPhoneField = document.getElementById('pat-prof-emer-phone');
+    const bloodField = document.getElementById('pat-prof-blood');
+    const ageField = document.getElementById('pat-prof-age');
+    const allergiesField = document.getElementById('pat-prof-allergies');
+    const chronicField = document.getElementById('pat-prof-chronic');
+    const medsField = document.getElementById('pat-prof-meds');
+
+    if (idField) idField.value = profile.cedula || patId;
+    if (nomField) nomField.value = profile.nombres || (user ? user.name.split(' ')[0] : 'Carlos');
+    if (apeField) apeField.value = profile.apellidos || (user ? user.name.split(' ').slice(1).join(' ') : 'Mendoza');
+    if (phoneField) phoneField.value = profile.phone || (user ? user.phone : '0987654321');
+    if (emailField) emailField.value = profile.email || (user ? user.email : 'carlos.mendoza@gmail.com');
+    if (addrField) addrField.value = profile.address || 'Cdla. Alborada 8va Etapa, Mz 812 Sl 14';
+    if (emerNameField) emerNameField.value = profile.emergencyContact || 'María Mendoza (Hermana)';
+    if (emerPhoneField) emerPhoneField.value = profile.emergencyPhone || '0991234567';
+    if (bloodField) bloodField.value = profile.bloodType || 'O+';
+    if (ageField) ageField.value = profile.age || 42;
+    if (allergiesField) allergiesField.value = profile.allergies || 'Penicilina, Sulfas';
+    if (chronicField) chronicField.value = profile.chronicConditions || 'Hipertensión Arterial Primaria (I10)';
+    if (medsField) medsField.value = profile.currentMedications || 'Losartán 50mg cada 24h';
+  }
+
+  // Guardar perfil y actualizar Supabase
+  const formProfile = document.getElementById('form-patient-profile');
+  if (formProfile) {
+    formProfile.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const user = store.getCurrentUser();
+      const patId = document.getElementById('pat-prof-id')?.value.trim() || (user ? user.idNumber : '0987654321');
+
+      const updatedProfile = {
+        cedula: patId,
+        nombres: document.getElementById('pat-prof-nombres')?.value.trim(),
+        apellidos: document.getElementById('pat-prof-apellidos')?.value.trim(),
+        phone: document.getElementById('pat-prof-phone')?.value.trim(),
+        email: document.getElementById('pat-prof-email')?.value.trim(),
+        address: document.getElementById('pat-prof-address')?.value.trim(),
+        emergencyContact: document.getElementById('pat-prof-emer-name')?.value.trim(),
+        emergencyPhone: document.getElementById('pat-prof-emer-phone')?.value.trim(),
+        bloodType: document.getElementById('pat-prof-blood')?.value,
+        age: parseInt(document.getElementById('pat-prof-age')?.value, 10) || 0,
+        allergies: document.getElementById('pat-prof-allergies')?.value.trim(),
+        chronicConditions: document.getElementById('pat-prof-chronic')?.value.trim(),
+        currentMedications: document.getElementById('pat-prof-meds')?.value.trim()
+      };
+
+      store.savePatientProfile(updatedProfile);
+      showToast('✅ Ficha clínica del paciente guardada y sincronizada en Supabase.', 'success');
+      renderPatientSummary();
+    });
+  }
+
+  // Accesos rápidos desde la ventana de Resumen
+  const btnDashQuickBook = document.getElementById('btn-dash-quick-book');
+  if (btnDashQuickBook) {
+    btnDashQuickBook.addEventListener('click', () => {
+      switchPatientTab('agendar');
+    });
+  }
+
+  const btnDashGotoCitas = document.getElementById('btn-dash-goto-citas');
+  if (btnDashGotoCitas) {
+    btnDashGotoCitas.addEventListener('click', () => {
+      switchPatientTab('mis-citas');
+    });
+  }
 
   // Botón volver al inicio dentro de la página del portal paciente
   const btnPatientExitInline = document.getElementById('btn-patient-exit-inline');
@@ -3499,12 +4719,20 @@ function setupPatientPortal(showToast) {
     });
   }
 
+  // Inicializar portal con la ventana de Resumen SIEMPRE al abrirse
+  window.renderPatientPortal = function() {
+    switchPatientTab('resumen');
+  };
+  window.switchPatientTab = switchPatientTab;
+
   // Inicializar vistas con la fecha de hoy
   renderCalendar();
   renderTimeSlots();
   updateSummaryCard();
   updateStepView();
+  renderPatientSummary();
 }
+
 
 
 // ==================== js/doctor.js ====================
@@ -3519,8 +4747,8 @@ function setupPatientPortal(showToast) {
 
 
 function setupDoctorPortal(showToast) {
-  let activeDoctorTab = 'agenda'; // 'agenda', 'fichas', 'recetas', 'gastos'
-  let activeDate = '2026-09-19';  // Sábado, 19 Septiembre 2026
+  let activeDoctorTab = 'agenda'; // 'agenda', 'fichas', 'recetas', 'gastos', 'ingresos'
+  let activeDate = getTodayDateStr(); // Inicializar SIEMPRE con la fecha de hoy automáticamente
 
   // Elementos de la barra de navegación (Móvil, Pestañas Superiores y Bottom Nav)
   const bottomNavButtons = document.querySelectorAll('.doctor-bottom-nav .bottom-nav-item');
@@ -3535,6 +4763,33 @@ function setupDoctorPortal(showToast) {
   const btnCloseEmergencyModal = document.getElementById('btn-close-emergency-modal');
   const emergencyActionsList = document.getElementById('emergency-affected-list');
   const emergencyBanner = document.getElementById('doctor-emergency-active-banner');
+
+  // Funciones de navegación de fecha (Día anterior, Hoy, Día siguiente)
+  function shiftActiveDate(days) {
+    const parts = activeDate.split('-');
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    d.setDate(d.getDate() + days);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    activeDate = `${y}-${m}-${day}`;
+    renderTimeline();
+  }
+
+  function setTodayDate() {
+    activeDate = getTodayDateStr();
+    renderTimeline();
+    showToast('Fecha de agenda restablecida al día de hoy.', 'info');
+  }
+
+  function formatSpanishDate(dateStr) {
+    const parts = dateStr.split('-');
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    const isToday = dateStr === getTodayDateStr();
+    return `${days[d.getDay()]}, ${d.getDate()} de ${months[d.getMonth()]} de ${d.getFullYear()}${isToday ? ' (HOY)' : ''}`;
+  }
 
   // Navegación unificada de pestañas (Móvil y Escritorio)
   function switchDoctorTab(tabKey) {
@@ -3592,13 +4847,13 @@ function setupDoctorPortal(showToast) {
     });
   }
 
-  // --- 1. CRONOGRAMA DIARIO & RUTAS (Timeline Vertical) ---
+  // --- 1. CRONOGRAMA DIARIO & RUTAS (Timeline Vertical con Navegación de Fechas) ---
   function renderTimeline() {
     const timelineEl = document.getElementById('doctor-timeline-list');
-    if (!timelineEl) return;
-
+    const agendaHeaderContainer = document.getElementById('doctor-agenda-header-toolbar');
     const state = store.getState();
     const isGuardActive = state.emergencyGuard.isActive;
+    const isToday = activeDate === getTodayDateStr();
 
     // Actualizar banner si la guardia está activa
     if (emergencyBanner) {
@@ -3610,6 +4865,59 @@ function setupDoctorPortal(showToast) {
       .sort((a, b) => a.time.localeCompare(b.time));
 
     const travelBuffers = state.travelBuffers.filter(t => t.date === activeDate);
+
+    // Actualizar o inyectar la barra de herramientas de fechas del Doctor
+    if (agendaHeaderContainer) {
+      agendaHeaderContainer.innerHTML = `
+        <div class="doctor-date-nav-card" style="background: #ffffff; border: 1px solid var(--border-light); border-radius: 12px; padding: 12px 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.25rem;">📅</span>
+              <div>
+                <strong style="color: var(--dark-navy); font-size: 0.95rem;">${formatSpanishDate(activeDate)}</strong>
+                <div style="font-size: 0.74rem; color: #64748b; margin-top: 1px;">
+                  ${todayAppointments.length} ${todayAppointments.length === 1 ? 'consulta agendada' : 'consultas agendadas'} • ${travelBuffers.length} ${travelBuffers.length === 1 ? 'traslado intersede' : 'traslados intersedes'}
+                </div>
+              </div>
+            </div>
+            
+            <!-- Botones de Navegación de Fecha -->
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <button type="button" class="btn-secondary" id="btn-doc-date-prev" style="padding: 6px 12px; font-size: 0.78rem; font-weight: 700;">
+                ◀ Anterior
+              </button>
+              <button type="button" class="${isToday ? 'btn-primary' : 'btn-secondary'}" id="btn-doc-date-today" style="padding: 6px 14px; font-size: 0.78rem; font-weight: 700;">
+                📅 Hoy
+              </button>
+              <button type="button" class="btn-secondary" id="btn-doc-date-next" style="padding: 6px 12px; font-size: 0.78rem; font-weight: 700;">
+                Siguiente ▶
+              </button>
+              <input type="date" id="input-doc-date-picker" value="${activeDate}" style="padding: 5px 8px; font-size: 0.78rem; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; cursor: pointer;" title="Seleccionar fecha específica" />
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Escuchadores de la barra de navegación de fecha
+      const btnPrev = document.getElementById('btn-doc-date-prev');
+      const btnToday = document.getElementById('btn-doc-date-today');
+      const btnNext = document.getElementById('btn-doc-date-next');
+      const inputPicker = document.getElementById('input-doc-date-picker');
+
+      if (btnPrev) btnPrev.addEventListener('click', () => shiftActiveDate(-1));
+      if (btnToday) btnToday.addEventListener('click', () => setTodayDate());
+      if (btnNext) btnNext.addEventListener('click', () => shiftActiveDate(1));
+      if (inputPicker) {
+        inputPicker.addEventListener('change', (e) => {
+          if (e.target.value) {
+            activeDate = e.target.value;
+            renderTimeline();
+          }
+        });
+      }
+    }
+
+    if (!timelineEl) return;
 
     // Combinar citas y traslados cronológicamente
     const timelineItems = [];
@@ -3626,9 +4934,10 @@ function setupDoctorPortal(showToast) {
 
     if (timelineItems.length === 0) {
       timelineEl.innerHTML = `
-        <div style="text-align: center; padding: 40px 20px; color: #64748b;">
+        <div style="text-align: center; padding: 40px 20px; background: #ffffff; border-radius: 12px; border: 1px dashed #cbd5e1; color: #64748b;">
           <span style="font-size: 2.5rem;">📅</span>
-          <p style="margin-top: 10px; font-weight: 600;">No hay citas agendadas para esta fecha.</p>
+          <p style="margin-top: 10px; font-weight: 700; color: #334155; font-size: 1rem;">No hay citas agendadas para esta fecha (${formatSpanishDate(activeDate)}).</p>
+          <p style="font-size: 0.82rem; margin-top: 4px;">Utilice los botones de navegación superiores para consultar otros días o el botón "📅 Hoy" para volver a la fecha actual.</p>
         </div>
       `;
       return;
@@ -4568,6 +5877,7 @@ function setupDoctorPortal(showToast) {
   // Escuchar cuando el médico entra a su portal o cambia el estado para renderizar
   store.subscribe((state) => {
     if (state.activeView === 'doctor') {
+      activeDate = getTodayDateStr();
       switchDoctorTab(activeDoctorTab);
     }
   });
@@ -4585,9 +5895,14 @@ function setupDoctorPortal(showToast) {
 
 /**
  * Flujo 3: Panel Administrativo de la Contadora (Página 5 del documento)
- * Gestión de liquidaciones semanales de los viernes,
- * retenciones automáticas (5%, 25%, 10%), balance de gastos clasificados
- * y exportación de informes tributarios para el SRI en Excel y PDF.
+ * Lcda. Morales - Auditoría Médica & Conciliación Tributaria SRI
+ *
+ * Módulos integrados:
+ * 1. Supervisar flujo de caja diario y semanal con liquidaciones y comisiones (5%, 25%, 10%).
+ * 2. Revisar y clasificar gastos operativos en: Ingresos, Egresos, Costos, Gastos, Activos o Patrimonio.
+ * 3. Auditar comprobantes y facturas electrónicas SRI (Aprobado, Pendiente, Observado).
+ * 4. Analizar rentabilidad por sedes, centros de costos y sugerencias de optimización de rutas.
+ * 5. Generar y exportar reportes para declaraciones tributarias (Formulario SRI 102).
  */
 
 
@@ -4597,11 +5912,34 @@ function setupAccountantPortal(showToast) {
   const btnCloseTaxModal = document.getElementById('btn-close-tax-modal');
   const btnDownloadCSV = document.getElementById('btn-download-csv');
 
+  // --- 1. GESTIÓN DE PESTAÑAS DEL PORTAL CONTABLE ---
+  const accountantTabs = document.querySelectorAll('#nav-menu-accountant .nav-tab-btn');
+  const accountantPanes = document.querySelectorAll('.accountant-tab-pane');
+
+  function switchAccountantTab(targetTab) {
+    accountantTabs.forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.target === targetTab);
+    });
+
+    accountantPanes.forEach(pane => {
+      pane.style.display = (pane.dataset.pane === targetTab) ? 'block' : 'none';
+    });
+
+    renderAccountantDashboard();
+  }
+
+  accountantTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      switchAccountantTab(tab.dataset.target);
+    });
+  });
+
+  // --- 2. RENDER PRINCIPAL DEL PANEL CONTABLE ---
   function renderAccountantDashboard() {
     const summary = store.getFinancialSummary();
     const state = store.getState();
 
-    // 1. Fila de Métricas KPI (4 tarjetas) (Página 5)
+    // 2.1 KPIs Superiores Globales
     const kpiGross = document.getElementById('kpi-gross-revenue');
     const kpiRetentions = document.getElementById('kpi-retentions-total');
     const kpiExpenses = document.getElementById('kpi-expenses-total');
@@ -4612,106 +5950,432 @@ function setupAccountantPortal(showToast) {
     if (kpiExpenses) kpiExpenses.textContent = `-$${summary.totalExpenses.toFixed(2)}`;
     if (kpiNet) kpiNet.textContent = `$${summary.realNetIncome.toFixed(2)}`;
 
-    // 2. Tabla de Liquidación de los Viernes (Corte de Caja)
+    // 2.2 PANE 1: Flujo de Caja & Liquidaciones Semanales
+    renderFridaySettlementTable(summary);
+    renderRecentConsultationsList(state);
+
+    // 2.3 PANE 2: Revisión y Clasificación Contable de Gastos
+    renderExpensesClassificationModule(state, summary);
+
+    // 2.4 PANE 3: Auditoría de Comprobantes y Facturas SRI
+    renderVouchersAuditModule(state);
+
+    // 2.5 PANE 4: Rentabilidad por Sedes, Centros de Costo y Rutas
+    renderProfitabilityAndRoutesModule(summary);
+
+    // 2.6 PANE 5: Declaración Tributaria SRI (Formulario 102)
+    renderTaxReportModule(summary);
+  }
+
+  // --- MÓDULO 1: Liquidación de los Viernes & Flujo de Caja ---
+  function renderFridaySettlementTable(summary) {
     const settlementTableBody = document.getElementById('friday-settlement-table-body');
-    if (settlementTableBody) {
-      const breakdown = summary.clinicBreakdown;
-      settlementTableBody.innerHTML = Object.keys(breakdown).map(clinicKey => {
-        const cData = breakdown[clinicKey];
-        const clinic = CLINICS[clinicKey] || { color: '#0284c7' };
-        const isHospital = clinicKey === 'hospital';
+    if (!settlementTableBody) return;
 
-        let badgeHtml = '';
-        if (isHospital) {
-          badgeHtml = `<span class="badge-status-pill sueldo-fijo">🏛️ Sueldo Fijo ($1,200)</span>`;
-        } else if (cData.status === 'Liquidado') {
-          badgeHtml = `<span class="badge-status-pill liquidado" data-clinic="${clinicKey}">✓ Liquidado</span>`;
-        } else {
-          badgeHtml = `<span class="badge-status-pill pendiente" data-clinic="${clinicKey}">⏳ Pendiente Facturación</span>`;
+    const breakdown = summary.clinicBreakdown;
+    settlementTableBody.innerHTML = Object.keys(breakdown).map(clinicKey => {
+      const cData = breakdown[clinicKey];
+      const clinic = CLINICS[clinicKey] || { color: '#0284c7' };
+      const isHospital = clinicKey === 'hospital';
+
+      let badgeHtml = '';
+      if (isHospital) {
+        badgeHtml = `<span class="badge-status-pill sueldo-fijo">🏛️ Sueldo Fijo ($1,200)</span>`;
+      } else if (cData.status === 'Liquidado') {
+        badgeHtml = `<span class="badge-status-pill liquidado" data-clinic="${clinicKey}">✓ Liquidado</span>`;
+      } else {
+        badgeHtml = `<span class="badge-status-pill pendiente" data-clinic="${clinicKey}">⏳ Pendiente</span>`;
+      }
+
+      const retentionPct = isHospital ? '0%' : `${(cData.retentionRate * 100).toFixed(0)}%`;
+      const netTransfer = isHospital ? summary.hospitalFixedSalary : cData.netDoctor;
+
+      return `
+        <tr>
+          <td>
+            <strong style="color: #0f172a; display: flex; align-items: center; gap: 8px;">
+              <span style="width: 10px; height: 10px; border-radius: 50%; background: ${clinic.color};"></span>
+              ${cData.name}
+            </strong>
+          </td>
+          <td>${isHospital ? 'Turnos Guardia' : `${cData.patientsCount} citas`}</td>
+          <td>${isHospital ? 'Convenio MSP' : `$${cData.gross.toFixed(2)}`}</td>
+          <td style="color: #b91c1c; font-weight: 700;">${isHospital ? '$0.00 (0%)' : `-$${cData.retentions.toFixed(2)} (${retentionPct})`}</td>
+          <td style="font-weight: 800; color: #0284c7;">$${netTransfer.toFixed(2)}</td>
+          <td>${badgeHtml}</td>
+        </tr>
+      `;
+    }).join('');
+
+    // Toggle de estado de liquidación al hacer clic
+    settlementTableBody.querySelectorAll('.badge-status-pill:not(.sueldo-fijo)').forEach(pill => {
+      pill.addEventListener('click', () => {
+        const cKey = pill.dataset.clinic;
+        if (summary.clinicBreakdown[cKey]) {
+          summary.clinicBreakdown[cKey].status = 
+            summary.clinicBreakdown[cKey].status === 'Liquidado' ? 'Pendiente' : 'Liquidado';
+          showToast(`Estado de liquidación actualizado para ${summary.clinicBreakdown[cKey].name}.`, 'info');
+          renderAccountantDashboard();
         }
-
-        const retentionPct = isHospital ? '0%' : `${(cData.retentionRate * 100).toFixed(0)}%`;
-        const netTransfer = isHospital ? summary.hospitalFixedSalary : cData.netDoctor;
-
-        return `
-          <tr>
-            <td>
-              <strong style="color: #0f172a; display: flex; align-items: center; gap: 8px;">
-                <span style="width: 10px; height: 10px; border-radius: 50%; background: ${clinic.color};"></span>
-                ${cData.name}
-              </strong>
-            </td>
-            <td>${isHospital ? 'Turnos de Guardia' : `${cData.patientsCount} pacientes`}</td>
-            <td>${isHospital ? 'Convenio MSP' : `$${cData.gross.toFixed(2)}`}</td>
-            <td style="color: #b91c1c; font-weight: 700;">${isHospital ? '$0.00 (0%)' : `-$${cData.retentions.toFixed(2)} (${retentionPct})`}</td>
-            <td style="font-weight: 800; color: #0284c7;">$${netTransfer.toFixed(2)}</td>
-            <td>${badgeHtml}</td>
-          </tr>
-        `;
-      }).join('');
-
-      // Alternar estado de liquidación con un clic
-      settlementTableBody.querySelectorAll('.badge-status-pill:not(.sueldo-fijo)').forEach(pill => {
-        pill.addEventListener('click', () => {
-          const cKey = pill.dataset.clinic;
-          if (summary.clinicBreakdown[cKey]) {
-            summary.clinicBreakdown[cKey].status = 
-              summary.clinicBreakdown[cKey].status === 'Liquidado' ? 'Pendiente' : 'Liquidado';
-            showToast(`Estado de liquidación actualizado para ${summary.clinicBreakdown[cKey].name}.`, 'info');
-            renderAccountantDashboard();
-          }
-        });
       });
+    });
+  }
+
+  function renderRecentConsultationsList(state) {
+    const listRoot = document.getElementById('acc-recent-consultations-list');
+    if (!listRoot) return;
+
+    if (state.appointments.length === 0) {
+      listRoot.innerHTML = `<p style="font-size: 0.8rem; color: #64748b; padding: 10px;">No hay consultas registradas para este período.</p>`;
+      return;
     }
 
-    // 3. Rentabilidad Real por Sede (Comparativa Neta)
+    listRoot.innerHTML = state.appointments.slice(0, 6).map(apt => {
+      const clinic = CLINICS[apt.clinicId] || { name: 'Sede' };
+      const fee = apt.totalPaid || apt.basePrice || 20.00;
+      const com = apt.retentionAmount || (fee * (clinic.retentionRate || 0.10));
+      const net = apt.netClinicYield || (fee - com);
+
+      return `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 0.8rem;">
+          <div>
+            <strong style="color: #0f172a;">${apt.patientName}</strong>
+            <div style="font-size: 0.72rem; color: #64748b;">📍 ${clinic.name} • ${apt.date} ${apt.time}</div>
+          </div>
+          <div style="text-align: right;">
+            <span style="font-weight: 800; color: #059669;">+$${net.toFixed(2)}</span>
+            <div style="font-size: 0.70rem; color: #b91c1c;">(Com. -$${com.toFixed(2)})</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // --- MÓDULO 2: Revisar y Clasificar Gastos Operativos ---
+  function renderExpensesClassificationModule(state, summary) {
+    // Resumen de Clasificación (Chips de totales)
+    const chipsRoot = document.getElementById('acc-classification-summary-chips');
+    if (chipsRoot) {
+      const totals = summary.accountingClassificationTotals || {
+        Costos: 32.00,
+        Gastos: 42.50,
+        Egresos: 0.00,
+        Activos: 0.00,
+        Patrimonio: 0.00,
+        Ingresos: 0.00
+      };
+
+      const categoriesInfo = [
+        { key: 'Costos', label: 'Costos Médicos', icon: '🩺', color: '#ea580c', bg: '#fff7ed' },
+        { key: 'Gastos', label: 'Gastos Ruta/Movilidad', icon: '⛽', color: '#7c3aed', bg: '#f5f3ff' },
+        { key: 'Egresos', label: 'Egresos Operacionales', icon: '📉', color: '#dc2626', bg: '#fef2f2' },
+        { key: 'Activos', label: 'Activos / Bienes', icon: '🏢', color: '#0284c7', bg: '#f0f9ff' },
+        { key: 'Patrimonio', label: 'Patrimonio Neto', icon: '🏛️', color: '#475569', bg: '#f8fafc' },
+        { key: 'Ingresos', label: 'Ingresos Contables', icon: '💵', color: '#16a34a', bg: '#f0fdf4' }
+      ];
+
+      chipsRoot.innerHTML = categoriesInfo.map(cat => {
+        const val = totals[cat.key] || 0.00;
+        return `
+          <div style="background: ${cat.bg}; border: 1px solid rgba(0,0,0,0.06); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.74rem; font-weight: 700; color: ${cat.color};">
+              <span>${cat.icon} ${cat.label}</span>
+            </div>
+            <div style="font-size: 1.15rem; font-weight: 800; color: #0f172a;">$${val.toFixed(2)}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Tabla con selectores de clasificación interactivos
+    const tbody = document.getElementById('acc-expenses-classification-table-body');
+    if (!tbody) return;
+
+    const expenses = state.expenses || [];
+    if (expenses.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: #64748b;">No hay gastos cargados por el médico.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = expenses.map(exp => {
+      const currentCat = exp.accountingCategory || (exp.category === 'Insumos Hospital' ? 'Costos' : 'Gastos');
+      const costCenter = exp.costCenter || (exp.category === 'Insumos Hospital' ? 'Hospital Público' : 'Rutas / Movilidad');
+
+      return `
+        <tr>
+          <td><span style="font-weight: 600; color: #334155;">${exp.date}</span></td>
+          <td>
+            <strong style="color: #0f172a;">${exp.description}</strong>
+            <div style="font-size: 0.72rem; color: #64748b;">ID: EXP-${exp.id}</div>
+          </td>
+          <td><span class="badge-sede badge-hospital" style="font-size: 0.74rem;">${costCenter}</span></td>
+          <td style="font-weight: 800; color: #dc2626;">-$${exp.amount.toFixed(2)}</td>
+          <td><span style="font-size: 0.78rem; font-weight: 700; color: #475569;">${exp.category}</span></td>
+          <td>
+            <select class="form-input acc-classification-select" data-expense-id="${exp.id}" style="padding: 4px 8px; font-size: 0.8rem; font-weight: 700; background: #ffffff; border-color: #cbd5e1;">
+              <option value="Costos" ${currentCat === 'Costos' ? 'selected' : ''}>🩺 Costos (Atención e Insumos)</option>
+              <option value="Gastos" ${currentCat === 'Gastos' ? 'selected' : ''}>⛽ Gastos (Transporte y Ruta)</option>
+              <option value="Egresos" ${currentCat === 'Egresos' ? 'selected' : ''}>📉 Egresos (Operacionales)</option>
+              <option value="Activos" ${currentCat === 'Activos' ? 'selected' : ''}>🏢 Activos (Equipo y Mantenimiento)</option>
+              <option value="Patrimonio" ${currentCat === 'Patrimonio' ? 'selected' : ''}>🏛️ Patrimonio</option>
+              <option value="Ingresos" ${currentCat === 'Ingresos' ? 'selected' : ''}>💵 Ingresos</option>
+            </select>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    // Escuchar cambio en selectores de clasificación
+    tbody.querySelectorAll('.acc-classification-select').forEach(sel => {
+      sel.addEventListener('change', (e) => {
+        const expenseId = parseInt(e.target.dataset.expenseId, 10);
+        const newCategory = e.target.value;
+        store.updateExpenseClassification(expenseId, newCategory);
+        showToast(`Gasto clasificado contablemente como "${newCategory}".`, 'success');
+        renderAccountantDashboard();
+      });
+    });
+  }
+
+  // --- MÓDULO 3: Auditar Comprobantes y Facturas SRI ---
+  function renderVouchersAuditModule(state) {
+    const expenses = state.expenses || [];
+    const countRoot = document.getElementById('acc-audit-badges-count');
+    if (countRoot) {
+      const aprobados = expenses.filter(e => (e.auditStatus || 'Aprobado') === 'Aprobado').length;
+      const pendientes = expenses.filter(e => (e.auditStatus || 'Aprobado') === 'Pendiente').length;
+      const observados = expenses.filter(e => (e.auditStatus || 'Aprobado') === 'Observado').length;
+
+      countRoot.innerHTML = `
+        <span class="badge-status-pill liquidado">✓ Aprobados: ${aprobados}</span>
+        <span class="badge-status-pill pendiente">⏳ Pendientes: ${pendientes}</span>
+        <span class="badge-status-pill" style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5;">⚠️ Observados: ${observados}</span>
+      `;
+    }
+
+    const tbody = document.getElementById('acc-audit-vouchers-table-body');
+    if (!tbody) return;
+
+    if (expenses.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 20px; color: #64748b;">No hay comprobantes para auditar.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = expenses.map(exp => {
+      const auditStatus = exp.auditStatus || 'Aprobado';
+      const voucherType = exp.voucherType || 'Factura Electrónica';
+      const voucherNum = exp.voucherNumber || '001-002-8394821';
+      const provider = exp.providerName || 'Proveedor Autorizado';
+      const ruc = exp.providerRuc || '0990000000001';
+
+      let statusBadge = '';
+      if (auditStatus === 'Aprobado') {
+        statusBadge = `<span class="badge-status-pill liquidado" data-exp-id="${exp.id}" title="Clic para conmutar estado">✓ APROBADO SRI</span>`;
+      } else if (auditStatus === 'Observado') {
+        statusBadge = `<span class="badge-status-pill" data-exp-id="${exp.id}" style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; cursor: pointer;" title="Clic para conmutar estado">⚠️ OBSERVADO</span>`;
+      } else {
+        statusBadge = `<span class="badge-status-pill pendiente" data-exp-id="${exp.id}" title="Clic para conmutar estado">⏳ PENDIENTE</span>`;
+      }
+
+      return `
+        <tr>
+          <td><strong style="color: #0284c7;">#EXP-${exp.id}</strong></td>
+          <td><span style="font-size: 0.78rem; font-weight: 700; color: #334155;">${voucherType}</span></td>
+          <td><code style="font-size: 0.74rem; background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">${voucherNum}</code></td>
+          <td>
+            <div style="font-weight: 700; color: #0f172a;">${provider}</div>
+            <div style="font-size: 0.70rem; color: #64748b;">RUC: ${ruc}</div>
+          </td>
+          <td>
+            <div style="color: #1e293b;">${exp.description}</div>
+            <div style="font-size: 0.72rem; color: #64748b;">Centro: ${exp.costCenter || 'Hospital'}</div>
+          </td>
+          <td style="font-weight: 800; color: #0f172a;">$${exp.amount.toFixed(2)}</td>
+          <td>${statusBadge}</td>
+          <td>
+            <button type="button" class="btn-ghost-sm btn-toggle-audit-status" data-exp-id="${exp.id}" style="font-size: 0.74rem; padding: 3px 8px;">
+              🔄 Cambiar Estado
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    // Conmutar estado de auditoría
+    tbody.querySelectorAll('.badge-status-pill, .btn-toggle-audit-status').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const expId = parseInt(btn.dataset.expId, 10);
+        const exp = expenses.find(x => x.id === expId);
+        if (!exp) return;
+
+        const current = exp.auditStatus || 'Aprobado';
+        let next = 'Aprobado';
+        if (current === 'Aprobado') next = 'Observado';
+        else if (current === 'Observado') next = 'Pendiente';
+        else next = 'Aprobado';
+
+        store.auditExpenseVoucher(expId, next, exp.auditNotes || '');
+        showToast(`Comprobante #EXP-${expId} actualizado a estado "${next}".`, 'info');
+        renderAccountantDashboard();
+      });
+    });
+  }
+
+  // --- MÓDULO 4: Rentabilidad por Sedes & Optimización de Rutas ---
+  function renderProfitabilityAndRoutesModule(summary) {
     const profitabilityList = document.getElementById('clinic-profitability-container');
     if (profitabilityList) {
       const breakdown = summary.clinicBreakdown;
-      const maxNet = Math.max(
-        ...Object.values(breakdown).map(b => b.netDoctor),
-        1
-      );
+      const maxNet = Math.max(...Object.values(breakdown).map(b => b.netDoctor), 1);
 
-      profitabilityList.innerHTML = Object.keys(breakdown).filter(k => k !== 'hospital').map(k => {
+      profitabilityList.innerHTML = Object.keys(breakdown).map(k => {
         const item = breakdown[k];
-        const clinic = CLINICS[k];
-        const pctWidth = Math.min(100, Math.max(15, (item.netDoctor / maxNet) * 100));
+        const clinic = CLINICS[k] || { color: '#0284c7' };
+        const isHospital = k === 'hospital';
+        const netVal = isHospital ? summary.hospitalFixedSalary : item.netDoctor;
+        const pctWidth = Math.min(100, Math.max(20, (netVal / (maxNet + 1200)) * 100));
+
+        let viabilityBadge = '<span class="badge-sede badge-alborada" style="font-size: 0.70rem;">ÓPTIMA (95% margen)</span>';
+        if (k === 'ceibos') {
+          viabilityBadge = '<span class="badge-sede badge-ceibos" style="font-size: 0.70rem;">MEDIA (75% margen)</span>';
+        } else if (k === 'hospital') {
+          viabilityBadge = '<span class="badge-sede badge-hospital" style="font-size: 0.70rem;">FIJA (Sin comisión)</span>';
+        }
 
         return `
-          <div class="profitability-item">
-            <div class="profitability-header-row">
-              <span style="color: #0f172a;">${item.name} (Retención: ${(item.retentionRate * 100)}%)</span>
-              <span style="color: ${clinic.color}; font-weight: 800;">$${item.netDoctor.toFixed(2)} Neto</span>
+          <div class="profitability-item" style="margin-bottom: 12px;">
+            <div class="profitability-header-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="color: #0f172a; font-weight: 700;">${item.name}</span>
+                ${viabilityBadge}
+              </div>
+              <span style="color: ${clinic.color}; font-weight: 800;">$${netVal.toFixed(2)} Neto</span>
             </div>
             <div class="progress-bar-track">
               <div class="progress-bar-fill" style="width: ${pctWidth}%; background: ${clinic.color};"></div>
             </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #64748b; margin-top: 2px;">
+              <span>Facturado Bruto: $${isHospital ? 'Convenio MSP' : item.gross.toFixed(2)}</span>
+              <span>Retención de Sede: ${isHospital ? '$0.00 (0%)' : `-$${item.retentions.toFixed(2)} (${(item.retentionRate * 100)}%)`}</span>
+            </div>
           </div>
         `;
       }).join('');
     }
 
-    // 4. Clasificador Contable de Egresos (Página 5)
-    const expenseCategoriesBox = document.getElementById('expense-categories-grid');
-    if (expenseCategoriesBox) {
-      const cats = summary.expensesByCategory;
-      expenseCategoriesBox.innerHTML = Object.keys(cats).map(catName => {
-        return `
-          <div class="expense-cat-box">
-            <span class="expense-cat-name">${catName}</span>
-            <span class="expense-cat-amount">-$${cats[catName].toFixed(2)}</span>
+    // Sugerencias de Optimización de Rutas
+    const routesList = document.getElementById('acc-route-optimizations-list');
+    if (routesList) {
+      const recommendations = summary.routeOptimizations || [
+        {
+          title: 'Agrupamiento Matutino Ceibos ↔ Hospital',
+          desc: 'Agrupar citas privadas en Ceibos antes del inicio de guardias hospitalarias para evitar desplazamientos dobles.',
+          saving: '$8.00 / día en taxi',
+          impact: 'Ahorro mensual aprox. $160.00'
+        },
+        {
+          title: 'Ruta Alborada y Mapasingue en Horas Valles',
+          desc: 'Planificar traslados entre Mapasingue y Alborada fuera del horario pico de la Av. Juan Tanca Marengo (18:00 - 19:30).',
+          saving: '45 minutos y $6.00 de combustible',
+          impact: 'Menor desgaste vehicular y menor retraso en buffer'
+        },
+        {
+          title: 'Compra Consolidada de Suministros Hospitalarios',
+          desc: 'Cargar facturas mensuales de insumos con crédito tributario del 15% directamente a nombre del RUC del médico.',
+          saving: '15% de crédito tributario en IVA',
+          impact: 'Deducción legal en Formulario 102 SRI'
+        }
+      ];
+
+      routesList.innerHTML = recommendations.map(rec => `
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid var(--primary-blue); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong style="color: #0f172a; font-size: 0.85rem;">💡 ${rec.title}</strong>
+            <span class="badge-sede badge-alborada" style="font-size: 0.70rem;">${rec.saving}</span>
           </div>
-        `;
-      }).join('');
+          <p style="font-size: 0.78rem; color: #475569; margin: 0; line-height: 1.4;">${rec.desc}</p>
+          <span style="font-size: 0.72rem; color: #15803d; font-weight: 700;">✓ Impacto: ${rec.impact}</span>
+        </div>
+      `).join('');
     }
   }
 
-  // --- Exportación de Balances SRI y Descarga en Excel/CSV (Página 5) ---
+  // --- MÓDULO 5: Reportes para Declaraciones Tributarias SRI ---
+  function renderTaxReportModule(summary) {
+    const previewContainer = document.getElementById('acc-tax-report-preview-container');
+    if (!previewContainer) return;
+
+    previewContainer.innerHTML = `
+      <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 18px; margin-top: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 12px;">
+          <div>
+            <h4 style="margin: 0; font-size: 1rem; color: #0f172a; font-weight: 800;">SERVICIO DE RENTAS INTERNAS (SRI) - FORMULARIO 102</h4>
+            <span style="font-size: 0.76rem; color: #64748b;">Declaración Consolidada de Impuesto a la Renta de Personas Naturales</span>
+          </div>
+          <div style="text-align: right; font-size: 0.78rem;">
+            <strong>RUC:</strong> 0930860044001<br>
+            <strong>Médico:</strong> Dr. Carlos Campoverde
+          </div>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
+          <thead>
+            <tr style="background: #e2e8f0; border-bottom: 1px solid #cbd5e1;">
+              <th style="padding: 8px; text-align: left;">Casillero SRI</th>
+              <th style="padding: 8px; text-align: left;">Concepto Contable Tributario</th>
+              <th style="padding: 8px; text-align: right;">Monto Consolidado ($)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="padding: 8px; font-weight: 700; color: #0284c7;">[301]</td>
+              <td style="padding: 8px;">Ingresos Brutos por Actividad Profesional Privada (Ceibos, Mapasingue, Alborada)</td>
+              <td style="padding: 8px; text-align: right; font-weight: 700;">$${summary.totalGrossRevenue.toFixed(2)}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="padding: 8px; font-weight: 700; color: #0284c7;">[302]</td>
+              <td style="padding: 8px;">Ingresos Bajo Relación de Dependencia (Sueldo Fijo Hospital Ceibos)</td>
+              <td style="padding: 8px; text-align: right; font-weight: 700;">$${summary.hospitalFixedSalary.toFixed(2)}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0; background: #fff1f2;">
+              <td style="padding: 8px; font-weight: 700; color: #dc2626;">[401]</td>
+              <td style="padding: 8px; color: #991b1b;">(-) Gastos Operativos Deducibles de Movilidad e Insumos (Justificados)</td>
+              <td style="padding: 8px; text-align: right; font-weight: 700; color: #dc2626;">-$${summary.totalExpenses.toFixed(2)}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="padding: 8px; font-weight: 700; color: #6366f1;">[501]</td>
+              <td style="padding: 8px;">Retenciones en la Fuente Aplicadas por las Clínicas (5%, 25%, 10%)</td>
+              <td style="padding: 8px; text-align: right; font-weight: 700; color: #6366f1;">-$${summary.totalRetentions.toFixed(2)}</td>
+            </tr>
+            <tr style="background: #f0fdf4; border-top: 2px solid #16a34a; font-size: 0.9rem;">
+              <td style="padding: 10px; font-weight: 800; color: #166534;">[601]</td>
+              <td style="padding: 10px; font-weight: 800; color: #166534;">BASE IMPONIBLE NETA LIQUIDABLE:</td>
+              <td style="padding: 10px; text-align: right; font-weight: 800; color: #166534;">$${summary.realNetIncome.toFixed(2)}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; font-size: 0.74rem; color: #64748b;">
+          <span>✓ Datos auditados sin requerir recopilación manual de recibos.</span>
+          <span>SRI Ecuador • Año Gravable 2026</span>
+        </div>
+      </div>
+    `;
+
+    const btnPrintDirect = document.getElementById('btn-acc-print-sri-direct');
+    if (btnPrintDirect) {
+      btnPrintDirect.onclick = () => window.print();
+    }
+
+    const btnExportDirect = document.getElementById('btn-acc-export-tax-direct');
+    if (btnExportDirect) {
+      btnExportDirect.onclick = () => openTaxReportModal();
+    }
+  }
+
+  // --- 3. MODAL DE INFORME TRIBUTARIO SRI ---
   if (btnExportTax) {
-    btnExportTax.addEventListener('click', () => {
-      openTaxReportModal();
-    });
+    btnExportTax.addEventListener('click', openTaxReportModal);
   }
 
   if (btnCloseTaxModal) {
@@ -4733,7 +6397,7 @@ function setupAccountantPortal(showToast) {
             <p style="font-size: 0.78rem; color: #64748b;">Informe de Conciliación Tributaria para Servicios Médicos Profesionales</p>
           </div>
           <div style="text-align: right; font-size: 0.8rem;">
-            <strong>Período Fiscal:</strong> Septiembre 2026<br>
+            <strong>Período Fiscal:</strong> Septiembre - Octubre 2026<br>
             <strong>Cédula / RUC:</strong> 0930860044001
           </div>
         </div>
@@ -4801,33 +6465,33 @@ function setupAccountantPortal(showToast) {
     taxModal.classList.add('active');
   }
 
-  // Generar y descargar archivo CSV para Excel
+  // --- 4. EXPORTACIÓN A EXCEL / CSV ---
   if (btnDownloadCSV) {
     btnDownloadCSV.addEventListener('click', () => {
       const summary = store.getFinancialSummary();
       const state = store.getState();
 
       let csvContent = "data:text/csv;charset=utf-8,";
-      csvContent += "FECHA,TIPO,DESCRIPCION/PACIENTE,SEDE,BRUTO,RETENCION/COMISION,NETO_FINAL,ESTADO\r\n";
+      csvContent += "FECHA,TIPO,DESCRIPCION/PACIENTE,SEDE,BRUTO,RETENCION/COMISION,NETO_FINAL,ESTADO,CLASIFICACION_CONTABLE\r\n";
 
       // Citas
       state.appointments.forEach(a => {
         const clinic = CLINICS[a.clinicId];
-        csvContent += `"${a.date}","CITA MEDICA","${a.patientName}","${clinic.name}",${a.basePrice.toFixed(2)},${a.retentionAmount.toFixed(2)},${a.netClinicYield.toFixed(2)},"${a.settlementStatus}"\r\n`;
+        csvContent += `"${a.date}","CITA MEDICA","${a.patientName}","${clinic.name}",${a.basePrice.toFixed(2)},${a.retentionAmount.toFixed(2)},${a.netClinicYield.toFixed(2)},"${a.settlementStatus}","Ingresos"\r\n`;
       });
 
       // Sueldo Hospital
-      csvContent += `"2026-09-30","SUELDO FIJO","Haber Mensual de Medicina General","Hospital Público Ceibos",${summary.hospitalFixedSalary.toFixed(2)},0.00,${summary.hospitalFixedSalary.toFixed(2)},"Liquidado"\r\n`;
+      csvContent += `"2026-09-30","SUELDO FIJO","Haber Mensual de Medicina General","Hospital Público Ceibos",${summary.hospitalFixedSalary.toFixed(2)},0.00,${summary.hospitalFixedSalary.toFixed(2)},"Liquidado","Ingresos"\r\n`;
 
       // Gastos
       state.expenses.forEach(e => {
-        csvContent += `"${e.date}","GASTO OPERATIVO","${e.description}","${e.category}",-${e.amount.toFixed(2)},0.00,-${e.amount.toFixed(2)},"Deducible SRI"\r\n`;
+        csvContent += `"${e.date}","GASTO OPERATIVO","${e.description}","${e.costCenter || e.category}",-${e.amount.toFixed(2)},0.00,-${e.amount.toFixed(2)},"${e.auditStatus || 'Aprobado'}","${e.accountingCategory || 'Gastos'}"\r\n`;
       });
 
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `Liquidacion_Medica_SRI_Septiembre_2026.csv`);
+      link.setAttribute("download", `Auditoria_Contable_SRI_Septiembre_2026.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -4838,7 +6502,7 @@ function setupAccountantPortal(showToast) {
 
   // Suscribirse al store para refrescar la tabla en tiempo real si el doctor o paciente interactúan
   store.subscribe(() => {
-    if (store.getActiveView() === 'contador') {
+    if (store.getActiveView() === 'contador' || store.getActiveView() === 'accountant') {
       renderAccountantDashboard();
     }
   });
@@ -4894,6 +6558,9 @@ function showToast(message, type = 'info') {
 
 // Inicialización de la Aplicación
 document.addEventListener('DOMContentLoaded', () => {
+  // Inicialización del motor dinámico de fondo interactivo (Canvas + Mouse physics)
+  initAmbientBackground();
+
   // Vistas / Pantallas Principales
   const viewLanding = document.getElementById('view-landing');
   const viewPatient = document.getElementById('view-patient');
@@ -4916,14 +6583,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const navbarBrandHome = document.getElementById('navbar-brand-home');
   const navbarBrandSubtitle = document.getElementById('navbar-brand-subtitle');
 
-  // Elementos de Usuario en la Barra
+  // Elementos de la Barra Superior y del Portal del Paciente
+  const patientPortalTabBar = document.getElementById('patient-portal-tab-bar');
+  const patientGuestNavActions = document.getElementById('patient-guest-nav-actions');
   const patientLoggedCard = document.getElementById('patient-logged-card');
   const patNavbarAvatar = document.getElementById('pat-navbar-avatar');
   const patNavbarName = document.getElementById('pat-navbar-name');
-  const btnNavPatientOpenLogin = document.getElementById('btn-nav-patient-open-login');
+  const patientBrandSubtitle = document.getElementById('patient-brand-subtitle');
+  const patientNavBrandBtn = document.getElementById('patient-nav-brand-btn');
+  const btnPatientBackToWeb = document.getElementById('btn-patient-back-to-web');
+  const btnPatientOpenLogin = document.getElementById('btn-patient-open-login');
 
   // Botones de Salir / Regreso
-  const btnNavPatientBack = document.getElementById('btn-nav-patient-back');
   const btnPatientLogout = document.getElementById('btn-patient-logout');
   const btnDoctorLogout = document.getElementById('btn-doctor-logout');
   const btnAccountantLogout = document.getElementById('btn-accountant-logout');
@@ -4970,19 +6641,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
     } else if (activeView === 'paciente' || activeView === 'patient') {
       if (viewPatient) viewPatient.style.display = 'block';
-      if (navMenuPatient) navMenuPatient.style.display = 'flex';
-      if (navActionsPatient) navActionsPatient.style.display = 'flex';
-      if (navbarBrandSubtitle) navbarBrandSubtitle.textContent = 'Portal de Pacientes & Citas';
 
-      // Estado de usuario en la barra del paciente
+      // Estado de la barra según si el usuario ha iniciado sesión como paciente o es nuevo/invitado
       if (currentUser && currentUser.role === 'paciente') {
+        // === USUARIO PACIENTE CON SESIÓN INICIADA ===
+        // 1. Mostrar barra con las pestañas completas: Resumen, Mis Citas, Mis Datos, Agendar Cita
+        if (patientPortalTabBar) patientPortalTabBar.style.display = 'flex';
+        // 2. Mostrar tarjeta con el nombre del paciente y botón de salir
         if (patientLoggedCard) patientLoggedCard.style.display = 'flex';
-        if (patNavbarName) patNavbarName.textContent = currentUser.name.split(' ')[0];
-        if (patNavbarAvatar) patNavbarAvatar.src = currentUser.avatar;
-        if (btnNavPatientOpenLogin) btnNavPatientOpenLogin.style.display = 'none';
+        // 3. Ocultar los botones de invitado
+        if (patientGuestNavActions) patientGuestNavActions.style.display = 'none';
+
+        if (patNavbarName) patNavbarName.textContent = (currentUser.name || 'Carlos').split(' ')[0];
+        if (patNavbarAvatar && currentUser.avatar) patNavbarAvatar.src = currentUser.avatar;
+        if (patientBrandSubtitle) patientBrandSubtitle.textContent = 'Portal del Paciente';
+
+        // Al iniciar sesión siempre abre la ventana de Resumen
+        if (typeof window.renderPatientPortal === 'function') {
+          window.renderPatientPortal();
+        }
       } else {
+        // === USUARIO NUEVO SIN INICIAR SESIÓN (AGENDAR CITA) ===
+        // 1. Ocultar completamente los botones de pestañas (Resumen, Mis Citas, Mis Datos, Agendar Cita)
+        if (patientPortalTabBar) patientPortalTabBar.style.display = 'none';
+        // 2. Ocultar tarjeta de usuario logueado
         if (patientLoggedCard) patientLoggedCard.style.display = 'none';
-        if (btnNavPatientOpenLogin) btnNavPatientOpenLogin.style.display = 'inline-flex';
+        // 3. Mostrar en la barra los botones de regresar al sitio web o iniciar sesión
+        if (patientGuestNavActions) patientGuestNavActions.style.display = 'flex';
+
+        if (patientBrandSubtitle) patientBrandSubtitle.textContent = 'Agendamiento de Citas';
+
+        // Mostrar directamente el panel para agendar cita
+        if (typeof window.switchPatientTab === 'function') {
+          window.switchPatientTab('agendar');
+        } else {
+          const patientPanes = document.querySelectorAll('.patient-portal-pane');
+          patientPanes.forEach(pane => {
+            pane.style.display = (pane.dataset.pane === 'agendar') ? 'block' : 'none';
+          });
+        }
       }
 
     } else if (activeView === 'doctor') {
@@ -5002,10 +6699,41 @@ document.addEventListener('DOMContentLoaded', () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  // --- BOTONES DE CIERRE DE SESIÓN Y RETORNO ---
-  if (btnNavPatientBack) {
-    btnNavPatientBack.addEventListener('click', () => {
+  // --- BOTONES DE LA BARRA DEL PACIENTE PARA USUARIOS NUEVOS / INVITADOS Y LOGOUT ---
+  if (btnPatientBackToWeb) {
+    btnPatientBackToWeb.addEventListener('click', (e) => {
+      e.preventDefault();
       store.setActiveView('landing');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+
+  if (patientNavBrandBtn) {
+    patientNavBrandBtn.addEventListener('click', () => {
+      store.setActiveView('landing');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+
+  if (btnPatientOpenLogin) {
+    btnPatientOpenLogin.addEventListener('click', (e) => {
+      e.preventDefault();
+      store.setActiveView('landing');
+      setTimeout(() => {
+        // Activar la pestaña de Paciente en el formulario de acceso
+        const patRoleTab = document.querySelector('.role-tab-btn[data-role="paciente"]');
+        if (patRoleTab) {
+          patRoleTab.click();
+        }
+        const portalAcceso = document.getElementById('portal-acceso');
+        if (portalAcceso) {
+          portalAcceso.scrollIntoView({ behavior: 'smooth' });
+        }
+        const loginInput = document.getElementById('login-username');
+        if (loginInput) {
+          loginInput.focus();
+        }
+      }, 80);
     });
   }
 
@@ -5013,18 +6741,8 @@ document.addEventListener('DOMContentLoaded', () => {
     btnPatientLogout.addEventListener('click', () => {
       store.setCurrentUser(null);
       showToast('Sesión de paciente cerrada. Regresando a la página principal.', 'info');
-      renderActiveView();
-    });
-  }
-
-  if (btnNavPatientOpenLogin) {
-    btnNavPatientOpenLogin.addEventListener('click', (e) => {
-      e.preventDefault();
       store.setActiveView('landing');
-      setTimeout(() => {
-        const portalAcceso = document.getElementById('portal-acceso');
-        if (portalAcceso) portalAcceso.scrollIntoView({ behavior: 'smooth' });
-      }, 50);
+      renderActiveView();
     });
   }
 
@@ -5096,14 +6814,21 @@ document.addEventListener('DOMContentLoaded', () => {
     store.setActiveView('paciente');
     renderActiveView();
 
-    if (clinicId) {
-      setTimeout(() => {
+    setTimeout(() => {
+      if (typeof window.switchPatientTab === 'function') {
+        window.switchPatientTab('agendar');
+      } else {
+        const agendarTabBtn = document.getElementById('nav-btn-pat-agendar');
+        if (agendarTabBtn) agendarTabBtn.click();
+      }
+
+      if (clinicId) {
         const targetClinicCard = document.querySelector(`.clinic-selection-card[data-clinic-id="${clinicId}"]`);
         if (targetClinicCard) {
           targetClinicCard.click();
         }
-      }, 50);
-    }
+      }
+    }, 50);
     showToast('Ingresando al portal de reserva de citas.', 'info');
   }
 

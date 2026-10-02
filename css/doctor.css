@@ -7,19 +7,21 @@
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - 56px);
-  background: #f8fafc;
+  background: transparent;
   position: relative;
 }
 
 /* Barra de Navegación de Pestañas para Pantallas Medianas y Grandes (Tablet / Desktop) */
 .doctor-desktop-nav {
   display: none; /* Oculto en móvil por defecto, visible en >= 768px */
-  background: #ffffff;
-  border-bottom: 1px solid var(--border-light);
+  background: rgba(8, 12, 20, 0.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
   padding: 8px 24px;
   align-items: center;
   justify-content: space-between;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
   position: sticky;
   top: 56px;
   z-index: 40;

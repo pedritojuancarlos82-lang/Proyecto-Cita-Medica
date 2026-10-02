@@ -109,13 +109,147 @@ export const DEMO_USERS = {
   }
 };
 
+// Función para obtener la fecha de hoy en formato YYYY-MM-DD
+export function getTodayDateStr() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+const TODAY_DATE = getTodayDateStr();
+
 // Datos Semilla Iniciales
 const INITIAL_STATE = {
   currentUser: null,
   activeView: 'landing', // 'landing', 'patient', 'doctor', 'accountant'
   
-  // Citas Iniciales del día Sábado 19 de Septiembre y semana activa
+  // Citas Iniciales (Incluye citas del día de hoy y de la semana para histórico)
   appointments: [
+    // --- CITAS DE HOY (FECHA ACTUAL DINÁMICA) ---
+    {
+      id: 'APT-TODAY-1',
+      code: 'MED-7001',
+      patientName: 'Carlos Mendoza Moreira',
+      patientId: '0987654321',
+      patientPhone: '0987654321',
+      patientEmail: 'paciente@gmail.com',
+      clinicId: 'alborada',
+      date: TODAY_DATE,
+      time: '09:00',
+      durationMinutes: 45,
+      reason: 'Control prioritario de hipertensión y receta Losartán',
+      paymentMethod: 'efectivo',
+      basePrice: 10.00,
+      feePercentage: 0.00,
+      feeAmount: 0.00,
+      totalPaid: 10.00,
+      retentionRate: 0.10,
+      retentionAmount: 1.00,
+      netClinicYield: 9.00,
+      status: 'confirmada',
+      settlementStatus: 'Liquidado',
+      notes: 'Paciente con antecedente de HTA grado 1. Control de rutina programado para hoy.'
+    },
+    {
+      id: 'APT-TODAY-2',
+      code: 'MED-7002',
+      patientName: 'Mariana Vera Loor',
+      patientId: '0918237465',
+      patientPhone: '0991234567',
+      patientEmail: 'mariana.vera@yahoo.com',
+      clinicId: 'alborada',
+      date: TODAY_DATE,
+      time: '10:15',
+      durationMinutes: 45,
+      reason: 'Evaluación respiratoria y chequeo de sibilancias',
+      paymentMethod: 'tarjeta',
+      basePrice: 10.00,
+      feePercentage: 0.0975,
+      feeAmount: 0.98,
+      totalPaid: 10.98,
+      retentionRate: 0.10,
+      retentionAmount: 1.00,
+      netClinicYield: 9.00,
+      status: 'confirmada',
+      settlementStatus: 'Liquidado',
+      notes: 'Requiere auscultación pulmonar y control de asma intermitente.'
+    },
+    {
+      id: 'APT-TODAY-3',
+      code: 'MED-7003',
+      patientName: 'Javier Andrade Romero',
+      patientId: '0922883344',
+      patientPhone: '0984561230',
+      patientEmail: 'jandrade@gmail.com',
+      clinicId: 'ceibos',
+      date: TODAY_DATE,
+      time: '13:00',
+      durationMinutes: 45,
+      reason: 'Dolor articular lumbar y valoración postural',
+      paymentMethod: 'efectivo',
+      basePrice: 20.00,
+      feePercentage: 0.00,
+      feeAmount: 0.00,
+      totalPaid: 20.00,
+      retentionRate: 0.25,
+      retentionAmount: 5.00,
+      netClinicYield: 15.00,
+      status: 'confirmada',
+      settlementStatus: 'Pendiente',
+      notes: 'Chequeo de columna lumbosacra y terapia analgésica.'
+    },
+    {
+      id: 'APT-TODAY-4',
+      code: 'MED-7004',
+      patientName: 'Sofía Carvajal Poveda',
+      patientId: '0933772211',
+      patientPhone: '0978901234',
+      patientEmail: 'sofia.carvajal@outlook.com',
+      clinicId: 'ceibos',
+      date: TODAY_DATE,
+      time: '14:30',
+      durationMinutes: 45,
+      reason: 'Certificado médico de aptitud y control de salud',
+      paymentMethod: 'tarjeta',
+      basePrice: 20.00,
+      feePercentage: 0.0975,
+      feeAmount: 1.95,
+      totalPaid: 21.95,
+      retentionRate: 0.25,
+      retentionAmount: 5.00,
+      netClinicYield: 15.00,
+      status: 'confirmada',
+      settlementStatus: 'Pendiente',
+      notes: 'Certificado de medicina preventiva e ingreso laboral.'
+    },
+    {
+      id: 'APT-TODAY-5',
+      code: 'MED-7005',
+      patientName: 'Elena Guamán Tomalá',
+      patientId: '0944119988',
+      patientPhone: '0967894561',
+      patientEmail: 'elena.guaman@gmail.com',
+      clinicId: 'mapasingue',
+      date: TODAY_DATE,
+      time: '16:30',
+      durationMinutes: 45,
+      reason: 'Control glucémico y revisión de perfil metabólico',
+      paymentMethod: 'efectivo',
+      basePrice: 20.00,
+      feePercentage: 0.00,
+      feeAmount: 0.00,
+      totalPaid: 20.00,
+      retentionRate: 0.05,
+      retentionAmount: 1.00,
+      netClinicYield: 19.00,
+      status: 'confirmada',
+      settlementStatus: 'Liquidado',
+      notes: 'Ajuste de medicación hipoglucemiante.'
+    },
+
+    // --- CITAS HISTÓRICAS (Semana 17-23 Sep 2026 para auditoría contable) ---
     {
       id: 'APT-1001',
       code: 'MED-1001',
@@ -136,9 +270,9 @@ const INITIAL_STATE = {
       retentionRate: 0.10,
       retentionAmount: 1.00,
       netClinicYield: 9.00,
-      status: 'confirmada', // confirmada, atendida, en_guardia, cancelada
-      settlementStatus: 'Liquidado', // Liquidado, Pendiente
-      notes: 'Paciente con antecedente de HTA grado 1. Recomienda perfil lipídico.'
+      status: 'confirmada',
+      settlementStatus: 'Liquidado',
+      notes: 'Paciente con antecedente de HTA grado 1.'
     },
     {
       id: 'APT-1002',
@@ -238,8 +372,30 @@ const INITIAL_STATE = {
     }
   ],
 
-  // Bloques de Traslado Protegido entre Clínicas (Página 2 y 4)
+  // Bloques de Traslado Protegido entre Clínicas
   travelBuffers: [
+    {
+      id: 'TRV-TODAY-1',
+      date: TODAY_DATE,
+      fromClinic: 'alborada',
+      toClinic: 'ceibos',
+      startTime: '11:15',
+      endTime: '12:45',
+      durationMinutes: 45,
+      bufferLabel: '🚗 Traslado Alborada → Ceibos (45 min + colchón de llegada)',
+      status: 'programado'
+    },
+    {
+      id: 'TRV-TODAY-2',
+      date: TODAY_DATE,
+      fromClinic: 'ceibos',
+      toClinic: 'mapasingue',
+      startTime: '15:30',
+      endTime: '16:15',
+      durationMinutes: 40,
+      bufferLabel: '🚗 En ruta hacia Mapasingue - 40 min buffer',
+      status: 'programado'
+    },
     {
       id: 'TRV-1',
       date: '2026-09-19',
@@ -261,6 +417,67 @@ const INITIAL_STATE = {
       durationMinutes: 40,
       bufferLabel: '🚗 En ruta hacia Mapasingue - 40 min buffer',
       status: 'programado'
+    }
+  ],
+
+  // Perfiles Completos de Pacientes (Portal Paciente & Ficha Clínica)
+  patientProfiles: [
+    {
+      id: 'PAT-PROF-01',
+      cedula: '0987654321',
+      nombres: 'Carlos',
+      apellidos: 'Mendoza Moreira',
+      nombreCompleto: 'Carlos Mendoza Moreira',
+      fechaNacimiento: '1982-05-14',
+      edad: 44,
+      genero: 'Masculino',
+      telefono: '+593 98 765 4321',
+      email: 'paciente@gmail.com',
+      direccion: 'Cdla. Alborada 8va Etapa, Mz 812 Villa 4',
+      contactoEmergenciaNombre: 'Laura Moreira (Cónyuge)',
+      contactoEmergenciaTelefono: '+593 99 223 3445',
+      tipoSangre: 'O+',
+      alergias: 'Penicilina, Sulfamidas',
+      enfermedadesCronicas: 'Hipertensión Arterial Primaria Grado 1',
+      medicacionHabitual: 'Losartán 50mg cada 24 horas vía oral'
+    },
+    {
+      id: 'PAT-PROF-02',
+      cedula: '0918237465',
+      nombres: 'Mariana',
+      apellidos: 'Vera Loor',
+      nombreCompleto: 'Mariana Vera Loor',
+      fechaNacimiento: '1994-08-22',
+      edad: 32,
+      genero: 'Femenino',
+      telefono: '+593 99 123 4567',
+      email: 'mariana.vera@yahoo.com',
+      direccion: 'Urdesa Central, Calle 4ta y Guayacanes',
+      contactoEmergenciaNombre: 'Roberto Vera (Padre)',
+      contactoEmergenciaTelefono: '+593 98 112 2334',
+      tipoSangre: 'A+',
+      alergias: 'AINES (Ibuprofeno causa broncoespasmo leve)',
+      enfermedadesCronicas: 'Asma Bronquial Intermitente',
+      medicacionHabitual: 'Salbutamol inhalador 100mcg a demanda'
+    },
+    {
+      id: 'PAT-PROF-03',
+      cedula: '0922883344',
+      nombres: 'Javier',
+      apellidos: 'Andrade Romero',
+      nombreCompleto: 'Javier Andrade Romero',
+      fechaNacimiento: '1975-11-03',
+      edad: 51,
+      genero: 'Masculino',
+      telefono: '+593 98 456 1230',
+      email: 'jandrade@gmail.com',
+      direccion: 'Ceibos Norte Mz 14 Solar 2',
+      contactoEmergenciaNombre: 'Patricia Romero (Hermana)',
+      contactoEmergenciaTelefono: '+593 97 665 5443',
+      tipoSangre: 'B+',
+      alergias: 'Sin alergias conocidas',
+      enfermedadesCronicas: 'Hernia Discal L4-L5',
+      medicacionHabitual: 'Complejo B y Paracetamol 500mg SOS'
     }
   ],
 
@@ -308,7 +525,7 @@ const INITIAL_STATE = {
     }
   ],
 
-  // Recetas Digitales Emitidas (Página 4)
+  // Recetas Digitales Emitidas
   prescriptions: [
     {
       id: 'RX-901',
@@ -327,35 +544,59 @@ const INITIAL_STATE = {
     }
   ],
 
-  // Registro de Gastos Diarios y Operativos (Página 4 y 5)
+  // Registro de Gastos Diarios y Operativos (Clasificación Contable Oficial y Auditoría)
   expenses: [
     {
       id: 'EXP-101',
-      date: '2026-09-19',
+      date: TODAY_DATE,
       category: 'Transporte',
+      accountingCategory: 'Gastos',
       description: 'Gasolina Super para traslados entre clínicas',
       amount: 15.00,
       paymentMethod: 'Efectivo',
+      voucherType: 'Factura Electrónica',
+      voucherNumber: '001-002-000847291',
+      providerName: 'Estación Primax Ceibos',
+      providerRuc: '0992384756001',
+      auditStatus: 'Aprobado',
+      costCenter: 'General Movilidad',
+      auditNotes: 'Comprobante cotejado con ruta Alborada-Ceibos.',
       quickLogged: true,
       deductibleSRI: true
     },
     {
       id: 'EXP-102',
-      date: '2026-09-19',
+      date: TODAY_DATE,
       category: 'Transporte',
+      accountingCategory: 'Gastos',
       description: 'Carrera de Taxi hacia Hospital Público Ceibos',
       amount: 4.00,
       paymentMethod: 'Efectivo',
+      voucherType: 'Recibo / Vale',
+      voucherNumber: 'VAL-2026-042',
+      providerName: 'Cooperativa Taxi Ceibos',
+      providerRuc: '0991122334001',
+      auditStatus: 'Aprobado',
+      costCenter: 'Hospital Ceibos',
+      auditNotes: 'Movilización por emergencia de guardia hospitalaria.',
       quickLogged: true,
       deductibleSRI: true
     },
     {
       id: 'EXP-103',
-      date: '2026-09-19',
+      date: TODAY_DATE,
       category: 'Suministros Hospital',
+      accountingCategory: 'Costos',
       description: 'Insumos médicos de emergencia (Guantes de nitrilo, gasas estériles y antiséptico)',
       amount: 12.00,
       paymentMethod: 'Efectivo',
+      voucherType: 'Factura Electrónica',
+      voucherNumber: '002-005-001294812',
+      providerName: 'Distribuidora Farmacéutica Difare',
+      providerRuc: '0990011223001',
+      auditStatus: 'Aprobado',
+      costCenter: 'Hospital Ceibos',
+      auditNotes: 'Insumos para atención de choque hospitalario.',
       quickLogged: true,
       deductibleSRI: true
     },
@@ -363,9 +604,17 @@ const INITIAL_STATE = {
       id: 'EXP-104',
       date: '2026-09-18',
       category: 'Mantenimiento',
+      accountingCategory: 'Costos',
       description: 'Desinfección y calibración de tensiómetro aneroide',
       amount: 25.00,
       paymentMethod: 'Transferencia',
+      voucherType: 'Factura Electrónica',
+      voucherNumber: '001-010-000004921',
+      providerName: 'Biomédica del Litoral S.A.',
+      providerRuc: '0991928374001',
+      auditStatus: 'Aprobado',
+      costCenter: 'Sede Mapasingue',
+      auditNotes: 'Mantenimiento preventivo de equipo instrumental.',
       quickLogged: false,
       deductibleSRI: true
     },
@@ -373,9 +622,17 @@ const INITIAL_STATE = {
       id: 'EXP-105',
       date: '2026-09-15',
       category: 'Transporte',
+      accountingCategory: 'Gastos',
       description: 'Peajes urbanos Vía a la Costa y combustible',
       amount: 18.50,
       paymentMethod: 'Efectivo',
+      voucherType: 'Factura Electrónica',
+      voucherNumber: '003-001-000994821',
+      providerName: 'Gasolinera Mobil Vía a la Costa',
+      providerRuc: '0990887766001',
+      auditStatus: 'Aprobado',
+      costCenter: 'Sede Ceibos',
+      auditNotes: 'Desplazamiento para turno extendido.',
       quickLogged: false,
       deductibleSRI: true
     }
@@ -707,10 +964,82 @@ class StateStore {
     this.saveState();
   }
 
-  // --- Cálculos Contables y Financieros (Página 5) ---
+  // --- Gestión de Perfiles de Pacientes ---
+  getPatientProfiles() {
+    return this.state.patientProfiles || [];
+  }
+
+  getPatientProfile(cedula) {
+    if (!cedula) return null;
+    return (this.state.patientProfiles || []).find(p => p.cedula === cedula) || null;
+  }
+
+  savePatientProfile(profileData) {
+    if (!profileData || !profileData.cedula) return null;
+    if (!this.state.patientProfiles) this.state.patientProfiles = [];
+    
+    const index = this.state.patientProfiles.findIndex(p => p.cedula === profileData.cedula);
+    const existing = index >= 0 ? this.state.patientProfiles[index] : {};
+    
+    const updated = {
+      ...existing,
+      ...profileData,
+      nombreCompleto: profileData.nombreCompleto || `${profileData.nombres || ''} ${profileData.apellidos || ''}`.trim(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    if (index >= 0) {
+      this.state.patientProfiles[index] = updated;
+    } else {
+      updated.id = `PAT-PROF-${Math.floor(100 + Math.random() * 900)}`;
+      this.state.patientProfiles.unshift(updated);
+    }
+    
+    // Sincronizar en memoria con medicalRecords si coincide
+    const medRec = (this.state.medicalRecords || []).find(m => m.patientId === profileData.cedula);
+    if (medRec) {
+      if (profileData.alergias) medRec.allergies = profileData.alergias;
+      if (profileData.tipoSangre) medRec.bloodType = profileData.tipoSangre;
+      if (profileData.enfermedadesCronicas) medRec.history = profileData.enfermedadesCronicas;
+    }
+
+    this.saveState();
+    return updated;
+  }
+
+  getPatientAppointments(cedula) {
+    if (!cedula) return [];
+    return (this.state.appointments || []).filter(a => a.patientId === cedula);
+  }
+
+  // --- Clasificación Contable y Auditoría de Gastos ---
+  updateExpenseClassification(expId, accountingCategory, auditStatus, costCenter) {
+    const exp = (this.state.expenses || []).find(e => e.id === expId);
+    if (exp) {
+      if (accountingCategory) exp.accountingCategory = accountingCategory;
+      if (auditStatus) exp.auditStatus = auditStatus;
+      if (costCenter) exp.costCenter = costCenter;
+      this.saveState();
+      return exp;
+    }
+    return null;
+  }
+
+  auditExpenseVoucher(expId, auditStatus, auditNotes) {
+    const exp = (this.state.expenses || []).find(e => e.id === expId);
+    if (exp) {
+      if (auditStatus) exp.auditStatus = auditStatus;
+      if (auditNotes !== undefined) exp.auditNotes = auditNotes;
+      this.saveState();
+      return exp;
+    }
+    return null;
+  }
+
+  // --- Cálculos Contables y Financieros Oficiales (Supervisión Contable & SRI) ---
   getFinancialSummary() {
-    const appointments = this.state.appointments;
-    const expenses = this.state.expenses;
+    const appointments = this.state.appointments || [];
+    const expenses = this.state.expenses || [];
 
     // Ingresos brutos facturados (excluyendo canceladas)
     const activeAppointments = appointments.filter(a => a.status !== 'cancelada');
@@ -720,10 +1049,10 @@ class StateStore {
     let totalRetentions = 0;
     
     const clinicBreakdown = {
-      ceibos: { name: 'Clínica Ceibos', patientsCount: 0, gross: 0, retentionRate: 0.25, retentions: 0, netDoctor: 0, status: 'Pendiente' },
-      mapasingue: { name: 'Consultorio Mapasingue', patientsCount: 0, gross: 0, retentionRate: 0.05, retentions: 0, netDoctor: 0, status: 'Liquidado' },
-      alborada: { name: 'Consultorio Alborada', patientsCount: 0, gross: 0, retentionRate: 0.10, retentions: 0, netDoctor: 0, status: 'Liquidado' },
-      hospital: { name: 'Hospital Público Ceibos', patientsCount: 0, gross: 0, retentionRate: 0.00, retentions: 0, netDoctor: 0, status: 'Sueldo Fijo' }
+      ceibos: { name: 'Clínica Ceibos', patientsCount: 0, gross: 0, retentionRate: 0.25, retentions: 0, netDoctor: 0, status: 'Pendiente', costCenterExpenses: 0 },
+      mapasingue: { name: 'Consultorio Mapasingue', patientsCount: 0, gross: 0, retentionRate: 0.05, retentions: 0, netDoctor: 0, status: 'Liquidado', costCenterExpenses: 0 },
+      alborada: { name: 'Consultorio Alborada', patientsCount: 0, gross: 0, retentionRate: 0.10, retentions: 0, netDoctor: 0, status: 'Liquidado', costCenterExpenses: 0 },
+      hospital: { name: 'Hospital Público Ceibos', patientsCount: 0, gross: 0, retentionRate: 0.00, retentions: 0, netDoctor: 0, status: 'Sueldo Fijo', costCenterExpenses: 0 }
     };
 
     activeAppointments.forEach(apt => {
@@ -739,7 +1068,7 @@ class StateStore {
       totalRetentions += apt.retentionAmount || 0;
     });
 
-    // Gastos Operativos Acumulados
+    // Gastos Operativos y Clasificación Contable en 6 Grupos
     let totalExpenses = 0;
     const expensesByCategory = {
       Transporte: 0,
@@ -748,15 +1077,55 @@ class StateStore {
       Activos: 0
     };
 
+    const accountingCategoriesSummary = {
+      Costos: 0,
+      Gastos: 0,
+      Activos: 0,
+      Patrimonio: 0,
+      Ingresos: totalGrossRevenue + HOSPITAL_FIXED_SALARY,
+      Egresos: 0
+    };
+
     expenses.forEach(exp => {
       totalExpenses += exp.amount;
       const cat = exp.category || 'Transporte';
       expensesByCategory[cat] = (expensesByCategory[cat] || 0) + exp.amount;
+
+      const accCat = exp.accountingCategory || (cat === 'Suministros Hospital' || cat === 'Mantenimiento' ? 'Costos' : 'Gastos');
+      accountingCategoriesSummary[accCat] = (accountingCategoriesSummary[accCat] || 0) + exp.amount;
+
+      // Asignar al centro de costos
+      const cc = exp.costCenter || '';
+      if (cc.includes('Ceibos') && !cc.includes('Hospital')) clinicBreakdown.ceibos.costCenterExpenses += exp.amount;
+      else if (cc.includes('Mapasingue')) clinicBreakdown.mapasingue.costCenterExpenses += exp.amount;
+      else if (cc.includes('Alborada')) clinicBreakdown.alborada.costCenterExpenses += exp.amount;
+      else if (cc.includes('Hospital')) clinicBreakdown.hospital.costCenterExpenses += exp.amount;
     });
+
+    accountingCategoriesSummary.Egresos = totalExpenses + totalRetentions;
 
     // Ingreso Neto Real: (Bruto - Retenciones) + Sueldo Fijo Hospital - Gastos Operativos
     const privateClinicsNet = totalGrossRevenue - totalRetentions;
     const realNetIncome = (privateClinicsNet + HOSPITAL_FIXED_SALARY) - totalExpenses;
+
+    // Indicadores y Consejos de Optimización de Rutas
+    const routeOptimizations = [
+      {
+        sede: 'Mapasingue',
+        consejo: 'Comisión reducida al 5%: Genera el mayor rendimiento neto por hora ($19.00/paciente). Recomendado abrir 2 turnos matutinos adicionales.',
+        impacto: '+ $76.00/semana de ganancia neta'
+      },
+      {
+        sede: 'Ceibos → Hospital',
+        consejo: 'Corredor Vía a la Costa: Traslado agrupado de 40 min evita horas de alta congestión (11:30 - 13:00) y reduce 25% el gasto de combustible.',
+        impacto: 'Ahorro mensual de ~$35.00 en gasolina'
+      },
+      {
+        sede: 'Hospital Público',
+        consejo: 'Los $16.00 asumidos en insumos médicos y traslados de emergencia son deducibles al 100% en la declaración semestral de I.R. del SRI.',
+        impacto: 'Crédito tributario fiscal verificado'
+      }
+    ];
 
     return {
       totalGrossRevenue,
@@ -767,7 +1136,10 @@ class StateStore {
       privateClinicsNet,
       realNetIncome,
       clinicBreakdown,
-      expensesByCategory
+      expensesByCategory,
+      accountingCategoriesSummary,
+      accountingClassificationTotals: accountingCategoriesSummary,
+      routeOptimizations
     };
   }
 }
