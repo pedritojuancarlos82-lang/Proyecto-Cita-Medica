@@ -1,0 +1,190 @@
+/* ==========================================================================
+   Estilos de Impresión y Generación de PDF
+   Para Recetas Médicas Oficiales y Comprobantes con Código QR
+   ========================================================================== */
+
+@media print {
+  /* Ocultar elementos de navegación, fondos animados y herramientas del sistema */
+  .ambient-mesh-background,
+  .ambient-interactive-canvas,
+  .mesh-orb,
+  .pulsing-dot,
+  .page-custom-navbar,
+  .app-navbar,
+  .patient-portal-nav,
+  #patient-custom-navbar,
+  .patient-portal-header,
+  .doctor-top-bar,
+  .doctor-desktop-nav,
+  .doctor-bottom-nav,
+  .doctor-emergency-fab,
+  .accountant-header,
+  .accountant-action-tools,
+  .wizard-stepper-container,
+  .wizard-actions-bar,
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger,
+  .btn-dynamic,
+  .modal-close-btn,
+  #modal-ticket-actions,
+  .toast-container {
+    display: none !important;
+  }
+
+  .modal-overlay.active {
+    position: static !important;
+    background: transparent !important;
+    width: 100% !important;
+    height: auto !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    display: block !important;
+    padding: 0 !important;
+  }
+
+  .modal-overlay.active .modal-card {
+    box-shadow: none !important;
+    border: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    background: transparent !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt;
+  }
+
+  .app-main-layout {
+    padding: 0 !important;
+    background: #ffffff !important;
+    min-height: auto !important;
+  }
+
+  /* Tarjeta de Ticket Imprimible */
+  .ticket-card-printable {
+    box-shadow: none !important;
+    border: 1px solid #000000 !important;
+    margin: 0 auto;
+    page-break-inside: avoid;
+    width: 100% !important;
+    max-width: 600px !important;
+  }
+
+  .qr-code-display-box svg {
+    width: 160px !important;
+    height: 160px !important;
+  }
+
+  /* Receta Médica Oficial para Impresión */
+  .official-rx-printable {
+    display: block !important;
+    border: 2px solid #0f172a;
+    padding: 24px;
+    border-radius: 8px;
+    margin: 20px auto;
+    max-width: 700px;
+    background: #ffffff;
+    page-break-inside: avoid;
+  }
+
+  .official-rx-printable .rx-header {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 2px solid #0f172a;
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+  }
+
+  .official-rx-printable .rx-seal {
+    text-align: right;
+    font-size: 9pt;
+    color: #334155;
+  }
+
+  .official-rx-printable .rx-body {
+    margin-bottom: 24px;
+  }
+
+  .official-rx-printable .rx-footer {
+    border-top: 1px dashed #64748b;
+    padding-top: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+
+  /* Semana 4 - Parte 2: Hoja Oficial de Prescripción Médica MSP (#printable-official-rx) */
+  #modal-receta-medica {
+    background: transparent !important;
+    position: static !important;
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  #modal-receta-medica .modal-receta-card {
+    box-shadow: none !important;
+    border: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .modal-receta-header,
+  .rx-patient-info-banner,
+  .rx-form-column,
+  .rx-preview-toolbar,
+  .modal-receta-actions-footer,
+  .btn-rx-action {
+    display: none !important;
+  }
+
+  .rx-modal-main-grid {
+    display: block !important;
+    padding: 0 !important;
+    background: transparent !important;
+  }
+
+  .rx-preview-column {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  .official-prescription-sheet {
+    display: block !important;
+    border: 2px solid #000000 !important;
+    box-shadow: none !important;
+    border-radius: 8px !important;
+    padding: 16px 20px !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 650px !important;
+    background: #ffffff !important;
+    page-break-inside: avoid;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .official-prescription-sheet table {
+    width: 100% !important;
+  }
+
+  .official-prescription-sheet th,
+  .official-prescription-sheet td {
+    color: #000000 !important;
+  }
+
+  .rx-sheet-header {
+    border-bottom: 2px solid #000000;
+  }
+
+  .rx-sheet-divider {
+    background: #000000 !important;
+  }
+}
+

@@ -1,0 +1,15 @@
+{
+  "name": "proyecto-cita-medica",
+  "version": "1.0.0",
+  "description": "Plataforma Integral de Gestion y Atencion Medica (SaaS Medico Multisede)",
+  "main": "server.py",
+  "scripts": {
+    "start": "python server.py",
+    "dev": "python server.py",
+    "build": "python build_bundle.py",
+    "test": "python -m unittest discover -s backend -v"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  }
+}

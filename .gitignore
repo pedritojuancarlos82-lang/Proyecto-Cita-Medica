@@ -1,0 +1,24 @@
+# Logs
+*.log
+.system_generated/
+scratch/
+
+# Environment & Secrets
+.env
+.env.*
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Node
+node_modules/
+package-lock.json
+
+# OS and Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
