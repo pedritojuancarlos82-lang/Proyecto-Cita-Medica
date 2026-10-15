@@ -136,11 +136,11 @@ export function setupAuth(showToast) {
       }
 
       // 2. Comprobar si coincide con Paciente
-      if (!matchedUser) {
+      if (!matchedUser && DEMO_USERS.paciente) {
         const pat = DEMO_USERS.paciente;
         const isPatUser = (
-          enteredUser === pat.username.toLowerCase() ||
-          enteredUser === pat.email.toLowerCase() ||
+          enteredUser === (pat.username || '').toLowerCase() ||
+          enteredUser === (pat.email || '').toLowerCase() ||
           enteredUser === pat.idNumber ||
           enteredUser === 'carlos mendoza'
         );
@@ -396,11 +396,11 @@ export function setupUnifiedLoginModal(showToast) {
       if (isDoctorUser && isDoctorPass) matchedUser = doc;
 
       // 2. Paciente
-      if (!matchedUser) {
+      if (!matchedUser && DEMO_USERS.paciente) {
         const pat = DEMO_USERS.paciente;
         const isPatUser = (
-          enteredUser === pat.username.toLowerCase() ||
-          enteredUser === pat.email.toLowerCase() ||
+          enteredUser === (pat.username || '').toLowerCase() ||
+          enteredUser === (pat.email || '').toLowerCase() ||
           enteredUser === pat.idNumber ||
           enteredUser === 'carlos mendoza'
         );
@@ -987,13 +987,13 @@ export const authService = {
     // 1. Paciente demo
     const pat = DEMO_USERS.paciente;
     let matchedUser = null;
-    if (
-      (enteredUser === pat.username.toLowerCase() ||
-       enteredUser === pat.email.toLowerCase() ||
+    if (pat && (
+      (enteredUser === (pat.username || '').toLowerCase() ||
+       enteredUser === (pat.email || '').toLowerCase() ||
        enteredUser === pat.idNumber ||
        enteredUser === 'carlos mendoza') &&
       enteredPass === pat.password
-    ) {
+    )) {
       matchedUser = pat;
     }
 

@@ -1538,8 +1538,8 @@ export function setupPatientPortal(showToast) {
     const btnPdf = document.getElementById('btn-modal-open-pdf');
 
     const user = store.getCurrentUser();
-    const patName = apt.patientName || (user ? user.name : 'Carlos Mendoza Moreira');
-    const patId = apt.patientId || (user ? (user.idNumber || user.cedula) : '0987654321');
+    const patName = apt.patientName || (user ? user.name : 'Paciente');
+    const patId = apt.patientId || (user ? (user.idNumber || user.cedula) : 'S/N');
     const totalAmount = apt.totalPaid ? Number(apt.totalPaid).toFixed(2) : (apt.basePrice ? Number(apt.basePrice).toFixed(2) : '20.00');
 
     if (codeEl) codeEl.textContent = `#${apt.code}`;
@@ -1629,22 +1629,22 @@ export function setupPatientPortal(showToast) {
   // 1. Renderizar Resumen / Ventana Principal (Dashboard del Paciente)
   function renderPatientSummary() {
     const user = store.getCurrentUser();
-    const patId = user ? (user.idNumber || user.cedula || '0987654321') : '0987654321';
-    const profile = store.getPatientProfile(patId) || store.getState().patientProfiles[0] || {
-      nombres: user ? user.name.split(' ')[0] : 'Carlos',
-      apellidos: user ? user.name.split(' ').slice(1).join(' ') : 'Mendoza',
-      allergies: 'Penicilina, Sulfas',
-      chronicConditions: 'Hipertensión Arterial Primaria (I10)'
+    const patId = user ? (user.idNumber || user.cedula || '') : '';
+    const profile = (patId ? store.getPatientProfile(patId) : null) || store.getState().patientProfiles[0] || {
+      nombres: user ? (user.name ? user.name.split(' ')[0] : 'Estimado') : 'Estimado',
+      apellidos: user ? (user.name ? user.name.split(' ').slice(1).join(' ') : 'Paciente') : 'Paciente',
+      allergies: 'Ninguna registrada',
+      chronicConditions: 'Ninguna reportada'
     };
 
-    const fullName = `${profile.nombres} ${profile.apellidos}`.trim();
+    const fullName = `${profile.nombres || ''} ${profile.apellidos || ''}`.trim();
 
     // Actualizar saludo y navbar
     const welcomeNameEl = document.getElementById('pat-welcome-name');
-    if (welcomeNameEl) welcomeNameEl.textContent = `¡Hola, ${fullName || 'Carlos Mendoza'}! 👋`;
+    if (welcomeNameEl) welcomeNameEl.textContent = `¡Hola, ${fullName || 'Estimado Paciente'}! 👋`;
 
     const navNameEl = document.getElementById('pat-navbar-name');
-    if (navNameEl) navNameEl.textContent = profile.nombres || fullName.split(' ')[0] || 'Carlos';
+    if (navNameEl) navNameEl.textContent = profile.nombres || (fullName ? fullName.split(' ')[0] : 'Paciente');
 
     // Obtener citas del paciente
     const apts = store.getPatientAppointments(patId);

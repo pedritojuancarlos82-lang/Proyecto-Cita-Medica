@@ -1375,31 +1375,16 @@ export function setupDoctorPortal(showToast) {
   // --- 4. MOTOR DE PRESCRIPCIÓN MÉDICA Y RECETA DIGITAL MSP (Semana 4 - Parte 2) ---
   // ==========================================================================
   let activeRxPatient = {
-    patientId: '0987654321',
-    patientCedula: '0987654321',
-    patientName: 'Carlos Mendoza Moreira',
-    age: 44,
-    sede: 'Clínica Ceibos',
-    diagnosis: 'Hipertensión Arterial Primaria (CIE-10: I10)',
+    patientId: '',
+    patientCedula: '',
+    patientName: '',
+    age: '',
+    sede: '',
+    diagnosis: '',
     appointmentId: null
   };
 
-  let activeRxItems = [
-    {
-      id: 1,
-      drug: 'Losartán 50mg',
-      presentation: 'Comprimidos / 30 unidades',
-      via: 'Vía Oral (V.O.)',
-      posology: 'Tomar 1 comprimido cada 24 horas vía oral por la mañana continuo.'
-    },
-    {
-      id: 2,
-      drug: 'Ibuprofeno 400mg',
-      presentation: 'Comprimidos / 15 unidades',
-      via: 'Vía Oral (V.O.)',
-      posology: 'Tomar 1 comprimido cada 8 horas vía oral por 3 días después de alimentos si hay dolor.'
-    }
-  ];
+  let activeRxItems = [];
 
   let currentRxFolio = 'REC-2026-0924';
 
@@ -1481,12 +1466,12 @@ export function setupDoctorPortal(showToast) {
     const formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
 
     activeRxPatient = {
-      patientId: patientData.patientId || patientData.cedula || '0987654321',
-      patientCedula: patientData.patientCedula || patientData.patientId || patientData.cedula || '0987654321',
-      patientName: patientData.patientName || patientData.nombreCompleto || 'Carlos Mendoza Moreira',
-      age: patientData.age || patientData.edad || 44,
+      patientId: patientData.patientId || patientData.cedula || '',
+      patientCedula: patientData.patientCedula || patientData.patientId || patientData.cedula || '',
+      patientName: patientData.patientName || patientData.nombreCompleto || 'Paciente',
+      age: patientData.age || patientData.edad || '',
       sede: patientData.sede || 'Clínica Ceibos',
-      diagnosis: defaultDiagnosis || patientData.diagnosis || patientData.lastDiagnosis || 'Hipertensión Arterial Primaria (CIE-10: I10)',
+      diagnosis: defaultDiagnosis || patientData.diagnosis || patientData.lastDiagnosis || 'Consulta de Medicina General',
       appointmentId: patientData.appointmentId || patientData.id || null
     };
 
