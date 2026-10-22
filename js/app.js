@@ -105,24 +105,37 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnDoctorLogout = document.getElementById('btn-doctor-logout');
   const btnAccountantLogout = document.getElementById('btn-accountant-logout');
 
-  // Navegación al hacer clic en el Brand/Logo (Retorno a Landing)
+  // Navegación al hacer clic en el Brand/Logo o Logout (Retorno Seguro a Landing)
   function returnToLanding() {
     const patientView = document.getElementById('view-patient') || document.getElementById('portal-paciente');
     if (patientView) {
-      patientView.classList.add('hidden');
-      patientView.style.display = 'none';
+      patientView.classList.add('hidden', 'd-none');
+      patientView.style.cssText = 'display: none !important;';
+    }
+    const doctorView = document.getElementById('view-doctor');
+    if (doctorView) {
+      doctorView.classList.add('hidden', 'd-none');
+      doctorView.style.cssText = 'display: none !important;';
+    }
+    const accView = document.getElementById('view-accountant');
+    if (accView) {
+      accView.classList.add('hidden', 'd-none');
+      accView.style.cssText = 'display: none !important;';
     }
     const landingView = document.getElementById('view-landing');
     if (landingView) {
-      landingView.classList.remove('hidden');
-      landingView.style.display = 'block';
+      landingView.classList.remove('hidden', 'd-none');
+      landingView.style.removeProperty('display');
+      landingView.style.cssText = 'display: block !important; opacity: 1 !important; visibility: visible !important;';
     }
     if (window.store) {
       window.store.setActiveView('landing');
     }
     renderActiveView();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'instant' });
   }
+
+  window.returnToLanding = returnToLanding;
 
   if (navbarBrandHome) {
     navbarBrandHome.addEventListener('click', (e) => {
@@ -136,11 +149,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const activeView = store.getActiveView();
     const currentUser = store.getCurrentUser();
 
-    // 1. Ocultar todas las vistas de contenido
-    if (viewLanding) viewLanding.style.display = 'none';
-    if (viewPatient) viewPatient.style.display = 'none';
-    if (viewDoctor) viewDoctor.style.display = 'none';
-    if (viewAccountant) viewAccountant.style.display = 'none';
+    // 1. Ocultar todas las vistas de contenido de forma completa
+    if (viewLanding) {
+      viewLanding.classList.add('hidden');
+      viewLanding.style.display = 'none';
+    }
+    if (viewPatient) {
+      viewPatient.classList.add('hidden');
+      viewPatient.style.display = 'none';
+    }
+    if (viewDoctor) {
+      viewDoctor.classList.add('hidden');
+      viewDoctor.style.display = 'none';
+    }
+    if (viewAccountant) {
+      viewAccountant.classList.add('hidden');
+      viewAccountant.style.display = 'none';
+    }
 
     // 2. Ocultar todos los menús centrales de la barra superior
     if (navMenuLanding) navMenuLanding.style.display = 'none';
@@ -156,7 +181,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 4. Mostrar y configurar la barra según la página activa
     if (activeView === 'landing') {
-      if (viewLanding) viewLanding.style.display = 'block';
+      if (viewLanding) {
+        viewLanding.classList.remove('hidden', 'd-none');
+        viewLanding.style.removeProperty('display');
+        viewLanding.style.cssText = 'display: block !important; opacity: 1 !important; visibility: visible !important;';
+      }
       if (navMenuLanding) navMenuLanding.style.display = 'flex';
       if (navActionsLanding) navActionsLanding.style.display = 'flex';
       if (navbarBrandSubtitle) navbarBrandSubtitle.textContent = 'Centro Médico & Red Asistencial';
@@ -164,7 +193,8 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (activeView === 'paciente' || activeView === 'patient') {
       if (viewPatient) {
         viewPatient.classList.remove('hidden', 'd-none');
-        viewPatient.style.display = 'block';
+        viewPatient.style.removeProperty('display');
+        viewPatient.style.cssText = 'display: block !important; opacity: 1 !important; visibility: visible !important; min-height: 100vh;';
       }
 
       // Estado de la barra según si el usuario ha iniciado sesión como paciente o es nuevo/invitado
@@ -208,13 +238,21 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
     } else if (activeView === 'doctor') {
-      if (viewDoctor) viewDoctor.style.display = 'flex';
+      if (viewDoctor) {
+        viewDoctor.classList.remove('hidden', 'd-none');
+        viewDoctor.style.removeProperty('display');
+        viewDoctor.style.cssText = 'display: flex !important; opacity: 1 !important; visibility: visible !important;';
+      }
       if (navMenuDoctor) navMenuDoctor.style.display = 'flex';
       if (navActionsDoctor) navActionsDoctor.style.display = 'flex';
       if (navbarBrandSubtitle) navbarBrandSubtitle.textContent = 'Portal Médico • Dr. Carlos Campoverde';
 
     } else if (activeView === 'contador' || activeView === 'accountant') {
-      if (viewAccountant) viewAccountant.style.display = 'flex';
+      if (viewAccountant) {
+        viewAccountant.classList.remove('hidden', 'd-none');
+        viewAccountant.style.removeProperty('display');
+        viewAccountant.style.cssText = 'display: flex !important; opacity: 1 !important; visibility: visible !important;';
+      }
       if (navMenuAccountant) navMenuAccountant.style.display = 'flex';
       if (navActionsAccountant) navActionsAccountant.style.display = 'flex';
       if (navbarBrandSubtitle) navbarBrandSubtitle.textContent = 'Portal Contable & SRI • Lcda. Morales';
@@ -223,6 +261,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Scroll arriba al cambiar de vista principal
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+
+  window.renderActiveView = renderActiveView;
 
   // --- BOTONES DE LA BARRA DEL PACIENTE PARA USUARIOS NUEVOS / INVITADOS Y LOGOUT ---
   if (btnPatientBackToWeb) {
@@ -250,33 +290,35 @@ document.addEventListener('DOMContentLoaded', () => {
         const loginInput = document.getElementById('modal-login-username');
         if (loginInput) setTimeout(() => loginInput.focus(), 100);
       } else {
-        store.setActiveView('landing');
+        returnToLanding();
       }
     });
   }
 
   if (btnPatientLogout) {
-    btnPatientLogout.addEventListener('click', () => {
+    btnPatientLogout.addEventListener('click', (e) => {
+      e.preventDefault();
       store.setCurrentUser(null);
       showToast('Sesión de paciente cerrada. Regresando a la página principal.', 'info');
-      store.setActiveView('landing');
-      renderActiveView();
+      returnToLanding();
     });
   }
 
   if (btnDoctorLogout) {
-    btnDoctorLogout.addEventListener('click', () => {
+    btnDoctorLogout.addEventListener('click', (e) => {
+      e.preventDefault();
       store.setCurrentUser(null);
       showToast('Sesión médica finalizada. Regresando a la página institucional.', 'info');
-      renderActiveView();
+      returnToLanding();
     });
   }
 
   if (btnAccountantLogout) {
-    btnAccountantLogout.addEventListener('click', () => {
+    btnAccountantLogout.addEventListener('click', (e) => {
+      e.preventDefault();
       store.setCurrentUser(null);
       showToast('Sesión contable finalizada. Regresando a la página institucional.', 'info');
-      renderActiveView();
+      returnToLanding();
     });
   }
 
@@ -384,7 +426,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const landingEl = document.getElementById('view-landing');
     if (landingEl) {
       landingEl.classList.add('hidden', 'd-none');
-      landingEl.style.cssText = 'display: none !important;';
+      landingEl.style.display = 'none';
     }
 
     // b) Muestra la vista del paciente:

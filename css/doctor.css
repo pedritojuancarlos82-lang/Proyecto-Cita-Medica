@@ -3883,3 +3883,210 @@
   border-color: #4ade80;
   transform: translateY(-1px);
 }
+
+/* ==========================================================================
+   BARRA DE NAVEGACIÓN SUPERIOR DEL DOCTOR (ESTILO DIFUMINADO AZUL IDÉNTICO A PACIENTE)
+   ========================================================================== */
+
+#doctor-custom-navbar.page-custom-navbar-doctor {
+  background: linear-gradient(90deg, #38bdf8 0%, #0284c7 28%, #1e40af 68%, #0f172a 100%) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18) !important;
+  box-shadow: 0 4px 24px rgba(2, 132, 199, 0.28) !important;
+  padding: 12px 28px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 100 !important;
+}
+
+#doctor-custom-navbar .navbar-brand-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#doctor-custom-navbar .brand-icon-box {
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: var(--radius-md) !important;
+  background: rgba(255, 255, 255, 0.22) !important;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  color: #ffffff !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 1.3rem !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+#doctor-custom-navbar .brand-title-text {
+  font-family: var(--font-display) !important;
+  font-size: 1.18rem !important;
+  font-weight: 800 !important;
+  color: #ffffff !important;
+  margin: 0 !important;
+  letter-spacing: -0.02em !important;
+  text-shadow: 0 2px 4px rgba(15, 23, 42, 0.4) !important;
+}
+
+#doctor-custom-navbar .brand-subtitle-text {
+  font-family: var(--font-body) !important;
+  font-size: 0.78rem !important;
+  color: #e0f2fe !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.02em !important;
+  text-shadow: 0 1px 2px rgba(15, 23, 42, 0.3) !important;
+}
+
+/* Cápsula de Pestañas Centrales */
+#doctor-custom-navbar .navbar-menu-view {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  padding: 4px 8px !important;
+  border-radius: 9999px !important;
+  border: 1px solid rgba(255, 255, 255, 0.45) !important;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.12) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+#doctor-custom-navbar .navbar-menu-view .nav-tab-btn {
+  background: transparent !important;
+  border: none !important;
+  padding: 6px 14px !important;
+  border-radius: 9999px !important;
+  font-family: var(--font-heading) !important;
+  font-size: 0.82rem !important;
+  font-weight: 700 !important;
+  color: #475569 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  white-space: nowrap !important;
+}
+
+#doctor-custom-navbar .navbar-menu-view .nav-tab-btn:hover {
+  background: rgba(2, 132, 199, 0.08) !important;
+  color: #0284c7 !important;
+}
+
+#doctor-custom-navbar .navbar-menu-view .nav-tab-btn.active {
+  background: #0284c7 !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35) !important;
+}
+
+/* Acciones Derechas */
+#doctor-custom-navbar .navbar-actions-view {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+#doctor-custom-navbar .btn-navbar-alerts {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.45) !important;
+  border-radius: 9999px !important;
+  padding: 6px 14px !important;
+  font-weight: 700 !important;
+  color: #1e293b !important;
+  font-size: 0.82rem !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  transition: all 0.2s ease !important;
+}
+
+#doctor-custom-navbar .btn-navbar-alerts:hover {
+  background: #ffffff !important;
+  transform: translateY(-1px) !important;
+}
+
+#doctor-custom-navbar .btn-navbar-emergency {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  border-radius: 9999px !important;
+  padding: 7px 16px !important;
+  font-weight: 800 !important;
+  font-size: 0.82rem !important;
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.4) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25) !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  transition: all 0.2s ease !important;
+}
+
+#doctor-custom-navbar .btn-navbar-emergency:hover {
+  transform: translateY(-1px) !important;
+  filter: brightness(1.08) !important;
+  box-shadow: 0 6px 18px rgba(220, 38, 38, 0.5) !important;
+}
+
+#doctor-custom-navbar .navbar-user-card {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.45) !important;
+  padding: 4px 14px !important;
+  border-radius: 30px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
+}
+
+#doctor-custom-navbar .navbar-avatar {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: var(--radius-full) !important;
+  object-fit: cover !important;
+  border: 1px solid var(--neutral-200) !important;
+}
+
+#doctor-custom-navbar .navbar-user-name {
+  font-family: var(--font-heading) !important;
+  font-size: 0.82rem !important;
+  font-weight: 700 !important;
+  color: var(--neutral-900) !important;
+}
+
+#doctor-custom-navbar .navbar-user-info .brand-badge {
+  font-family: var(--font-mono) !important;
+  font-size: 0.65rem !important;
+  font-weight: 700 !important;
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border: 1px solid #bfdbfe !important;
+  border-radius: 4px !important;
+  padding: 1px 5px !important;
+}
+
+#doctor-custom-navbar .btn-logout {
+  color: #ef4444 !important;
+  background: #fff5f5 !important;
+  border: 1px solid #fecdd3 !important;
+  padding: 4px 12px !important;
+  border-radius: 9999px !important;
+  font-family: var(--font-heading) !important;
+  font-size: 0.78rem !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+#doctor-custom-navbar .btn-logout:hover {
+  background: #ef4444 !important;
+  color: #ffffff !important;
+}
+

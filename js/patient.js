@@ -1775,7 +1775,11 @@ export function setupPatientPortal(showToast) {
 
       return `
         <tr>
-          <td><strong style="color: var(--primary-blue);">#${apt.code}</strong></td>
+          <td>
+            <strong style="color: var(--primary-blue);">#${apt.code}</strong>
+            <div style="font-size: 0.72rem; color: #0284c7; font-weight: 700; margin-top: 2px;">👤 ${apt.patientName || apt.patient_name || 'Paciente'}</div>
+            <div style="font-size: 0.68rem; color: #64748b;">CI: ${apt.patientCedula || apt.patientId || apt.patient_id || 'Registrado'}</div>
+          </td>
           <td>
             <div style="font-weight: 600; color: #1e293b;">${apt.date}</div>
             <div style="font-size: 0.72rem; color: #64748b;">${apt.time}</div>
@@ -1967,20 +1971,25 @@ export function setupPatientPortal(showToast) {
       e.preventDefault();
       e.stopPropagation();
     }
+    if (typeof window.returnToLanding === 'function') {
+      window.returnToLanding();
+      return;
+    }
     const landingEl = document.getElementById('view-landing');
     if (landingEl) {
-      landingEl.classList.remove('hidden');
-      landingEl.style.display = 'block';
+      landingEl.classList.remove('hidden', 'd-none');
+      landingEl.style.removeProperty('display');
+      landingEl.style.cssText = 'display: block !important; opacity: 1 !important; visibility: visible !important;';
     }
     const patientEl = document.getElementById('view-patient') || document.getElementById('portal-paciente');
     if (patientEl) {
-      patientEl.classList.add('hidden');
-      patientEl.style.display = 'none';
+      patientEl.classList.add('hidden', 'd-none');
+      patientEl.style.cssText = 'display: none !important;';
     }
     if (window.store) {
       window.store.setActiveView('landing');
     }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   if (patientBrandBtn) {

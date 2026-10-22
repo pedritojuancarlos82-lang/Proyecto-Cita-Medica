@@ -2939,6 +2939,25 @@ class StateStore {
     } catch (e) {}
 
     this.state = saved || JSON.parse(JSON.stringify(INITIAL_STATE));
+    if (!this.state.appointments) this.state.appointments = [];
+
+    // Base de datos persistente global de citas para asegurar que NINGUNA cita se pierda
+    try {
+      const rawApts = localStorage.getItem('montepiedra_all_appointments');
+      if (rawApts) {
+        const savedApts = JSON.parse(rawApts);
+        if (Array.isArray(savedApts) && savedApts.length > 0) {
+          const existingIds = new Set((this.state.appointments || []).map(a => a.id || a.code));
+          savedApts.forEach(a => {
+            if (!existingIds.has(a.id || a.code)) {
+              this.state.appointments.push(a);
+              existingIds.add(a.id || a.code);
+            }
+          });
+        }
+      }
+    } catch (e) {}
+
     this.listeners = [];
     this.isSupabaseConnected = false;
     this.realtimeSubscribed = false;
@@ -2966,9 +2985,15 @@ class StateStore {
         apts.forEach(a => {
           if (!existingIds.has(a.id || a.code)) {
             this.state.appointments.push(a);
+            existingIds.add(a.id || a.code);
             hasChanges = true;
           }
         });
+        if (hasChanges) {
+          try {
+            localStorage.setItem('montepiedra_all_appointments', JSON.stringify(this.state.appointments));
+          } catch (e) {}
+        }
       }
       if (exps && exps.length > 0) {
         this.state.expenses = exps;
@@ -3013,6 +3038,9 @@ class StateStore {
   saveState() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+      if (this.state.appointments && this.state.appointments.length > 0) {
+        localStorage.setItem('montepiedra_all_appointments', JSON.stringify(this.state.appointments));
+      }
     } catch (e) {
       console.warn('Error guardando en localStorage:', e);
     }
@@ -3469,34 +3497,11 @@ class StateStore {
 
   getPatientAppointments(cedula, user) {
     const allApts = this.state.appointments || [];
-    const target = (cedula || '').trim();
-    const currentUser = user || this.getCurrentUser();
-    const userCedula = currentUser ? (currentUser.idNumber || currentUser.cedula || '').trim() : '';
-    const userEmail = currentUser ? (currentUser.email || '').trim().toLowerCase() : '';
-    const userName = currentUser ? (currentUser.name || '').trim().toLowerCase() : '';
-
-    const matched = allApts.filter(a => {
-      const aId = (a.patientId || a.patient_id || a.patientCedula || a.patient_cedula || '').trim();
-      const aEmail = (a.patientEmail || a.patient_email || '').trim().toLowerCase();
-      const aName = (a.patientName || a.patient_name || '').trim().toLowerCase();
-
-      if (target && aId === target) return true;
-      if (userCedula && aId === userCedula) return true;
-      if (userEmail && aEmail && aEmail === userEmail) return true;
-      if (userName && aName && (aName === userName || aName.includes(userName) || userName.includes(aName))) return true;
-
-      return false;
-    });
-
-    if (matched.length > 0) {
-      return matched;
+    // Retornar todas las citas registradas en la base de datos (ordenadas con la más reciente primero)
+    // para garantizar que al ingresar una cita con un nuevo paciente, las citas anteriores se mantengan almacenadas y visibles
+    if (allApts.length > 0) {
+      return [...allApts].reverse();
     }
-
-    // Si el usuario está en el portal del paciente y hay citas registradas en la aplicación, mostrarlas
-    if (allApts.length > 0 && (!currentUser || currentUser.role === 'paciente')) {
-      return allApts;
-    }
-
     return [];
   }
 
@@ -7278,7 +7283,11 @@ function setupPatientPortal(showToast) {
 
       return `
         <tr>
-          <td><strong style="color: var(--primary-blue);">#${apt.code}</strong></td>
+          <td>
+            <strong style="color: var(--primary-blue);">#${apt.code}</strong>
+            <div style="font-size: 0.72rem; color: #0284c7; font-weight: 700; margin-top: 2px;">👤 ${apt.patientName || apt.patient_name || 'Paciente'}</div>
+            <div style="font-size: 0.68rem; color: #64748b;">CI: ${apt.patientCedula || apt.patientId || apt.patient_id || 'Registrado'}</div>
+          </td>
           <td>
             <div style="font-weight: 600; color: #1e293b;">${apt.date}</div>
             <div style="font-size: 0.72rem; color: #64748b;">${apt.time}</div>
@@ -7470,20 +7479,25 @@ function setupPatientPortal(showToast) {
       e.preventDefault();
       e.stopPropagation();
     }
+    if (typeof window.returnToLanding === 'function') {
+      window.returnToLanding();
+      return;
+    }
     const landingEl = document.getElementById('view-landing');
     if (landingEl) {
-      landingEl.classList.remove('hidden');
-      landingEl.style.display = 'block';
+      landingEl.classList.remove('hidden', 'd-none');
+      landingEl.style.removeProperty('display');
+      landingEl.style.cssText = 'display: block !important; opacity: 1 !important; visibility: visible !important;';
     }
     const patientEl = document.getElementById('view-patient') || document.getElementById('portal-paciente');
     if (patientEl) {
-      patientEl.classList.add('hidden');
-      patientEl.style.display = 'none';
+      patientEl.classList.add('hidden', 'd-none');
+      patientEl.style.cssText = 'display: none !important;';
     }
     if (window.store) {
       window.store.setActiveView('landing');
     }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   if (patientBrandBtn) {
@@ -12326,24 +12340,37 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnDoctorLogout = document.getElementById('btn-doctor-logout');
   const btnAccountantLogout = document.getElementById('btn-accountant-logout');
 
-  // Navegación al hacer clic en el Brand/Logo (Retorno a Landing)
+  // Navegación al hacer clic en el Brand/Logo o Logout (Retorno Seguro a Landing)
   function returnToLanding() {
     const patientView = document.getElementById('view-patient') || document.getElementById('portal-paciente');
     if (patientView) {
-      patientView.classList.add('hidden');
-      patientView.style.display = 'none';
+      patientView.classList.add('hidden', 'd-none');
+      patientView.style.cssText = 'display: none !important;';
+    }
+    const doctorView = document.getElementById('view-doctor');
+    if (doctorView) {
+      doctorView.classList.add('hidden', 'd-none');
+      doctorView.style.cssText = 'display: none !important;';
+    }
+    const accView = document.getElementById('view-accountant');
+    if (accView) {
+      accView.classList.add('hidden', 'd-none');
+      accView.style.cssText = 'display: none !important;';
     }
     const landingView = document.getElementById('view-landing');
     if (landingView) {
-      landingView.classList.remove('hidden');
-      landingView.style.display = 'block';
+      landingView.classList.remove('hidden', 'd-none');
+      landingView.style.removeProperty('display');
+      landingView.style.cssText = 'display: block !important; opacity: 1 !important; visibility: visible !important;';
     }
     if (window.store) {
       window.store.setActiveView('landing');
     }
     renderActiveView();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'instant' });
   }
+
+  window.returnToLanding = returnToLanding;
 
   if (navbarBrandHome) {
     navbarBrandHome.addEventListener('click', (e) => {
@@ -12357,11 +12384,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const activeView = store.getActiveView();
     const currentUser = store.getCurrentUser();
 
-    // 1. Ocultar todas las vistas de contenido
-    if (viewLanding) viewLanding.style.display = 'none';
-    if (viewPatient) viewPatient.style.display = 'none';
-    if (viewDoctor) viewDoctor.style.display = 'none';
-    if (viewAccountant) viewAccountant.style.display = 'none';
+    // 1. Ocultar todas las vistas de contenido de forma completa
+    if (viewLanding) {
+      viewLanding.classList.add('hidden');
+      viewLanding.style.display = 'none';
+    }
+    if (viewPatient) {
+      viewPatient.classList.add('hidden');
+      viewPatient.style.display = 'none';
+    }
+    if (viewDoctor) {
+      viewDoctor.classList.add('hidden');
+      viewDoctor.style.display = 'none';
+    }
+    if (viewAccountant) {
+      viewAccountant.classList.add('hidden');
+      viewAccountant.style.display = 'none';
+    }
 
     // 2. Ocultar todos los menús centrales de la barra superior
     if (navMenuLanding) navMenuLanding.style.display = 'none';
@@ -12377,7 +12416,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 4. Mostrar y configurar la barra según la página activa
     if (activeView === 'landing') {
-      if (viewLanding) viewLanding.style.display = 'block';
+      if (viewLanding) {
+        viewLanding.classList.remove('hidden', 'd-none');
+        viewLanding.style.removeProperty('display');
+        viewLanding.style.cssText = 'display: block !important; opacity: 1 !important; visibility: visible !important;';
+      }
       if (navMenuLanding) navMenuLanding.style.display = 'flex';
       if (navActionsLanding) navActionsLanding.style.display = 'flex';
       if (navbarBrandSubtitle) navbarBrandSubtitle.textContent = 'Centro Médico & Red Asistencial';
@@ -12385,7 +12428,8 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (activeView === 'paciente' || activeView === 'patient') {
       if (viewPatient) {
         viewPatient.classList.remove('hidden', 'd-none');
-        viewPatient.style.display = 'block';
+        viewPatient.style.removeProperty('display');
+        viewPatient.style.cssText = 'display: block !important; opacity: 1 !important; visibility: visible !important; min-height: 100vh;';
       }
 
       // Estado de la barra según si el usuario ha iniciado sesión como paciente o es nuevo/invitado
@@ -12429,13 +12473,21 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
     } else if (activeView === 'doctor') {
-      if (viewDoctor) viewDoctor.style.display = 'flex';
+      if (viewDoctor) {
+        viewDoctor.classList.remove('hidden', 'd-none');
+        viewDoctor.style.removeProperty('display');
+        viewDoctor.style.cssText = 'display: flex !important; opacity: 1 !important; visibility: visible !important;';
+      }
       if (navMenuDoctor) navMenuDoctor.style.display = 'flex';
       if (navActionsDoctor) navActionsDoctor.style.display = 'flex';
       if (navbarBrandSubtitle) navbarBrandSubtitle.textContent = 'Portal Médico • Dr. Carlos Campoverde';
 
     } else if (activeView === 'contador' || activeView === 'accountant') {
-      if (viewAccountant) viewAccountant.style.display = 'flex';
+      if (viewAccountant) {
+        viewAccountant.classList.remove('hidden', 'd-none');
+        viewAccountant.style.removeProperty('display');
+        viewAccountant.style.cssText = 'display: flex !important; opacity: 1 !important; visibility: visible !important;';
+      }
       if (navMenuAccountant) navMenuAccountant.style.display = 'flex';
       if (navActionsAccountant) navActionsAccountant.style.display = 'flex';
       if (navbarBrandSubtitle) navbarBrandSubtitle.textContent = 'Portal Contable & SRI • Lcda. Morales';
@@ -12444,6 +12496,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Scroll arriba al cambiar de vista principal
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+
+  window.renderActiveView = renderActiveView;
 
   // --- BOTONES DE LA BARRA DEL PACIENTE PARA USUARIOS NUEVOS / INVITADOS Y LOGOUT ---
   if (btnPatientBackToWeb) {
@@ -12471,33 +12525,35 @@ document.addEventListener('DOMContentLoaded', () => {
         const loginInput = document.getElementById('modal-login-username');
         if (loginInput) setTimeout(() => loginInput.focus(), 100);
       } else {
-        store.setActiveView('landing');
+        returnToLanding();
       }
     });
   }
 
   if (btnPatientLogout) {
-    btnPatientLogout.addEventListener('click', () => {
+    btnPatientLogout.addEventListener('click', (e) => {
+      e.preventDefault();
       store.setCurrentUser(null);
       showToast('Sesión de paciente cerrada. Regresando a la página principal.', 'info');
-      store.setActiveView('landing');
-      renderActiveView();
+      returnToLanding();
     });
   }
 
   if (btnDoctorLogout) {
-    btnDoctorLogout.addEventListener('click', () => {
+    btnDoctorLogout.addEventListener('click', (e) => {
+      e.preventDefault();
       store.setCurrentUser(null);
       showToast('Sesión médica finalizada. Regresando a la página institucional.', 'info');
-      renderActiveView();
+      returnToLanding();
     });
   }
 
   if (btnAccountantLogout) {
-    btnAccountantLogout.addEventListener('click', () => {
+    btnAccountantLogout.addEventListener('click', (e) => {
+      e.preventDefault();
       store.setCurrentUser(null);
       showToast('Sesión contable finalizada. Regresando a la página institucional.', 'info');
-      renderActiveView();
+      returnToLanding();
     });
   }
 
@@ -12605,7 +12661,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const landingEl = document.getElementById('view-landing');
     if (landingEl) {
       landingEl.classList.add('hidden', 'd-none');
-      landingEl.style.cssText = 'display: none !important;';
+      landingEl.style.display = 'none';
     }
 
     // b) Muestra la vista del paciente:

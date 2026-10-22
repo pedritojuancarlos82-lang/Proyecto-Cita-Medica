@@ -252,6 +252,25 @@ class StateStore {
     } catch (e) {}
 
     this.state = saved || JSON.parse(JSON.stringify(INITIAL_STATE));
+    if (!this.state.appointments) this.state.appointments = [];
+
+    // Base de datos persistente global de citas para asegurar que NINGUNA cita se pierda
+    try {
+      const rawApts = localStorage.getItem('montepiedra_all_appointments');
+      if (rawApts) {
+        const savedApts = JSON.parse(rawApts);
+        if (Array.isArray(savedApts) && savedApts.length > 0) {
+          const existingIds = new Set((this.state.appointments || []).map(a => a.id || a.code));
+          savedApts.forEach(a => {
+            if (!existingIds.has(a.id || a.code)) {
+              this.state.appointments.push(a);
+              existingIds.add(a.id || a.code);
+            }
+          });
+        }
+      }
+    } catch (e) {}
+
     this.listeners = [];
     this.isSupabaseConnected = false;
     this.realtimeSubscribed = false;
@@ -279,9 +298,15 @@ class StateStore {
         apts.forEach(a => {
           if (!existingIds.has(a.id || a.code)) {
             this.state.appointments.push(a);
+            existingIds.add(a.id || a.code);
             hasChanges = true;
           }
         });
+        if (hasChanges) {
+          try {
+            localStorage.setItem('montepiedra_all_appointments', JSON.stringify(this.state.appointments));
+          } catch (e) {}
+        }
       }
       if (exps && exps.length > 0) {
         this.state.expenses = exps;
@@ -326,6 +351,9 @@ class StateStore {
   saveState() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+      if (this.state.appointments && this.state.appointments.length > 0) {
+        localStorage.setItem('montepiedra_all_appointments', JSON.stringify(this.state.appointments));
+      }
     } catch (e) {
       console.warn('Error guardando en localStorage:', e);
     }
@@ -782,34 +810,11 @@ class StateStore {
 
   getPatientAppointments(cedula, user) {
     const allApts = this.state.appointments || [];
-    const target = (cedula || '').trim();
-    const currentUser = user || this.getCurrentUser();
-    const userCedula = currentUser ? (currentUser.idNumber || currentUser.cedula || '').trim() : '';
-    const userEmail = currentUser ? (currentUser.email || '').trim().toLowerCase() : '';
-    const userName = currentUser ? (currentUser.name || '').trim().toLowerCase() : '';
-
-    const matched = allApts.filter(a => {
-      const aId = (a.patientId || a.patient_id || a.patientCedula || a.patient_cedula || '').trim();
-      const aEmail = (a.patientEmail || a.patient_email || '').trim().toLowerCase();
-      const aName = (a.patientName || a.patient_name || '').trim().toLowerCase();
-
-      if (target && aId === target) return true;
-      if (userCedula && aId === userCedula) return true;
-      if (userEmail && aEmail && aEmail === userEmail) return true;
-      if (userName && aName && (aName === userName || aName.includes(userName) || userName.includes(aName))) return true;
-
-      return false;
-    });
-
-    if (matched.length > 0) {
-      return matched;
+    // Retornar todas las citas registradas en la base de datos (ordenadas con la más reciente primero)
+    // para garantizar que al ingresar una cita con un nuevo paciente, las citas anteriores se mantengan almacenadas y visibles
+    if (allApts.length > 0) {
+      return [...allApts].reverse();
     }
-
-    // Si el usuario está en el portal del paciente y hay citas registradas en la aplicación, mostrarlas
-    if (allApts.length > 0 && (!currentUser || currentUser.role === 'paciente')) {
-      return allApts;
-    }
-
     return [];
   }
 
