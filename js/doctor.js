@@ -723,11 +723,11 @@ export function setupDoctorPortal(showToast) {
 
     if (countBadge) {
       countBadge.textContent = alerts.length;
-      countBadge.style.display = alerts.length > 0 ? 'inline-block' : 'none';
+      countBadge.style.display = alerts.length > 0 ? 'inline-flex' : 'none';
     }
     if (mobileBadge) {
       mobileBadge.textContent = alerts.length;
-      mobileBadge.style.display = alerts.length > 0 ? 'inline-block' : 'none';
+      mobileBadge.style.display = alerts.length > 0 ? 'inline-flex' : 'none';
     }
     if (allCountEl) {
       allCountEl.textContent = alerts.length;

@@ -1427,6 +1427,36 @@ body {
   will-change: opacity, transform;
 }
 
+/* Ocultamiento estricto de vistas completas */
+.landing-wrapper.hidden,
+.landing-wrapper[style*="display: none"],
+.patient-portal-wrapper.hidden,
+.patient-portal-wrapper[style*="display: none"],
+.doctor-portal-wrapper.hidden,
+.doctor-portal-wrapper[style*="display: none"],
+.accountant-portal-wrapper.hidden,
+.accountant-portal-wrapper[style*="display: none"],
+#view-landing.hidden,
+#view-landing[style*="display: none"],
+#view-patient.hidden,
+#view-patient[style*="display: none"],
+#view-doctor.hidden,
+#view-doctor[style*="display: none"],
+#view-accountant.hidden,
+#view-accountant[style*="display: none"],
+body[data-active-view="paciente"] #view-landing,
+body[data-active-view="doctor"] #view-landing,
+body[data-active-view="accountant"] #view-landing,
+body[data-active-view="landing"] #view-patient,
+body[data-active-view="landing"] #view-doctor,
+body[data-active-view="landing"] #view-accountant,
+body[data-active-view="doctor"] #view-patient,
+body[data-active-view="accountant"] #view-patient,
+.hidden,
+.d-none {
+  display: none !important;
+}
+
 @keyframes viewFadeIn {
   from {
     opacity: 0.92;

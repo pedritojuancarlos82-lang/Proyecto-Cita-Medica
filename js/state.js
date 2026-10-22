@@ -236,8 +236,51 @@ const INITIAL_STATE = {
   // Historial de Relevos Médicos entre Colegas (0 relevos)
   reliefAssignments: [],
 
-  // Registro de Alertas Operativas del Sistema (0 alertas)
-  systemAlerts: []
+  // Registro de Alertas Operativas del Sistema (Semana 5 - Parte 2)
+  systemAlerts: [
+    {
+      id: 'ALT-101',
+      type: 'ALLERGY_ALERT',
+      severity: 'CRITICAL',
+      icon: '⚠️',
+      title: 'Alergia Severa en Paciente Agendado Hoy',
+      message: 'Paciente Carlos Mendoza presenta alergia severa a Penicilina y derivados betalactámicos.',
+      category: 'clinica',
+      patientId: '0987654321',
+      patientName: 'Carlos Mendoza Moreira',
+      appointmentId: 'MED-7001',
+      date: '2026-10-22',
+      time: '09:00',
+      actionRequired: 'Prescribir macrólidos o quinolonas en caso de requerir antibioterapia.',
+      dismissed: false
+    },
+    {
+      id: 'ALT-102',
+      type: 'TIGHT_TRANSIT',
+      severity: 'WARNING',
+      icon: '🚗',
+      title: 'Tránsito Ajustado entre Sedes Ceibos y Samborondón',
+      message: 'Margen de 30 min para traslado en hora pico (13:30 - 14:00). Se activó alerta de amortiguamiento preventivo.',
+      category: 'logistica',
+      date: '2026-10-22',
+      time: '13:30',
+      actionRequired: 'Monitorear tráfico vía Waze integrado o solicitar 10 min de tolerancia.',
+      dismissed: false
+    },
+    {
+      id: 'ALT-103',
+      type: 'PENDING_CONFIRMATION',
+      severity: 'INFO',
+      icon: '📱',
+      title: 'Cita Pendiente de Confirmación 24h',
+      message: 'Paciente Sofía Alarcón (11:30 - Cons. 2) no ha respondido al recordatorio por WhatsApp/Email.',
+      category: 'agenda',
+      date: '2026-10-22',
+      time: '11:30',
+      actionRequired: 'Recepción realizará llamada telefónica preventiva a las 08:30.',
+      dismissed: false
+    }
+  ]
 };
 
 import { SupabaseDB } from './supabase-client.js';
@@ -253,6 +296,9 @@ class StateStore {
 
     this.state = saved || JSON.parse(JSON.stringify(INITIAL_STATE));
     if (!this.state.appointments) this.state.appointments = [];
+    if (!this.state.systemAlerts || this.state.systemAlerts.length === 0) {
+      this.state.systemAlerts = JSON.parse(JSON.stringify(INITIAL_STATE.systemAlerts));
+    }
 
     // Base de datos persistente global de citas para asegurar que NINGUNA cita se pierda
     try {

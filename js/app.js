@@ -149,22 +149,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const activeView = store.getActiveView();
     const currentUser = store.getCurrentUser();
 
+    // Sincronizar atributo en el body para aislamiento estricto de vistas vía CSS
+    document.body.setAttribute('data-active-view', activeView);
+
     // 1. Ocultar todas las vistas de contenido de forma completa
     if (viewLanding) {
-      viewLanding.classList.add('hidden');
-      viewLanding.style.display = 'none';
+      viewLanding.classList.add('hidden', 'd-none');
+      viewLanding.style.setProperty('display', 'none', 'important');
     }
     if (viewPatient) {
-      viewPatient.classList.add('hidden');
-      viewPatient.style.display = 'none';
+      viewPatient.classList.add('hidden', 'd-none');
+      viewPatient.style.setProperty('display', 'none', 'important');
     }
     if (viewDoctor) {
-      viewDoctor.classList.add('hidden');
-      viewDoctor.style.display = 'none';
+      viewDoctor.classList.add('hidden', 'd-none');
+      viewDoctor.style.setProperty('display', 'none', 'important');
     }
     if (viewAccountant) {
-      viewAccountant.classList.add('hidden');
-      viewAccountant.style.display = 'none';
+      viewAccountant.classList.add('hidden', 'd-none');
+      viewAccountant.style.setProperty('display', 'none', 'important');
     }
 
     // 2. Ocultar todos los menús centrales de la barra superior
@@ -184,7 +187,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (viewLanding) {
         viewLanding.classList.remove('hidden', 'd-none');
         viewLanding.style.removeProperty('display');
-        viewLanding.style.cssText = 'display: block !important; opacity: 1 !important; visibility: visible !important;';
+        viewLanding.style.setProperty('display', 'block', 'important');
+        viewLanding.style.opacity = '1';
+        viewLanding.style.visibility = 'visible';
       }
       if (navMenuLanding) navMenuLanding.style.display = 'flex';
       if (navActionsLanding) navActionsLanding.style.display = 'flex';
@@ -194,7 +199,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (viewPatient) {
         viewPatient.classList.remove('hidden', 'd-none');
         viewPatient.style.removeProperty('display');
-        viewPatient.style.cssText = 'display: block !important; opacity: 1 !important; visibility: visible !important; min-height: 100vh;';
+        viewPatient.style.setProperty('display', 'block', 'important');
+        viewPatient.style.opacity = '1';
+        viewPatient.style.visibility = 'visible';
+        viewPatient.style.minHeight = '100vh';
       }
 
       // Estado de la barra según si el usuario ha iniciado sesión como paciente o es nuevo/invitado
@@ -211,8 +219,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (patNavbarAvatar && currentUser.avatar) patNavbarAvatar.src = currentUser.avatar;
         if (patientBrandSubtitle) patientBrandSubtitle.textContent = 'Portal del Paciente';
 
-        // Al iniciar sesión siempre abre la ventana de Resumen
-        if (typeof window.renderPatientPortal === 'function') {
+        // Al iniciar sesión abre la ventana de Resumen (excepto si estamos en el flujo de agendamiento)
+        const agendarPane = document.getElementById('pat-pane-agendar');
+        const isAgendarActive = agendarPane && (agendarPane.style.display !== 'none' && !agendarPane.classList.contains('hidden'));
+        if (!isAgendarActive && typeof window.renderPatientPortal === 'function') {
           window.renderPatientPortal();
         }
       } else {
@@ -420,36 +430,53 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // --- FLUJO DE AGENDAMIENTO LIMPIO CON DESPLAZAMIENTO SUAVE AL PASO 1 ---
+  // --- FLUJO DE AGENDAMIENTO LIMPIO A PÁGINA DEDICADA DEL ASISTENTE ---
   function startBookingFlow(clinicId = null) {
-    // a) Oculta la vista landing:
+    // a) Oculta completamente la landing page y demás vistas:
     const landingEl = document.getElementById('view-landing');
     if (landingEl) {
       landingEl.classList.add('hidden', 'd-none');
-      landingEl.style.display = 'none';
+      landingEl.style.setProperty('display', 'none', 'important');
+    }
+    const docEl = document.getElementById('view-doctor');
+    if (docEl) {
+      docEl.classList.add('hidden', 'd-none');
+      docEl.style.setProperty('display', 'none', 'important');
+    }
+    const accEl = document.getElementById('view-accountant');
+    if (accEl) {
+      accEl.classList.add('hidden', 'd-none');
+      accEl.style.setProperty('display', 'none', 'important');
     }
 
-    // b) Muestra la vista del paciente:
+    // b) Muestra la vista dedicada del paciente:
     const pView = document.getElementById('view-patient') || document.getElementById('portal-paciente');
     if (pView) {
       pView.classList.remove('hidden', 'd-none');
-      pView.style.cssText = 'display: block !important; opacity: 1 !important; visibility: visible !important; min-height: 100vh;';
+      pView.style.removeProperty('display');
+      pView.style.setProperty('display', 'block', 'important');
+      pView.style.opacity = '1';
+      pView.style.visibility = 'visible';
+      pView.style.minHeight = '100vh';
     }
 
-    // e) Actualiza el estado global de la vista:
+    // c) Actualiza el estado global de la vista:
     if (window.store) window.store.setActiveView('paciente');
     renderActiveView();
 
     if (pView) {
       pView.classList.remove('hidden', 'd-none');
-      pView.style.cssText = 'display: block !important; opacity: 1 !important; visibility: visible !important; min-height: 100vh;';
+      pView.style.removeProperty('display');
+      pView.style.setProperty('display', 'block', 'important');
+      pView.style.opacity = '1';
+      pView.style.visibility = 'visible';
     }
 
-    // c) Asegura que la pestaña activa sea el Wizard de Agendamiento en el Paso 1 (Sedes).
+    // d) Asegura que la pestaña activa sea el Wizard de Agendamiento en el Paso 1 (Sedes).
     const patPaneAgendar = document.getElementById('pat-pane-agendar');
     if (patPaneAgendar) {
       patPaneAgendar.classList.remove('hidden', 'd-none');
-      patPaneAgendar.style.cssText = 'display: block !important; visibility: visible !important; opacity: 1 !important;';
+      patPaneAgendar.style.setProperty('display', 'block', 'important');
     }
 
     if (typeof window.switchPatientTab === 'function') {
@@ -466,7 +493,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const step1 = document.querySelector('.wizard-step-pane[data-step="1"]');
     if (step1) {
       step1.classList.remove('hidden', 'd-none');
-      step1.style.cssText = 'display: block !important; opacity: 1 !important; visibility: visible !important;';
+      step1.style.setProperty('display', 'block', 'important');
     }
 
     if (clinicId) {
@@ -476,17 +503,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // d) Haz scroll al inicio del asistente:
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    setTimeout(() => {
-      const wizardStep1 = document.querySelector('.wizard-step-pane[data-step="1"]') ||
-                          document.getElementById('pat-pane-agendar') ||
-                          document.querySelector('.wizard-stepper-container') ||
-                          document.getElementById('view-patient');
-      if (wizardStep1) {
-        wizardStep1.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 80);
+    // e) Navegación limpia a la parte superior de la nueva página (sin scrollIntoView hacia abajo)
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
 
     if (typeof showToast === 'function') {
       showToast('Ingresando al Asistente de Agendamiento de Citas (Paso 1: Sedes).', 'info');

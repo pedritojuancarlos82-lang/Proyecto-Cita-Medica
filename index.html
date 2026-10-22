@@ -12,18 +12,18 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 
   <!-- Hojas de Estilo del Sistema de Diseño -->
-  <link rel="stylesheet" href="css/main.css?v=20261001_difuminado_v5">
-  <link rel="stylesheet" href="css/landing.css?v=20261001_difuminado_v5">
-  <link rel="stylesheet" href="css/patient.css?v=20261001_difuminado_v5">
-  <link rel="stylesheet" href="css/doctor.css?v=20261001_difuminado_v5">
-  <link rel="stylesheet" href="css/expediente.css?v=20261001_difuminado_v5">
-  <link rel="stylesheet" href="css/accountant.css?v=20261001_difuminado_v5">
-  <link rel="stylesheet" href="css/print.css?v=20261001_difuminado_v5">
+  <link rel="stylesheet" href="css/main.css?v=20261022_difuminado_v6">
+  <link rel="stylesheet" href="css/landing.css?v=20261022_difuminado_v6">
+  <link rel="stylesheet" href="css/patient.css?v=20261022_difuminado_v6">
+  <link rel="stylesheet" href="css/doctor.css?v=20261022_difuminado_v6">
+  <link rel="stylesheet" href="css/expediente.css?v=20261022_difuminado_v6">
+  <link rel="stylesheet" href="css/accountant.css?v=20261022_difuminado_v6">
+  <link rel="stylesheet" href="css/print.css?v=20261022_difuminado_v6">
   <style>
     .hidden { display: none !important; }
   </style>
 </head>
-<body>
+<body data-active-view="landing">
 
   <!-- Fondo de Decoloración Difuminada CSS entre Tonos Neutros (Efecto Continuo 24/7) -->
   <div class="ambient-mesh-background" id="ambient-mesh-bg"></div>
@@ -709,7 +709,7 @@
         <!-- ================================================================
              VISTA 1: PORTAL DE CITAS DEL PACIENTE (Página 3 - Flujo 4 Pasos)
              ================================================================ -->
-        <section id="view-patient" class="patient-portal-wrapper">
+        <section id="view-patient" class="patient-portal-wrapper" style="display: none;">
           <div id="portal-paciente" style="position: absolute; top: 0; left: 0;" aria-hidden="true"></div>
 
           <!-- Barra de Navegación Exclusiva y Limpia del Portal del Paciente -->
@@ -1415,11 +1415,8 @@
 
           <!-- Barra de Navegación Exclusiva para la Página del Médico (Portal Dr. Carlos Campoverde) -->
           <header class="page-custom-navbar page-custom-navbar-doctor" id="doctor-custom-navbar">
-            <div class="navbar-brand-group" style="cursor: default;">
+            <div class="navbar-brand-group" style="cursor: default;" title="Centro Médico Montepiedra">
               <div class="brand-icon-box">🩺</div>
-              <div style="display: flex; flex-direction: column;">
-                <span class="brand-title-text">Portal Médico</span>
-              </div>
             </div>
 
             <!-- Menú de Gestión Clínica Exclusivo del Médico -->
@@ -1445,9 +1442,10 @@
             </nav>
 
             <div class="navbar-actions-view" id="nav-actions-doctor">
-              <button type="button" class="btn-navbar-alerts" id="btn-doctor-system-alerts" title="Ver Alertas Operativas del Sistema">
-                <span>🔔</span>
-                <span class="alerts-label">Alertas</span>
+              <button type="button" class="btn-navbar-alerts" id="btn-doctor-system-alerts" title="Ver Notificaciones y Alertas del Sistema" aria-label="Notificaciones del Sistema">
+                <svg class="navbar-bell-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M12 22a2.5 2.5 0 0 0 2.5-2.5h-5A2.5 2.5 0 0 0 12 22zm7-6v-5.5c0-3.36-2.18-6.19-5.25-6.84V3a1.75 1.75 0 0 0-3.5 0v.66C7.18 4.31 5 7.14 5 10.5V16l-2 2v1h18v-1l-2-2z"/>
+                </svg>
                 <span class="badge-alert-count" id="badge-system-alerts-count">3</span>
               </button>
               <button type="button" class="btn-navbar-emergency" id="btn-nav-doctor-guard-btn">
@@ -1483,8 +1481,10 @@
                 </div>
               </div>
               <div style="display: flex; align-items: center; gap: 6px;">
-                <button type="button" class="btn-mobile-alerts-trigger" id="btn-mobile-quick-alerts" title="Alertas Operativas">
-                  <span>🔔</span>
+                <button type="button" class="btn-mobile-alerts-trigger" id="btn-mobile-quick-alerts" title="Notificaciones y Alertas" aria-label="Notificaciones del Sistema">
+                  <svg class="navbar-bell-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M12 22a2.5 2.5 0 0 0 2.5-2.5h-5A2.5 2.5 0 0 0 12 22zm7-6v-5.5c0-3.36-2.18-6.19-5.25-6.84V3a1.75 1.75 0 0 0-3.5 0v.66C7.18 4.31 5 7.14 5 10.5V16l-2 2v1h18v-1l-2-2z"/>
+                  </svg>
                   <span class="badge-alert-count-mini" id="badge-mobile-alerts-count">3</span>
                 </button>
                 <button type="button" class="btn-mobile-emergency-trigger" id="btn-mobile-quick-guard" title="Gestionar Convocatoria de Guardia">
@@ -2216,12 +2216,8 @@
 
           <!-- Barra de Navegación Exclusiva para la Página de Contabilidad (Portal Lcda. Morales) -->
           <header class="page-custom-navbar page-custom-navbar-accountant" id="accountant-custom-navbar">
-            <div class="navbar-brand-group" style="cursor: default;">
-              <div class="brand-icon-box" style="background: linear-gradient(135deg, #4f46e5, #6366f1);">📊</div>
-              <div style="display: flex; flex-direction: column;">
-                <span class="brand-title-text">Portal Contable</span>
-                <span class="brand-subtitle-text">Lcda. Morales • Auditoría Médica & SRI</span>
-              </div>
+            <div class="navbar-brand-group" style="cursor: default;" title="Portal Contable">
+              <div class="brand-icon-box">📊</div>
             </div>
 
             <!-- Menú de Auditoría y Liquidación Exclusivo de Contabilidad -->
@@ -4515,6 +4511,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
   <!-- Script Principal de la Aplicación y Módulos Unificados (Compatible con file:/// y http://) -->
-  <script src="js/app.bundle.js"></script>
+  <script src="js/app.bundle.js?v=20261022_auth_gate_v1"></script>
 </body>
 </html>

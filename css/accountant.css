@@ -10,36 +10,200 @@
   background: transparent;
 }
 
-/* Cabecera del Panel Contable con Glassmorphism */
+/* ==========================================================================
+   BARRA DE NAVEGACIÓN SUPERIOR DE CONTABILIDAD
+   (ESTILO DIFUMINADO AZUL IDÉNTICO A PACIENTE Y DOCTOR)
+   ========================================================================== */
+#accountant-custom-navbar.page-custom-navbar-accountant {
+  background: linear-gradient(90deg, #38bdf8 0%, #0284c7 28%, #1e40af 68%, #0f172a 100%) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18) !important;
+  box-shadow: 0 4px 24px rgba(2, 132, 199, 0.28) !important;
+  padding: 12px 28px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 100 !important;
+}
+
+#accountant-custom-navbar .navbar-brand-group {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+#accountant-custom-navbar .brand-icon-box {
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: var(--radius-md) !important;
+  background: rgba(255, 255, 255, 0.22) !important;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  color: #ffffff !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 1.3rem !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+#accountant-custom-navbar #nav-menu-accountant {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  padding: 4px 8px !important;
+  border-radius: 9999px !important;
+  border: 1px solid rgba(255, 255, 255, 0.45) !important;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.12) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+#accountant-custom-navbar #nav-menu-accountant .nav-tab-btn {
+  background: transparent !important;
+  border: none !important;
+  padding: 7px 15px !important;
+  border-radius: 9999px !important;
+  font-family: var(--font-heading) !important;
+  font-size: 0.82rem !important;
+  font-weight: 600 !important;
+  color: #475569 !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  white-space: nowrap !important;
+  box-shadow: none !important;
+}
+
+#accountant-custom-navbar #nav-menu-accountant .nav-tab-btn:hover {
+  color: #0f172a !important;
+  background: rgba(255, 255, 255, 0.6) !important;
+  transform: none !important;
+}
+
+#accountant-custom-navbar #nav-menu-accountant .nav-tab-btn.active {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12), 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+  border-radius: 9999px !important;
+}
+
+#accountant-custom-navbar .navbar-user-card {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
+}
+
+#accountant-custom-navbar .btn-navbar-sri {
+  background: linear-gradient(135deg, #059669, #10b981) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  border-radius: 9999px !important;
+  padding: 7px 16px !important;
+  font-weight: 800 !important;
+  font-size: 0.82rem !important;
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+#accountant-custom-navbar .btn-navbar-sri:hover {
+  transform: translateY(-1px) !important;
+  filter: brightness(1.08) !important;
+  box-shadow: 0 6px 18px rgba(5, 150, 105, 0.45) !important;
+}
+
+/* Cabecera del Panel Contable (Bloque Inferior) - Fondo Claro y Contraste Nítido */
 .accountant-header {
-  background: rgba(8, 12, 20, 0.85);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
-  padding: 18px 32px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  position: sticky;
-  top: 0;
-  z-index: 60;
+  background: #ffffff !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  padding: 20px 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 60 !important;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 .accountant-title-group h2 {
-  font-size: 1.28rem;
-  font-weight: 800;
-  color: var(--dark-navy);
+  font-size: 1.28rem !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+  margin: 0 0 4px 0 !important;
+  letter-spacing: -0.015em !important;
 }
 
 .accountant-title-group p {
-  font-size: 0.82rem;
-  color: var(--text-muted);
+  font-size: 0.84rem !important;
+  color: #475569 !important;
+  margin: 0 !important;
+  font-weight: 500 !important;
 }
 
 .accountant-action-tools {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+.accountant-action-tools #btn-download-csv,
+.accountant-action-tools .btn-secondary {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  font-weight: 700 !important;
+  font-size: 0.84rem !important;
+  padding: 9px 18px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.accountant-action-tools #btn-download-csv:hover,
+.accountant-action-tools .btn-secondary:hover {
+  background: #f8fafc !important;
+  border-color: #94a3b8 !important;
+  color: #0284c7 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08) !important;
+}
+
+.accountant-action-tools #btn-export-tax-report,
+.accountant-action-tools .btn-primary {
+  background: linear-gradient(135deg, #0284c7 0%, #1e40af 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  font-weight: 700 !important;
+  font-size: 0.84rem !important;
+  padding: 9px 20px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.accountant-action-tools #btn-export-tax-report:hover,
+.accountant-action-tools .btn-primary:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.45) !important;
+  filter: brightness(1.05) !important;
 }
 
 /* Fila de Métricas KPI (4 Tarjetas Principales) (Página 5) */

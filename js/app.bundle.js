@@ -3183,8 +3183,51 @@ const INITIAL_STATE = {
   // Historial de Relevos Médicos entre Colegas (0 relevos)
   reliefAssignments: [],
 
-  // Registro de Alertas Operativas del Sistema (0 alertas)
-  systemAlerts: []
+  // Registro de Alertas Operativas del Sistema (Semana 5 - Parte 2)
+  systemAlerts: [
+    {
+      id: 'ALT-101',
+      type: 'ALLERGY_ALERT',
+      severity: 'CRITICAL',
+      icon: '⚠️',
+      title: 'Alergia Severa en Paciente Agendado Hoy',
+      message: 'Paciente Carlos Mendoza presenta alergia severa a Penicilina y derivados betalactámicos.',
+      category: 'clinica',
+      patientId: '0987654321',
+      patientName: 'Carlos Mendoza Moreira',
+      appointmentId: 'MED-7001',
+      date: '2026-10-22',
+      time: '09:00',
+      actionRequired: 'Prescribir macrólidos o quinolonas en caso de requerir antibioterapia.',
+      dismissed: false
+    },
+    {
+      id: 'ALT-102',
+      type: 'TIGHT_TRANSIT',
+      severity: 'WARNING',
+      icon: '🚗',
+      title: 'Tránsito Ajustado entre Sedes Ceibos y Samborondón',
+      message: 'Margen de 30 min para traslado en hora pico (13:30 - 14:00). Se activó alerta de amortiguamiento preventivo.',
+      category: 'logistica',
+      date: '2026-10-22',
+      time: '13:30',
+      actionRequired: 'Monitorear tráfico vía Waze integrado o solicitar 10 min de tolerancia.',
+      dismissed: false
+    },
+    {
+      id: 'ALT-103',
+      type: 'PENDING_CONFIRMATION',
+      severity: 'INFO',
+      icon: '📱',
+      title: 'Cita Pendiente de Confirmación 24h',
+      message: 'Paciente Sofía Alarcón (11:30 - Cons. 2) no ha respondido al recordatorio por WhatsApp/Email.',
+      category: 'agenda',
+      date: '2026-10-22',
+      time: '11:30',
+      actionRequired: 'Recepción realizará llamada telefónica preventiva a las 08:30.',
+      dismissed: false
+    }
+  ]
 };
 
 
@@ -3198,6 +3241,9 @@ class StateStore {
 
     this.state = saved || JSON.parse(JSON.stringify(INITIAL_STATE));
     if (!this.state.appointments) this.state.appointments = [];
+    if (!this.state.systemAlerts || this.state.systemAlerts.length === 0) {
+      this.state.systemAlerts = JSON.parse(JSON.stringify(INITIAL_STATE.systemAlerts));
+    }
 
     // Base de datos persistente global de citas para asegurar que NINGUNA cita se pierda
     try {
@@ -6702,8 +6748,24 @@ function setupPatientPortal(showToast) {
 
   // --- MÓDULO DE AUTENTICACIÓN Y RESIDUAL DE CITA (GUEST WIZARD + AUTH WALL) ---
   async function confirmAndCreateAppointment(patientUser) {
-    if (!patientUser) {
-      showToast('No se detectó un usuario autenticado para confirmar la cita.', 'warning');
+    const authUser = patientUser || store.getCurrentUser();
+    if (!authUser || authUser.role !== 'paciente') {
+      showToast('Por favor inicia sesión o crea tu cuenta para confirmar tu cita.', 'warning');
+      const patReasonInput = document.getElementById('pat-input-reason');
+      const pendingBooking = {
+        clinicId: selectedClinicId,
+        serviceId: selectedServiceId,
+        date: selectedDate,
+        time: selectedTimeSlot,
+        paymentMethod: selectedPaymentMethod,
+        tempName: (nameInput && nameInput.value.trim()) || '',
+        tempId: (idInput && idInput.value.trim()) || '',
+        tempPhone: (phoneInput && phoneInput.value.trim()) || '',
+        tempEmail: (emailInput && emailInput.value.trim()) || '',
+        tempReason: (patReasonInput ? patReasonInput.value.trim() : '') || 'Consulta médica general'
+      };
+      sessionStorage.setItem('montepiedra_pending_booking', JSON.stringify(pendingBooking));
+      openWizardAuthGate(pendingBooking);
       return;
     }
 
@@ -6740,11 +6802,11 @@ function setupPatientPortal(showToast) {
       }
     } catch (e) {}
 
-    // 3. Asociar la cita al identificador del paciente priorizando los datos del formulario
-    const patId = (idInput && idInput.value.trim()) || (pending && pending.tempId) || patientUser.idNumber || patientUser.cedula || patientUser.username || '';
-    const patName = (nameInput && nameInput.value.trim()) || (pending && pending.tempName) || patientUser.name || 'Paciente';
-    const patPhone = (phoneInput && phoneInput.value.trim()) || (pending && pending.tempPhone) || patientUser.phone || '';
-    const patEmail = (emailInput && emailInput.value.trim()) || (pending && pending.tempEmail) || patientUser.email || '';
+    // 3. Asociar la cita al identificador del paciente formalmente autenticado
+    const patId = authUser.idNumber || authUser.cedula || (idInput && idInput.value.trim()) || '';
+    const patName = authUser.name || (nameInput && nameInput.value.trim()) || 'Paciente';
+    const patPhone = authUser.phone || (phoneInput && phoneInput.value.trim()) || '';
+    const patEmail = authUser.email || (emailInput && emailInput.value.trim()) || '';
     const reasonInput = document.getElementById('pat-input-reason');
     const patReason = (reasonInput && reasonInput.value.trim()) || (pending && pending.reason) || 'Consulta médica general';
 
@@ -6835,20 +6897,10 @@ function setupPatientPortal(showToast) {
     // 4. Crear la cita en el estado central INMEDIATAMENTE (0ms)
     createdAppointment = store.addAppointment(appointmentPayload);
 
-    // Sincronizar el usuario activo de la sesión con los datos ingresados
-    const currentU = store.getCurrentUser() || {};
-    const updatedUser = {
-      ...currentU,
-      role: 'paciente',
-      idNumber: patId,
-      cedula: patId,
-      name: patName,
-      phone: patPhone,
-      email: patEmail
-    };
-    store.setCurrentUser(updatedUser);
+    // Garantizar que la sesión activa corresponda al paciente autenticado
+    store.setCurrentUser(authUser);
     if (typeof authService !== 'undefined' && authService.setCurrentUser) {
-      authService.setCurrentUser(updatedUser);
+      authService.setCurrentUser(authUser);
     }
 
     // Liberar hold temporal tras confirmación formal
@@ -7030,7 +7082,19 @@ function setupPatientPortal(showToast) {
         if (res.success && res.user) {
           modal.classList.remove('active');
           showToast(`¡Sesión iniciada con éxito! Bienvenido(a), ${res.user.name}.`, 'success');
-          await confirmAndCreateAppointment(res.user);
+
+          // Sincronizar datos del usuario autenticado en los campos del formulario
+          if (nameInput) nameInput.value = res.user.name;
+          if (idInput) idInput.value = res.user.idNumber || res.user.cedula;
+          if (phoneInput && res.user.phone) phoneInput.value = res.user.phone;
+          if (emailInput && res.user.email) emailInput.value = res.user.email;
+          updateSummaryCard();
+
+          if (pendingBooking && (pendingBooking.paymentMethod === 'transfer' || pendingBooking.paymentMethod === 'card')) {
+            openPaymentCheckoutModal(res.user);
+          } else {
+            await confirmAndCreateAppointment(res.user);
+          }
         } else {
           showToast(res.error || 'Credenciales inválidas. Por favor verifique.', 'danger');
         }
@@ -7201,7 +7265,19 @@ function setupPatientPortal(showToast) {
         if (res.success && res.user) {
           modal.classList.remove('active');
           showToast(`¡Cuenta creada con éxito! Bienvenido(a), ${res.user.name}.`, 'success');
-          await confirmAndCreateAppointment(res.user);
+
+          // Sincronizar datos del nuevo paciente en los campos del formulario
+          if (nameInput) nameInput.value = res.user.name;
+          if (idInput) idInput.value = res.user.idNumber || res.user.cedula;
+          if (phoneInput && res.user.phone) phoneInput.value = res.user.phone;
+          if (emailInput && res.user.email) emailInput.value = res.user.email;
+          updateSummaryCard();
+
+          if (pendingBooking && (pendingBooking.paymentMethod === 'transfer' || pendingBooking.paymentMethod === 'card')) {
+            openPaymentCheckoutModal(res.user);
+          } else {
+            await confirmAndCreateAppointment(res.user);
+          }
         } else {
           showToast(res.error || 'Error al registrar la cuenta. Verifique los campos.', 'danger');
         }
@@ -7239,20 +7315,34 @@ function setupPatientPortal(showToast) {
           ? authService.getCurrentUser()
           : store.getCurrentUser();
 
-        const userToUse = (currentUser && currentUser.role === 'paciente')
-          ? currentUser
-          : {
-              role: 'paciente',
-              name: (nameInput && nameInput.value.trim()) || 'Paciente',
-              idNumber: (idInput && idInput.value.trim()) || '',
-              email: (emailInput && emailInput.value.trim()) || '',
-              phone: (phoneInput && phoneInput.value.trim()) || ''
-            };
+        const isPatientLoggedIn = !!(currentUser && currentUser.role === 'paciente');
+
+        if (!isPatientLoggedIn) {
+          // El visitante no tiene sesión iniciada:
+          // Guardar borrador temporal y solicitar iniciar sesión o registrar cuenta nueva
+          const patReasonInput = document.getElementById('pat-input-reason');
+          const patReasonVal = (patReasonInput ? patReasonInput.value.trim() : '') || 'Consulta médica general';
+          const pendingBooking = {
+            clinicId: selectedClinicId,
+            serviceId: selectedServiceId,
+            date: selectedDate,
+            time: selectedTimeSlot,
+            paymentMethod: selectedPaymentMethod,
+            tempName: (nameInput && nameInput.value.trim()) || '',
+            tempId: (idInput && idInput.value.trim()) || '',
+            tempPhone: (phoneInput && phoneInput.value.trim()) || '',
+            tempEmail: (emailInput && emailInput.value.trim()) || '',
+            tempReason: patReasonVal
+          };
+          sessionStorage.setItem('montepiedra_pending_booking', JSON.stringify(pendingBooking));
+          openWizardAuthGate(pendingBooking);
+          return;
+        }
+
+        // Si ya está formalmente autenticado como paciente:
+        const userToUse = currentUser;
 
         // Procesar según el método de pago seleccionado:
-        // - Transferencia Bancaria: abre ventana, envía correo con datos de cuenta y cédula, luego entrega ticket
-        // - Tarjeta de Crédito: abre ventana, pide datos y valida con algoritmos (Luhn, etc.), luego entrega ticket
-        // - Efectivo: genera y entrega el ticket directamente
         if (selectedPaymentMethod === 'transfer' || selectedPaymentMethod === 'card') {
           openPaymentCheckoutModal(userToUse);
         } else {
@@ -8908,11 +8998,11 @@ function setupDoctorPortal(showToast) {
 
     if (countBadge) {
       countBadge.textContent = alerts.length;
-      countBadge.style.display = alerts.length > 0 ? 'inline-block' : 'none';
+      countBadge.style.display = alerts.length > 0 ? 'inline-flex' : 'none';
     }
     if (mobileBadge) {
       mobileBadge.textContent = alerts.length;
-      mobileBadge.style.display = alerts.length > 0 ? 'inline-block' : 'none';
+      mobileBadge.style.display = alerts.length > 0 ? 'inline-flex' : 'none';
     }
     if (allCountEl) {
       allCountEl.textContent = alerts.length;
@@ -13045,22 +13135,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const activeView = store.getActiveView();
     const currentUser = store.getCurrentUser();
 
+    // Sincronizar atributo en el body para aislamiento estricto de vistas vía CSS
+    document.body.setAttribute('data-active-view', activeView);
+
     // 1. Ocultar todas las vistas de contenido de forma completa
     if (viewLanding) {
-      viewLanding.classList.add('hidden');
-      viewLanding.style.display = 'none';
+      viewLanding.classList.add('hidden', 'd-none');
+      viewLanding.style.setProperty('display', 'none', 'important');
     }
     if (viewPatient) {
-      viewPatient.classList.add('hidden');
-      viewPatient.style.display = 'none';
+      viewPatient.classList.add('hidden', 'd-none');
+      viewPatient.style.setProperty('display', 'none', 'important');
     }
     if (viewDoctor) {
-      viewDoctor.classList.add('hidden');
-      viewDoctor.style.display = 'none';
+      viewDoctor.classList.add('hidden', 'd-none');
+      viewDoctor.style.setProperty('display', 'none', 'important');
     }
     if (viewAccountant) {
-      viewAccountant.classList.add('hidden');
-      viewAccountant.style.display = 'none';
+      viewAccountant.classList.add('hidden', 'd-none');
+      viewAccountant.style.setProperty('display', 'none', 'important');
     }
 
     // 2. Ocultar todos los menús centrales de la barra superior
@@ -13080,7 +13173,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (viewLanding) {
         viewLanding.classList.remove('hidden', 'd-none');
         viewLanding.style.removeProperty('display');
-        viewLanding.style.cssText = 'display: block !important; opacity: 1 !important; visibility: visible !important;';
+        viewLanding.style.setProperty('display', 'block', 'important');
+        viewLanding.style.opacity = '1';
+        viewLanding.style.visibility = 'visible';
       }
       if (navMenuLanding) navMenuLanding.style.display = 'flex';
       if (navActionsLanding) navActionsLanding.style.display = 'flex';
@@ -13090,7 +13185,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (viewPatient) {
         viewPatient.classList.remove('hidden', 'd-none');
         viewPatient.style.removeProperty('display');
-        viewPatient.style.cssText = 'display: block !important; opacity: 1 !important; visibility: visible !important; min-height: 100vh;';
+        viewPatient.style.setProperty('display', 'block', 'important');
+        viewPatient.style.opacity = '1';
+        viewPatient.style.visibility = 'visible';
+        viewPatient.style.minHeight = '100vh';
       }
 
       // Estado de la barra según si el usuario ha iniciado sesión como paciente o es nuevo/invitado
@@ -13107,8 +13205,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (patNavbarAvatar && currentUser.avatar) patNavbarAvatar.src = currentUser.avatar;
         if (patientBrandSubtitle) patientBrandSubtitle.textContent = 'Portal del Paciente';
 
-        // Al iniciar sesión siempre abre la ventana de Resumen
-        if (typeof window.renderPatientPortal === 'function') {
+        // Al iniciar sesión abre la ventana de Resumen (excepto si estamos en el flujo de agendamiento)
+        const agendarPane = document.getElementById('pat-pane-agendar');
+        const isAgendarActive = agendarPane && (agendarPane.style.display !== 'none' && !agendarPane.classList.contains('hidden'));
+        if (!isAgendarActive && typeof window.renderPatientPortal === 'function') {
           window.renderPatientPortal();
         }
       } else {
@@ -13316,36 +13416,53 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // --- FLUJO DE AGENDAMIENTO LIMPIO CON DESPLAZAMIENTO SUAVE AL PASO 1 ---
+  // --- FLUJO DE AGENDAMIENTO LIMPIO A PÁGINA DEDICADA DEL ASISTENTE ---
   function startBookingFlow(clinicId = null) {
-    // a) Oculta la vista landing:
+    // a) Oculta completamente la landing page y demás vistas:
     const landingEl = document.getElementById('view-landing');
     if (landingEl) {
       landingEl.classList.add('hidden', 'd-none');
-      landingEl.style.display = 'none';
+      landingEl.style.setProperty('display', 'none', 'important');
+    }
+    const docEl = document.getElementById('view-doctor');
+    if (docEl) {
+      docEl.classList.add('hidden', 'd-none');
+      docEl.style.setProperty('display', 'none', 'important');
+    }
+    const accEl = document.getElementById('view-accountant');
+    if (accEl) {
+      accEl.classList.add('hidden', 'd-none');
+      accEl.style.setProperty('display', 'none', 'important');
     }
 
-    // b) Muestra la vista del paciente:
+    // b) Muestra la vista dedicada del paciente:
     const pView = document.getElementById('view-patient') || document.getElementById('portal-paciente');
     if (pView) {
       pView.classList.remove('hidden', 'd-none');
-      pView.style.cssText = 'display: block !important; opacity: 1 !important; visibility: visible !important; min-height: 100vh;';
+      pView.style.removeProperty('display');
+      pView.style.setProperty('display', 'block', 'important');
+      pView.style.opacity = '1';
+      pView.style.visibility = 'visible';
+      pView.style.minHeight = '100vh';
     }
 
-    // e) Actualiza el estado global de la vista:
+    // c) Actualiza el estado global de la vista:
     if (window.store) window.store.setActiveView('paciente');
     renderActiveView();
 
     if (pView) {
       pView.classList.remove('hidden', 'd-none');
-      pView.style.cssText = 'display: block !important; opacity: 1 !important; visibility: visible !important; min-height: 100vh;';
+      pView.style.removeProperty('display');
+      pView.style.setProperty('display', 'block', 'important');
+      pView.style.opacity = '1';
+      pView.style.visibility = 'visible';
     }
 
-    // c) Asegura que la pestaña activa sea el Wizard de Agendamiento en el Paso 1 (Sedes).
+    // d) Asegura que la pestaña activa sea el Wizard de Agendamiento en el Paso 1 (Sedes).
     const patPaneAgendar = document.getElementById('pat-pane-agendar');
     if (patPaneAgendar) {
       patPaneAgendar.classList.remove('hidden', 'd-none');
-      patPaneAgendar.style.cssText = 'display: block !important; visibility: visible !important; opacity: 1 !important;';
+      patPaneAgendar.style.setProperty('display', 'block', 'important');
     }
 
     if (typeof window.switchPatientTab === 'function') {
@@ -13362,7 +13479,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const step1 = document.querySelector('.wizard-step-pane[data-step="1"]');
     if (step1) {
       step1.classList.remove('hidden', 'd-none');
-      step1.style.cssText = 'display: block !important; opacity: 1 !important; visibility: visible !important;';
+      step1.style.setProperty('display', 'block', 'important');
     }
 
     if (clinicId) {
@@ -13372,17 +13489,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // d) Haz scroll al inicio del asistente:
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    setTimeout(() => {
-      const wizardStep1 = document.querySelector('.wizard-step-pane[data-step="1"]') ||
-                          document.getElementById('pat-pane-agendar') ||
-                          document.querySelector('.wizard-stepper-container') ||
-                          document.getElementById('view-patient');
-      if (wizardStep1) {
-        wizardStep1.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 80);
+    // e) Navegación limpia a la parte superior de la nueva página (sin scrollIntoView hacia abajo)
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
 
     if (typeof showToast === 'function') {
       showToast('Ingresando al Asistente de Agendamiento de Citas (Paso 1: Sedes).', 'info');

@@ -942,8 +942,24 @@ export function setupPatientPortal(showToast) {
 
   // --- MÓDULO DE AUTENTICACIÓN Y RESIDUAL DE CITA (GUEST WIZARD + AUTH WALL) ---
   async function confirmAndCreateAppointment(patientUser) {
-    if (!patientUser) {
-      showToast('No se detectó un usuario autenticado para confirmar la cita.', 'warning');
+    const authUser = patientUser || store.getCurrentUser();
+    if (!authUser || authUser.role !== 'paciente') {
+      showToast('Por favor inicia sesión o crea tu cuenta para confirmar tu cita.', 'warning');
+      const patReasonInput = document.getElementById('pat-input-reason');
+      const pendingBooking = {
+        clinicId: selectedClinicId,
+        serviceId: selectedServiceId,
+        date: selectedDate,
+        time: selectedTimeSlot,
+        paymentMethod: selectedPaymentMethod,
+        tempName: (nameInput && nameInput.value.trim()) || '',
+        tempId: (idInput && idInput.value.trim()) || '',
+        tempPhone: (phoneInput && phoneInput.value.trim()) || '',
+        tempEmail: (emailInput && emailInput.value.trim()) || '',
+        tempReason: (patReasonInput ? patReasonInput.value.trim() : '') || 'Consulta médica general'
+      };
+      sessionStorage.setItem('montepiedra_pending_booking', JSON.stringify(pendingBooking));
+      openWizardAuthGate(pendingBooking);
       return;
     }
 
@@ -980,11 +996,11 @@ export function setupPatientPortal(showToast) {
       }
     } catch (e) {}
 
-    // 3. Asociar la cita al identificador del paciente priorizando los datos del formulario
-    const patId = (idInput && idInput.value.trim()) || (pending && pending.tempId) || patientUser.idNumber || patientUser.cedula || patientUser.username || '';
-    const patName = (nameInput && nameInput.value.trim()) || (pending && pending.tempName) || patientUser.name || 'Paciente';
-    const patPhone = (phoneInput && phoneInput.value.trim()) || (pending && pending.tempPhone) || patientUser.phone || '';
-    const patEmail = (emailInput && emailInput.value.trim()) || (pending && pending.tempEmail) || patientUser.email || '';
+    // 3. Asociar la cita al identificador del paciente formalmente autenticado
+    const patId = authUser.idNumber || authUser.cedula || (idInput && idInput.value.trim()) || '';
+    const patName = authUser.name || (nameInput && nameInput.value.trim()) || 'Paciente';
+    const patPhone = authUser.phone || (phoneInput && phoneInput.value.trim()) || '';
+    const patEmail = authUser.email || (emailInput && emailInput.value.trim()) || '';
     const reasonInput = document.getElementById('pat-input-reason');
     const patReason = (reasonInput && reasonInput.value.trim()) || (pending && pending.reason) || 'Consulta médica general';
 
@@ -1075,20 +1091,10 @@ export function setupPatientPortal(showToast) {
     // 4. Crear la cita en el estado central INMEDIATAMENTE (0ms)
     createdAppointment = store.addAppointment(appointmentPayload);
 
-    // Sincronizar el usuario activo de la sesión con los datos ingresados
-    const currentU = store.getCurrentUser() || {};
-    const updatedUser = {
-      ...currentU,
-      role: 'paciente',
-      idNumber: patId,
-      cedula: patId,
-      name: patName,
-      phone: patPhone,
-      email: patEmail
-    };
-    store.setCurrentUser(updatedUser);
+    // Garantizar que la sesión activa corresponda al paciente autenticado
+    store.setCurrentUser(authUser);
     if (typeof authService !== 'undefined' && authService.setCurrentUser) {
-      authService.setCurrentUser(updatedUser);
+      authService.setCurrentUser(authUser);
     }
 
     // Liberar hold temporal tras confirmación formal
@@ -1270,7 +1276,19 @@ export function setupPatientPortal(showToast) {
         if (res.success && res.user) {
           modal.classList.remove('active');
           showToast(`¡Sesión iniciada con éxito! Bienvenido(a), ${res.user.name}.`, 'success');
-          await confirmAndCreateAppointment(res.user);
+
+          // Sincronizar datos del usuario autenticado en los campos del formulario
+          if (nameInput) nameInput.value = res.user.name;
+          if (idInput) idInput.value = res.user.idNumber || res.user.cedula;
+          if (phoneInput && res.user.phone) phoneInput.value = res.user.phone;
+          if (emailInput && res.user.email) emailInput.value = res.user.email;
+          updateSummaryCard();
+
+          if (pendingBooking && (pendingBooking.paymentMethod === 'transfer' || pendingBooking.paymentMethod === 'card')) {
+            openPaymentCheckoutModal(res.user);
+          } else {
+            await confirmAndCreateAppointment(res.user);
+          }
         } else {
           showToast(res.error || 'Credenciales inválidas. Por favor verifique.', 'danger');
         }
@@ -1441,7 +1459,19 @@ export function setupPatientPortal(showToast) {
         if (res.success && res.user) {
           modal.classList.remove('active');
           showToast(`¡Cuenta creada con éxito! Bienvenido(a), ${res.user.name}.`, 'success');
-          await confirmAndCreateAppointment(res.user);
+
+          // Sincronizar datos del nuevo paciente en los campos del formulario
+          if (nameInput) nameInput.value = res.user.name;
+          if (idInput) idInput.value = res.user.idNumber || res.user.cedula;
+          if (phoneInput && res.user.phone) phoneInput.value = res.user.phone;
+          if (emailInput && res.user.email) emailInput.value = res.user.email;
+          updateSummaryCard();
+
+          if (pendingBooking && (pendingBooking.paymentMethod === 'transfer' || pendingBooking.paymentMethod === 'card')) {
+            openPaymentCheckoutModal(res.user);
+          } else {
+            await confirmAndCreateAppointment(res.user);
+          }
         } else {
           showToast(res.error || 'Error al registrar la cuenta. Verifique los campos.', 'danger');
         }
@@ -1479,20 +1509,34 @@ export function setupPatientPortal(showToast) {
           ? authService.getCurrentUser()
           : store.getCurrentUser();
 
-        const userToUse = (currentUser && currentUser.role === 'paciente')
-          ? currentUser
-          : {
-              role: 'paciente',
-              name: (nameInput && nameInput.value.trim()) || 'Paciente',
-              idNumber: (idInput && idInput.value.trim()) || '',
-              email: (emailInput && emailInput.value.trim()) || '',
-              phone: (phoneInput && phoneInput.value.trim()) || ''
-            };
+        const isPatientLoggedIn = !!(currentUser && currentUser.role === 'paciente');
+
+        if (!isPatientLoggedIn) {
+          // El visitante no tiene sesión iniciada:
+          // Guardar borrador temporal y solicitar iniciar sesión o registrar cuenta nueva
+          const patReasonInput = document.getElementById('pat-input-reason');
+          const patReasonVal = (patReasonInput ? patReasonInput.value.trim() : '') || 'Consulta médica general';
+          const pendingBooking = {
+            clinicId: selectedClinicId,
+            serviceId: selectedServiceId,
+            date: selectedDate,
+            time: selectedTimeSlot,
+            paymentMethod: selectedPaymentMethod,
+            tempName: (nameInput && nameInput.value.trim()) || '',
+            tempId: (idInput && idInput.value.trim()) || '',
+            tempPhone: (phoneInput && phoneInput.value.trim()) || '',
+            tempEmail: (emailInput && emailInput.value.trim()) || '',
+            tempReason: patReasonVal
+          };
+          sessionStorage.setItem('montepiedra_pending_booking', JSON.stringify(pendingBooking));
+          openWizardAuthGate(pendingBooking);
+          return;
+        }
+
+        // Si ya está formalmente autenticado como paciente:
+        const userToUse = currentUser;
 
         // Procesar según el método de pago seleccionado:
-        // - Transferencia Bancaria: abre ventana, envía correo con datos de cuenta y cédula, luego entrega ticket
-        // - Tarjeta de Crédito: abre ventana, pide datos y valida con algoritmos (Luhn, etc.), luego entrega ticket
-        // - Efectivo: genera y entrega el ticket directamente
         if (selectedPaymentMethod === 'transfer' || selectedPaymentMethod === 'card') {
           openPaymentCheckoutModal(userToUse);
         } else {
