@@ -675,7 +675,7 @@ export function setupDoctorPortal(showToast) {
         const coveringDoctor = opt ? opt.dataset.name : 'Dra. Elena Morales';
         const coveringDoctorCode = opt ? opt.dataset.code : 'MSP-REG-092834';
         const coveringDoctorSpecialty = opt ? opt.dataset.spec : 'Medicina Familiar y Comunitaria';
-        const coveringDoctorPhone = opt ? opt.dataset.phone : '+593 98 471 9283';
+        const coveringDoctorPhone = opt ? opt.dataset.phone : '0984719283';
         const reason = motivoInput ? motivoInput.value.trim() : 'Convocatoria imprevista a guardia hospitalaria en Hospital Ceibos';
 
         const scopeBtn = document.getElementById('btn-scope-full');

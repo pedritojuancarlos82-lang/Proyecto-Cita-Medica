@@ -493,12 +493,16 @@
                       </span>
                       <span style="font-size: 0.68rem; color: #64748b; font-weight: 600;">Click para ingresar directo</span>
                     </div>
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;">
-                      <button type="button" class="btn-demo-autofill" data-role="doctor" data-user="doctor" data-pass="admin123" title="Ingresar como Dr. Carlos Campoverde (admin123)" style="padding: 8px 6px; font-size: 0.75rem; font-weight: 700; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: all 0.2s;">
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;">
+                      <button type="button" class="btn-demo-autofill" data-role="doctor" data-user="doctor" data-pass="admin123" title="Ingresar como Dr. Carlos Campoverde (admin123)" style="padding: 8px 4px; font-size: 0.72rem; font-weight: 700; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: all 0.2s;">
                         <span>👨‍⚕️ Médico</span>
                         <span style="font-size: 0.65rem; color: #2563eb; font-family: var(--font-mono);">doctor</span>
                       </button>
-                      <button type="button" class="btn-demo-autofill" data-role="contador" data-user="contador" data-pass="contador123" title="Ingresar como Contadora Patricia Morales (contador123)" style="padding: 8px 6px; font-size: 0.75rem; font-weight: 700; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: all 0.2s;">
+                      <button type="button" class="btn-demo-autofill" data-role="paciente" data-user="paciente" data-pass="paciente123" title="Ingresar como Paciente Carlos Mendoza (paciente123)" style="padding: 8px 4px; font-size: 0.72rem; font-weight: 700; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: all 0.2s;">
+                        <span>👤 Paciente</span>
+                        <span style="font-size: 0.65rem; color: #10b981; font-family: var(--font-mono);">paciente</span>
+                      </button>
+                      <button type="button" class="btn-demo-autofill" data-role="contador" data-user="contador" data-pass="contador123" title="Ingresar como Contadora Patricia Morales (contador123)" style="padding: 8px 4px; font-size: 0.72rem; font-weight: 700; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: all 0.2s;">
                         <span>📊 Contadora</span>
                         <span style="font-size: 0.65rem; color: #b45309; font-family: var(--font-mono);">contador</span>
                       </button>
@@ -1378,9 +1382,12 @@
                     📧 Hemos enviado la confirmación oficial con copia al correo del paciente y a la agenda del doctor. Se activará una alerta 24h antes de su turno.
                   </p>
 
-                  <div class="ticket-actions-group">
+                  <div class="ticket-actions-group" style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
                     <button type="button" class="btn-primary" id="btn-print-ticket">
                       🖨️ Descargar Comprobante PDF / Imprimir
+                    </button>
+                    <button type="button" class="btn-secondary" id="btn-view-in-mis-citas" style="background: #e0f2fe; color: #0284c7; border: 1px solid #7dd3fc; font-weight: 700; padding: 10px 18px; border-radius: 8px; cursor: pointer;">
+                      📅 Ver en Mis Citas →
                     </button>
                   </div>
                 </div>
@@ -4026,14 +4033,18 @@
             </span>
             <span style="font-size: 0.67rem; color: #64748b; font-weight: 600;">Ingreso directo</span>
           </div>
-          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;">
-            <button type="button" class="btn-modal-demo-autofill" data-role="doctor" data-user="doctor" data-pass="admin123" title="Ingresar como Dr. Carlos Campoverde (admin123)" style="padding: 7px 4px; font-size: 0.72rem; font-weight: 700; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: all 0.2s;">
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;">
+            <button type="button" class="btn-modal-demo-autofill" data-role="doctor" data-user="doctor" data-pass="admin123" title="Ingresar como Dr. Carlos Campoverde (admin123)" style="padding: 7px 3px; font-size: 0.70rem; font-weight: 700; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: all 0.2s;">
               <span>👨‍⚕️ Médico</span>
-              <span style="font-size: 0.64rem; color: #2563eb; font-family: var(--font-mono);">doctor</span>
+              <span style="font-size: 0.62rem; color: #2563eb; font-family: var(--font-mono);">doctor</span>
             </button>
-            <button type="button" class="btn-modal-demo-autofill" data-role="contador" data-user="contador" data-pass="contador123" title="Ingresar como Contadora Patricia Morales (contador123)" style="padding: 7px 4px; font-size: 0.72rem; font-weight: 700; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: all 0.2s;">
+            <button type="button" class="btn-modal-demo-autofill" data-role="paciente" data-user="paciente" data-pass="paciente123" title="Ingresar como Paciente Carlos Mendoza (paciente123)" style="padding: 7px 3px; font-size: 0.70rem; font-weight: 700; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: all 0.2s;">
+              <span>👤 Paciente</span>
+              <span style="font-size: 0.62rem; color: #10b981; font-family: var(--font-mono);">paciente</span>
+            </button>
+            <button type="button" class="btn-modal-demo-autofill" data-role="contador" data-user="contador" data-pass="contador123" title="Ingresar como Contadora Patricia Morales (contador123)" style="padding: 7px 3px; font-size: 0.70rem; font-weight: 700; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: all 0.2s;">
               <span>📊 Contadora</span>
-              <span style="font-size: 0.64rem; color: #b45309; font-family: var(--font-mono);">contador</span>
+              <span style="font-size: 0.62rem; color: #b45309; font-family: var(--font-mono);">contador</span>
             </button>
           </div>
         </div>

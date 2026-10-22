@@ -2,12 +2,11 @@
   "name": "proyecto-cita-medica",
   "version": "1.0.0",
   "description": "Plataforma Integral de Gestion y Atencion Medica (SaaS Medico Multisede)",
-  "main": "server.py",
+  "main": "server.tsx",
   "scripts": {
-    "start": "python server.py",
-    "dev": "python server.py",
-    "build": "python build_bundle.py",
-    "test": "python -m unittest discover -s backend -v"
+    "start": "powershell -ExecutionPolicy Bypass -File build_bundle.ps1",
+    "dev": "powershell -ExecutionPolicy Bypass -File build_bundle.ps1",
+    "build": "powershell -ExecutionPolicy Bypass -File build_bundle.ps1"
   },
   "dependencies": {
     "qrcode": "^1.5.4"

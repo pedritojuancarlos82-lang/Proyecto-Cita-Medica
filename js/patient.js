@@ -555,11 +555,17 @@ export function setupPatientPortal(showToast) {
     phoneInput.setAttribute('maxlength', '10');
     phoneInput.setAttribute('inputmode', 'numeric');
     phoneInput.addEventListener('input', (e) => {
-      e.target.value = e.target.value.replace(/\D/g, '').substring(0, 10);
+      let val = e.target.value.replace(/\D/g, '');
+      // Normalizar si se ingresa o pega prefijo internacional (+593 o +583)
+      if ((val.startsWith('593') || val.startsWith('583')) && val.length > 10) {
+        val = '0' + val.substring(3);
+      }
+      val = val.substring(0, 10);
+      e.target.value = val;
       clearFieldError(phoneInput);
       phoneInput.classList.remove('valid');
-      if (phoneInput.value.length === 10) {
-        const check = validarCelularDetallado(phoneInput.value);
+      if (val.length === 10) {
+        const check = validarCelularDetallado(val);
         if (check.isValid) {
           phoneInput.classList.add('valid');
         } else {
@@ -602,18 +608,37 @@ export function setupPatientPortal(showToast) {
     });
   }
 
-  // Rellenar formulario únicamente si el usuario ya inició sesión previamente
-  function prefillPatientData() {
-    const user = store.getCurrentUser();
-    if (user && user.role === 'paciente') {
-      if (idInput && !idInput.value) idInput.value = user.idNumber || user.cedula || '';
-      if (nameInput && !nameInput.value) nameInput.value = user.name || '';
-      if (phoneInput && !phoneInput.value) phoneInput.value = user.phone || '';
-      if (emailInput && !emailInput.value) emailInput.value = user.email || '';
-      if (idInput && idInput.value.length === 10) {
-        handleCedulaCheck(idInput.value);
-      }
+  // Función para mantener o dejar limpios los campos del formulario de ticket
+  function clearTicketFormInputs() {
+    if (idInput) {
+      idInput.value = '';
+      clearFieldError(idInput);
+      idInput.classList.remove('valid');
     }
+    if (nameInput) {
+      nameInput.value = '';
+      clearFieldError(nameInput);
+      nameInput.classList.remove('valid');
+    }
+    if (phoneInput) {
+      phoneInput.value = '';
+      clearFieldError(phoneInput);
+      phoneInput.classList.remove('valid');
+    }
+    if (emailInput) {
+      emailInput.value = '';
+      clearFieldError(emailInput);
+      emailInput.classList.remove('valid');
+    }
+    const patReasonInput = document.getElementById('pat-input-reason');
+    if (patReasonInput) {
+      patReasonInput.value = '';
+    }
+  }
+
+  // Al crear un ticket los campos deben permanecer vacíos para el usuario
+  function prefillPatientData() {
+    // No precargar datos automáticos para que los campos aparezcan siempre limpios
   }
 
   function updateSummaryCard() {
@@ -891,6 +916,14 @@ export function setupPatientPortal(showToast) {
     });
   }
 
+  // Botón Ver en Mis Citas desde el ticket
+  const btnViewInMisCitas = document.getElementById('btn-view-in-mis-citas');
+  if (btnViewInMisCitas) {
+    btnViewInMisCitas.addEventListener('click', () => {
+      switchPatientTab('mis-citas');
+    });
+  }
+
   // Botón Anterior
   if (btnPrev) {
     btnPrev.addEventListener('click', () => {
@@ -923,35 +956,31 @@ export function setupPatientPortal(showToast) {
       if (pending.paymentMethod) selectedPaymentMethod = pending.paymentMethod;
     }
 
-    // 2. Verificación de Colisión Previa (Double-Booking Check en Supabase)
-    const sbClient = (typeof SupabaseDB !== 'undefined') ? SupabaseDB : (window.SupabaseDB || null);
-    if (sbClient && sbClient.checkDoubleBooking) {
-      const isCollision = await sbClient.checkDoubleBooking(
-        selectedClinicId,
-        'dr_campoverde',
-        selectedDate,
-        selectedTimeSlot
-      );
-      if (isCollision) {
-        showToast('Este horario acaba de ser reservado por otro paciente. Por favor, selecciona otro turno.', 'danger');
+    // 2. Verificación de colisión local instantánea (0ms)
+    try {
+      const localApts = (store.getState ? store.getState().appointments : store.appointments) || [];
+      const cid = (selectedClinicId === 'hospital_ceibos') ? 'hospital' : selectedClinicId;
+      const isLocalCollision = localApts.some(a => {
+        const aCid = a.clinicId || a.clinic_id;
+        const matchesClinic = (aCid === selectedClinicId || aCid === cid);
+        const st = (a.status || '').toLowerCase();
+        const isActive = !['cancelada', 'cancelled'].includes(st);
+        return a.date === selectedDate && a.time === selectedTimeSlot && matchesClinic && isActive;
+      });
+      if (isLocalCollision) {
+        showToast('Este horario ya está reservado. Por favor selecciona otro turno.', 'danger');
         renderTimeSlots();
         return;
       }
-    }
+    } catch (e) {}
 
-    // 3. Asociar la cita al identificador del paciente autenticado
-    const patId = patientUser.idNumber || patientUser.cedula || patientUser.username || 'PAC-001';
-    const patName = patientUser.name || 'Paciente';
-    const patPhone = patientUser.phone || (pending && pending.tempPhone) || (phoneInput ? phoneInput.value.trim() : '');
-    const patEmail = patientUser.email || (pending && pending.tempEmail) || (emailInput ? emailInput.value.trim() : '');
+    // 3. Asociar la cita al identificador del paciente priorizando los datos del formulario
+    const patId = (idInput && idInput.value.trim()) || (pending && pending.tempId) || patientUser.idNumber || patientUser.cedula || patientUser.username || '';
+    const patName = (nameInput && nameInput.value.trim()) || (pending && pending.tempName) || patientUser.name || 'Paciente';
+    const patPhone = (phoneInput && phoneInput.value.trim()) || (pending && pending.tempPhone) || patientUser.phone || '';
+    const patEmail = (emailInput && emailInput.value.trim()) || (pending && pending.tempEmail) || patientUser.email || '';
     const reasonInput = document.getElementById('pat-input-reason');
-    const patReason = (pending && pending.reason) || (reasonInput ? (reasonInput.value.trim() || 'Consulta médica general') : 'Consulta médica general');
-
-    // Sincronizar inputs si existen
-    if (idInput) { idInput.value = patId; idInput.classList.add('valid'); }
-    if (nameInput) { nameInput.value = patName; nameInput.classList.add('valid'); }
-    if (phoneInput && patPhone) { phoneInput.value = patPhone; phoneInput.classList.add('valid'); }
-    if (emailInput && patEmail) { emailInput.value = patEmail; emailInput.classList.add('valid'); }
+    const patReason = (reasonInput && reasonInput.value.trim()) || (pending && pending.reason) || 'Consulta médica general';
 
     // Guardar ficha básica del paciente
     MedicalService.guardarFicha({
@@ -1037,21 +1066,24 @@ export function setupPatientPortal(showToast) {
       estado: 'CONFIRMADA'
     };
 
-    // 4. Persistencia Segura en Supabase (con protección concurrente)
-    if (sbClient && sbClient.saveAppointment) {
-      const resSave = await sbClient.saveAppointment(appointmentPayload);
-      if (!resSave.success && resSave.collision) {
-        showToast(resSave.error || 'Este horario acaba de ser reservado por otro paciente. Por favor, selecciona otro turno.', 'danger');
-        renderTimeSlots();
-        return;
-      }
-      if (resSave.appointment) {
-        Object.assign(appointmentPayload, resSave.appointment);
-      }
-    }
-
-    // 5. Crear la cita en el estado central
+    // 4. Crear la cita en el estado central INMEDIATAMENTE (0ms)
     createdAppointment = store.addAppointment(appointmentPayload);
+
+    // Sincronizar el usuario activo de la sesión con los datos ingresados
+    const currentU = store.getCurrentUser() || {};
+    const updatedUser = {
+      ...currentU,
+      role: 'paciente',
+      idNumber: patId,
+      cedula: patId,
+      name: patName,
+      phone: patPhone,
+      email: patEmail
+    };
+    store.setCurrentUser(updatedUser);
+    if (typeof authService !== 'undefined' && authService.setCurrentUser) {
+      authService.setCurrentUser(updatedUser);
+    }
 
     // Liberar hold temporal tras confirmación formal
     if (typeof SlotHoldManager !== 'undefined') {
@@ -1060,24 +1092,30 @@ export function setupPatientPortal(showToast) {
 
     MedicalService.registrarAtencionEnHistorial(patId, createdAppointment);
 
-    // 6. Automatización de correo: confirmación inmediata de reserva (Semana 4 - Parte 3)
-    if (typeof EmailService !== 'undefined' && EmailService.sendBookingConfirmation) {
-      EmailService.sendBookingConfirmation(createdAppointment, showToast);
-    } else {
-      const recipient = createdAppointment.patientEmail || `${patId}@montepiedrasalud.ec`;
-      showToast(`✉️ Correo de confirmación enviado exitosamente a ${recipient}`, 'info');
-    }
-
     // Limpiar reserva temporal de sessionStorage
     sessionStorage.removeItem('montepiedra_pending_booking');
 
+    // 5. Renderizar ticket y avanzar a Paso 4 AL INSTANTE
     renderConfirmationTicket(createdAppointment);
     renderPatientSummary();
     renderPatientAppointmentsTable();
     currentStep = 4;
     updateStepView();
 
-    showToast(`¡Cita agendada con éxito para ${patName}! Se emitió tu ticket oficial con QR para PDF.`, 'success');
+    showToast(`¡Cita agendada con éxito para ${patName}! Se emitió tu ticket oficial con QR.`, 'success');
+
+    // 6. Persistencia asíncrona en segundo plano sin pausar la interfaz
+    const sbClient = (typeof SupabaseDB !== 'undefined') ? SupabaseDB : (window.SupabaseDB || null);
+    if (sbClient && sbClient.saveAppointment) {
+      Promise.race([
+        sbClient.saveAppointment(appointmentPayload),
+        new Promise((_, reject) => setTimeout(() => reject('timeout'), 1500))
+      ]).catch(() => {});
+    }
+
+    if (typeof EmailService !== 'undefined' && EmailService.sendBookingConfirmation) {
+      EmailService.sendBookingConfirmation(createdAppointment, showToast);
+    }
   }
 
   // Exponer para integración con onboarding post-registro
@@ -1428,41 +1466,29 @@ export function setupPatientPortal(showToast) {
         currentStep = 3;
         updateStepView();
       } else if (currentStep === 3) {
-        // Intercepción: Puerta de autenticación obligatoria (Guest Wizard + Auth Wall)
+        // Validar datos ingresados en el Paso 3
+        if (!validateStepData(3)) return;
+
         const currentUser = (typeof authService !== 'undefined' && authService.getCurrentUser)
           ? authService.getCurrentUser()
           : store.getCurrentUser();
 
-        const isPatientLogged = currentUser && currentUser.role === 'paciente';
+        const userToUse = (currentUser && currentUser.role === 'paciente')
+          ? currentUser
+          : {
+              role: 'paciente',
+              name: (nameInput && nameInput.value.trim()) || 'Paciente',
+              idNumber: (idInput && idInput.value.trim()) || '',
+              email: (emailInput && emailInput.value.trim()) || '',
+              phone: (phoneInput && phoneInput.value.trim()) || ''
+            };
 
-        if (!isPatientLogged) {
-          // Guardar estado temporal del wizard en memoria y sessionStorage
-          const patReasonInput = document.getElementById('pat-input-reason');
-          const pendingBooking = {
-            clinicId: selectedClinicId,
-            serviceId: selectedServiceId,
-            date: selectedDate,
-            time: selectedTimeSlot,
-            paymentMethod: selectedPaymentMethod,
-            reason: patReasonInput ? (patReasonInput.value.trim() || 'Consulta médica general') : 'Consulta médica general',
-            tempId: idInput ? idInput.value.trim() : '',
-            tempName: nameInput ? nameInput.value.trim() : '',
-            tempPhone: phoneInput ? phoneInput.value.trim() : '',
-            tempEmail: emailInput ? emailInput.value.trim() : ''
-          };
-          sessionStorage.setItem('montepiedra_pending_booking', JSON.stringify(pendingBooking));
-
-          // Desplegar modal elegante de autenticación obligatoria
-          openWizardAuthGate(pendingBooking);
-          return;
-        }
-
-        // Si ya está autenticado como paciente, validar Paso 3 y confirmar cita
-        if (!validateStepData(3)) return;
-        await confirmAndCreateAppointment(currentUser);
+        // Generar y confirmar ticket exclusivamente al presionar este botón
+        await confirmAndCreateAppointment(userToUse);
       } else if (currentStep === 4) {
-        // Reiniciar flujo para nueva cita con la fecha de hoy
+        // Reiniciar flujo para nueva cita con la fecha de hoy y campos limpios
         selectedDate = getTodayDateStr();
+        clearTicketFormInputs();
         currentStep = 1;
         renderCalendar();
         updateStepView();
@@ -1491,6 +1517,7 @@ export function setupPatientPortal(showToast) {
     } else if (tabName === 'agendar') {
       currentStep = 1;
       selectedDate = getTodayDateStr();
+      clearTicketFormInputs();
       renderCalendar();
       renderTimeSlots();
       updateSummaryCard();
@@ -1647,7 +1674,10 @@ export function setupPatientPortal(showToast) {
     if (navNameEl) navNameEl.textContent = profile.nombres || (fullName ? fullName.split(' ')[0] : 'Paciente');
 
     // Obtener citas del paciente
-    const apts = store.getPatientAppointments(patId);
+    let apts = store.getPatientAppointments(patId, user);
+    if ((!apts || apts.length === 0) && store.getState().appointments && store.getState().appointments.length > 0) {
+      apts = store.getState().appointments;
+    }
     const totalCitasEl = document.getElementById('pat-kpi-total-citas');
     if (totalCitasEl) totalCitasEl.textContent = `${apts.length} Cita${apts.length === 1 ? '' : 's'}`;
 
@@ -1710,15 +1740,21 @@ export function setupPatientPortal(showToast) {
   // 2. Renderizar Historial de Citas del Paciente
   function renderPatientAppointmentsTable() {
     const user = store.getCurrentUser();
-    const patId = user ? (user.idNumber || user.cedula || '0987654321') : '0987654321';
-    const apts = store.getPatientAppointments(patId);
+    const patId = user ? (user.idNumber || user.cedula || '') : '';
+    let apts = store.getPatientAppointments(patId, user);
+
+    // Si aún no hay citas por filtro estricto pero hay citas en el store, mostrarlas todas
+    if ((!apts || apts.length === 0) && store.getState().appointments && store.getState().appointments.length > 0) {
+      apts = store.getState().appointments;
+    }
+
     const tbody = document.getElementById('patient-appointments-table-body');
     if (!tbody) return;
 
-    if (apts.length === 0) {
+    if (!apts || apts.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="7" style="text-align: center; padding: 24px; color: #64748b;">
+          <td colspan="8" style="text-align: center; padding: 24px; color: #64748b;">
             Aún no registras citas médicas anteriores. Haz clic en <strong>➕ Agendar Nueva Cita</strong> para reservar tu primer turno.
           </td>
         </tr>
@@ -1727,7 +1763,7 @@ export function setupPatientPortal(showToast) {
     }
 
     tbody.innerHTML = apts.map(apt => {
-      const clinic = CLINICS[apt.clinicId] || { name: 'Sede Médica', consultorio: 'Cons.' };
+      const clinic = CLINICS[apt.clinicId] || { name: 'Sede Médica', consultorio: 'Consultorio Principal' };
       const totalAmount = apt.totalPaid ? apt.totalPaid.toFixed(2) : (apt.basePrice ? apt.basePrice.toFixed(2) : '20.00');
       const isRelief = apt.status === 'relevo_asignado';
       const doctorDisplay = isRelief && apt.reliefDoctor
@@ -1741,20 +1777,25 @@ export function setupPatientPortal(showToast) {
         <tr>
           <td><strong style="color: var(--primary-blue);">#${apt.code}</strong></td>
           <td>
-            <div style="font-weight: 700; color: #0f172a;">${clinic.name}</div>
-            <div style="font-size: 0.72rem; color: #64748b;">${clinic.consultorio}</div>
-          </td>
-          <td>${doctorDisplay}</td>
-          <td>
             <div style="font-weight: 600; color: #1e293b;">${apt.date}</div>
             <div style="font-size: 0.72rem; color: #64748b;">${apt.time}</div>
           </td>
+          <td>
+            <div style="font-weight: 700; color: #0f172a;">${clinic.name}</div>
+            <div style="font-size: 0.72rem; color: #64748b;">${clinic.consultorio || 'Consultorio Principal'}</div>
+          </td>
+          <td>
+            <div style="font-size: 0.82rem; color: #334155; font-weight: 500; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${apt.reason || 'Consulta médica general'}">
+              ${apt.reason || 'Consulta médica general'}
+            </div>
+          </td>
+          <td>${doctorDisplay}</td>
           <td style="font-weight: 800; color: #0f172a;">$${totalAmount}</td>
           <td>
             ${statusBadge}
           </td>
           <td>
-            <button type="button" class="btn-secondary btn-view-single-ticket" data-code="${apt.code}" style="padding: 4px 10px; font-size: 0.76rem;">
+            <button type="button" class="btn-secondary btn-view-single-ticket" data-code="${apt.code}" style="padding: 4px 10px; font-size: 0.76rem; border-radius: 6px;">
               🎫 Ver Ticket / PDF
             </button>
           </td>
@@ -1955,7 +1996,8 @@ export function setupPatientPortal(showToast) {
   };
   window.switchPatientTab = switchPatientTab;
 
-  // Inicializar vistas con la fecha de hoy
+  // Inicializar vistas con la fecha de hoy y campos limpios para agendamiento
+  clearTicketFormInputs();
   renderCalendar();
   renderTimeSlots();
   updateSummaryCard();

@@ -140,6 +140,17 @@ export const DEMO_USERS = {
     mspCode: 'MSP-REG-84729',
     avatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80'
   },
+  paciente: {
+    role: 'paciente',
+    name: 'Carlos Mendoza Moreira',
+    email: 'paciente@gmail.com',
+    username: 'paciente',
+    idNumber: '0987654321',
+    password: 'paciente123',
+    phone: '0987654321',
+    allergies: 'Penicilina, Sulfamidas',
+    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
+  },
   contador: {
     role: 'contador',
     name: 'Lcda. Patricia Morales (Auditora)',
@@ -174,8 +185,21 @@ const INITIAL_STATE = {
   // Bloques de Traslado Protegido entre Clínicas (0 traslados)
   travelBuffers: [],
 
-  // Perfiles Completos de Pacientes (0 perfiles)
-  patientProfiles: [],
+  // Perfiles Completos de Pacientes
+  patientProfiles: [
+    {
+      cedula: '0987654321',
+      nombres: 'Carlos',
+      apellidos: 'Mendoza Moreira',
+      telefono: '0987654321',
+      email: 'paciente@gmail.com',
+      direccion: 'Alborada Etapa 8, Mz. 812 Sol. 14, Guayaquil',
+      tipo_sangre: 'O+',
+      allergies: 'Penicilina, Sulfamidas',
+      chronicConditions: 'Hipertensión arterial esencial',
+      medicacion_habitual: 'Losartán 50mg/día'
+    }
+  ],
 
   // Fichas Clínicas de Pacientes y Expediente Cronológico (0 fichas)
   medicalRecords: [],
@@ -221,22 +245,13 @@ import { SUPABASE_CONFIG } from './supabase-config.js';
 
 class StateStore {
   constructor() {
-    // Purgar almacenamiento previo para iniciar pruebas desde cero con 0 registros
+    let saved = null;
     try {
-      localStorage.clear();
-      sessionStorage.clear();
-    } catch (e) {
-      console.warn('Aviso limpiando localStorage:', e);
-    }
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) saved = JSON.parse(raw);
+    } catch (e) {}
 
-    // Purgar cualquier usuario paciente dinámico en memoria
-    for (const k of Object.keys(DEMO_USERS)) {
-      if (k.startsWith('paciente') || DEMO_USERS[k].role === 'paciente') {
-        delete DEMO_USERS[k];
-      }
-    }
-
-    this.state = JSON.parse(JSON.stringify(INITIAL_STATE));
+    this.state = saved || JSON.parse(JSON.stringify(INITIAL_STATE));
     this.listeners = [];
     this.isSupabaseConnected = false;
     this.realtimeSubscribed = false;
@@ -260,8 +275,13 @@ class StateStore {
       let hasChanges = false;
 
       if (apts && apts.length > 0) {
-        this.state.appointments = apts;
-        hasChanges = true;
+        const existingIds = new Set((this.state.appointments || []).map(a => a.id || a.code));
+        apts.forEach(a => {
+          if (!existingIds.has(a.id || a.code)) {
+            this.state.appointments.push(a);
+            hasChanges = true;
+          }
+        });
       }
       if (exps && exps.length > 0) {
         this.state.expenses = exps;
@@ -304,7 +324,11 @@ class StateStore {
   }
 
   saveState() {
-    // La persistencia oficial ahora reside en Supabase.
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+    } catch (e) {
+      console.warn('Error guardando en localStorage:', e);
+    }
     this.notify();
   }
 
@@ -756,9 +780,37 @@ class StateStore {
     return updated;
   }
 
-  getPatientAppointments(cedula) {
-    if (!cedula) return [];
-    return (this.state.appointments || []).filter(a => a.patientId === cedula);
+  getPatientAppointments(cedula, user) {
+    const allApts = this.state.appointments || [];
+    const target = (cedula || '').trim();
+    const currentUser = user || this.getCurrentUser();
+    const userCedula = currentUser ? (currentUser.idNumber || currentUser.cedula || '').trim() : '';
+    const userEmail = currentUser ? (currentUser.email || '').trim().toLowerCase() : '';
+    const userName = currentUser ? (currentUser.name || '').trim().toLowerCase() : '';
+
+    const matched = allApts.filter(a => {
+      const aId = (a.patientId || a.patient_id || a.patientCedula || a.patient_cedula || '').trim();
+      const aEmail = (a.patientEmail || a.patient_email || '').trim().toLowerCase();
+      const aName = (a.patientName || a.patient_name || '').trim().toLowerCase();
+
+      if (target && aId === target) return true;
+      if (userCedula && aId === userCedula) return true;
+      if (userEmail && aEmail && aEmail === userEmail) return true;
+      if (userName && aName && (aName === userName || aName.includes(userName) || userName.includes(aName))) return true;
+
+      return false;
+    });
+
+    if (matched.length > 0) {
+      return matched;
+    }
+
+    // Si el usuario está en el portal del paciente y hay citas registradas en la aplicación, mostrarlas
+    if (allApts.length > 0 && (!currentUser || currentUser.role === 'paciente')) {
+      return allApts;
+    }
+
+    return [];
   }
 
   // --- Clasificación Contable y Auditoría de Gastos ---
@@ -1517,7 +1569,7 @@ class StateStore {
     coveringDoctor = 'Dra. Elena Morales',
     coveringDoctorCode = 'MSP-REG-092834',
     coveringDoctorSpecialty = 'Medicina Familiar y Comunitaria',
-    coveringDoctorPhone = '+593 98 471 9283',
+    coveringDoctorPhone = '0984719283',
     reason = 'Guardia imprevista hospitalaria',
     scope = 'citas_especificas',
     appointmentIds = [],
@@ -1642,7 +1694,7 @@ class StateStore {
       console.warn('Error limpiando localStorage:', e);
     }
     for (const k of Object.keys(DEMO_USERS)) {
-      if (k.startsWith('paciente') || DEMO_USERS[k].role === 'paciente') {
+      if (k.startsWith('paciente_') && k !== 'paciente') {
         delete DEMO_USERS[k];
       }
     }
