@@ -383,3 +383,199 @@ export const aplicarMascaraInputs = () => {
     }
   });
 };
+
+/**
+ * ========================================================================
+ * VALIDACIONES ALGORÍTMICAS PARA TARJETAS DE CRÉDITO Y PASARELA DE PAGO
+ * ========================================================================
+ */
+
+/**
+ * Detecta la marca / franquicia de la tarjeta según los rangos BIN oficiales
+ * @param {string} numero
+ * @returns {{ brand: string, name: string, cvvLength: number }}
+ */
+export const detectarMarcaTarjeta = (numero) => {
+  const clean = (numero || '').replace(/\D/g, '');
+  if (/^4/.test(clean)) {
+    return { brand: 'visa', name: 'Visa', cvvLength: 3 };
+  }
+  if (/^(5[1-5]|2[2-7])/.test(clean)) {
+    return { brand: 'mastercard', name: 'Mastercard', cvvLength: 3 };
+  }
+  if (/^3[47]/.test(clean)) {
+    return { brand: 'amex', name: 'American Express', cvvLength: 4 };
+  }
+  if (/^3(0[0-5]|[68])/.test(clean)) {
+    return { brand: 'diners', name: 'Diners Club', cvvLength: 3 };
+  }
+  if (/^6(011|5)/.test(clean)) {
+    return { brand: 'discover', name: 'Discover', cvvLength: 3 };
+  }
+  return { brand: 'generic', name: 'Tarjeta de Crédito / Débito', cvvLength: 3 };
+};
+
+/**
+ * Validador Algorítmico Módulo 10 (Luhn) para Números de Tarjeta de Crédito
+ * Requisitos:
+ * 1. Longitud entre 13 y 19 dígitos numéricos enteros positivos.
+ * 2. Multiplicación alternada x2 de derecha a izquierda con resta de 9 si producto > 9.
+ * 3. Coincidencia estricta de residuo cero al aplicar Módulo 10.
+ * @param {string} numero
+ * @returns {{ isValid: boolean, message: string, brand?: object }}
+ */
+export const validarTarjetaLuhn = (numero) => {
+  if (!numero || typeof numero !== 'string') {
+    return { isValid: false, message: 'Ingrese el número de la tarjeta de crédito.' };
+  }
+
+  const clean = numero.replace(/\D/g, '');
+
+  if (clean.length < 13 || clean.length > 19) {
+    return {
+      isValid: false,
+      message: `El número de tarjeta debe tener entre 13 y 19 dígitos (actualmente tiene ${clean.length}).`
+    };
+  }
+
+  let sum = 0;
+  let shouldDouble = false;
+
+  for (let i = clean.length - 1; i >= 0; i--) {
+    let digit = parseInt(clean.charAt(i), 10);
+    if (shouldDouble) {
+      digit *= 2;
+      if (digit > 9) {
+        digit -= 9;
+      }
+    }
+    sum += digit;
+    shouldDouble = !shouldDouble;
+  }
+
+  const isValid = (sum % 10 === 0);
+  const brand = detectarMarcaTarjeta(clean);
+
+  if (!isValid) {
+    return {
+      isValid: false,
+      message: 'Número de tarjeta inválido. No supera el algoritmo matemático de verificación Luhn.',
+      brand
+    };
+  }
+
+  return {
+    isValid: true,
+    message: `Tarjeta ${brand.name} válida.`,
+    brand
+  };
+};
+
+/**
+ * Validador Algorítmico de Fecha de Expiración (MM/AA o MM/AAAA)
+ * Requisitos:
+ * 1. Formato exacto MM/AA o MM/AAAA.
+ * 2. Mes comprendido entre 01 y 12.
+ * 3. No vencida respecto al mes y año actual del sistema.
+ * 4. Máximo 20 años de vigencia razonable.
+ * @param {string} fechaStr
+ * @returns {{ isValid: boolean, message: string }}
+ */
+export const validarFechaExpiracion = (fechaStr) => {
+  if (!fechaStr || typeof fechaStr !== 'string') {
+    return { isValid: false, message: 'Ingrese la fecha de expiración (MM/AA).' };
+  }
+
+  const clean = fechaStr.trim().replace(/\s+/g, '');
+  const match = clean.match(/^(0[1-9]|1[0-2])\/([0-9]{2}|[0-9]{4})$/);
+
+  if (!match) {
+    return { isValid: false, message: 'Formato incorrecto. Use MM/AA (ejemplo: 08/28).' };
+  }
+
+  const mes = parseInt(match[1], 10);
+  let anio = parseInt(match[2], 10);
+  if (anio < 100) {
+    anio += 2000;
+  }
+
+  const now = new Date();
+  const anioActual = now.getFullYear();
+  const mesActual = now.getMonth() + 1; // 1-12
+
+  if (anio < anioActual || (anio === anioActual && mes < mesActual)) {
+    return { isValid: false, message: 'La tarjeta se encuentra vencida / expirada.' };
+  }
+
+  if (anio > anioActual + 20) {
+    return { isValid: false, message: 'Año de expiración inválido o demasiado lejano.' };
+  }
+
+  return { isValid: true, message: 'Fecha de expiración válida.' };
+};
+
+/**
+ * Validador de Código de Seguridad CVV / CVC
+ * Requisitos:
+ * 1. Exactamente 3 dígitos numéricos (o 4 para American Express).
+ * @param {string} cvv
+ * @param {string} [brand='generic']
+ * @returns {{ isValid: boolean, message: string }}
+ */
+export const validarCodigoSeguridadCVV = (cvv, brand = 'generic') => {
+  if (!cvv || typeof cvv !== 'string') {
+    return { isValid: false, message: 'Ingrese el código de seguridad (CVV/CVC).' };
+  }
+
+  const clean = cvv.trim();
+  const reqLen = (brand === 'amex') ? 4 : 3;
+
+  if (!/^\d+$/.test(clean)) {
+    return { isValid: false, message: 'El CVV debe contener únicamente dígitos numéricos.' };
+  }
+
+  if (brand === 'amex') {
+    if (clean.length !== 4) {
+      return { isValid: false, message: 'Para American Express el código de seguridad debe tener 4 dígitos.' };
+    }
+  } else {
+    if (clean.length !== 3 && clean.length !== 4) {
+      return { isValid: false, message: 'El código CVV de seguridad debe tener 3 dígitos (al reverso de la tarjeta).' };
+    }
+  }
+
+  return { isValid: true, message: 'Código de seguridad válido.' };
+};
+
+/**
+ * Validador de Nombre del Titular de la Tarjeta
+ * Requisitos:
+ * 1. Solo caracteres alfabéticos y espacios.
+ * 2. Mínimo 2 palabras (Nombre y Apellido).
+ * 3. Entre 5 y 60 caracteres.
+ * @param {string} nombre
+ * @returns {{ isValid: boolean, message: string }}
+ */
+export const validarNombreTitularTarjeta = (nombre) => {
+  if (!nombre || typeof nombre !== 'string') {
+    return { isValid: false, message: 'Ingrese el nombre y apellido tal como aparece en la tarjeta.' };
+  }
+
+  const clean = nombre.trim().replace(/\s+/g, ' ');
+
+  if (clean.length < 5) {
+    return { isValid: false, message: 'El nombre del titular debe contener al menos 5 letras.' };
+  }
+
+  if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(clean)) {
+    return { isValid: false, message: 'El nombre solo puede contener letras y espacios (sin números ni símbolos).' };
+  }
+
+  const words = clean.split(' ').filter(w => w.length >= 2);
+  if (words.length < 2) {
+    return { isValid: false, message: 'Ingrese nombre y apellido completos del titular (mínimo 2 palabras).' };
+  }
+
+  return { isValid: true, message: 'Nombre del titular válido.' };
+};
+

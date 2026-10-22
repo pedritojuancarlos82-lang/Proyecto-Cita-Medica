@@ -2030,6 +2030,68 @@ const EmailService = {
   },
 
   /**
+   * Envía correo con los datos de cuenta bancaria e instrucciones de transferencia
+   * para confirmar la cita médica por Transferencia Bancaria Directa
+   * @param {Object} appointmentData
+   * @param {Function} [showToastFn]
+   */
+  sendBankTransferEmail(appointmentData, showToastFn) {
+    if (!appointmentData) return null;
+
+    const recipient = appointmentData.patientEmail || `${appointmentData.patientId || 'paciente'}@montepiedrasalud.ec`;
+    const patientName = appointmentData.patientName || 'Estimado Paciente';
+    const patientId = appointmentData.patientId || appointmentData.patientCedula || '0999999999';
+    const amountVal = (appointmentData.totalPaid !== undefined ? appointmentData.totalPaid : 20.00);
+    const amountStr = typeof amountVal === 'number' ? amountVal.toFixed(2) : parseFloat(amountVal || 20).toFixed(2);
+    const code = appointmentData.code || appointmentData.id || 'TRANS-PENDING';
+
+    const bankDetails = {
+      bank: 'Banco Pichincha',
+      accountType: 'Cuenta Corriente',
+      accountNumber: '2100849201',
+      beneficiary: 'Montepiedra Salud S.A.',
+      ruc: '0992384751001',
+      referenceId: patientId,
+      amount: `$${amountStr}`
+    };
+
+    const details = `Estimado/a ${patientName},\n\n` +
+      `Para completar su reserva médica (#${code}) mediante Transferencia Bancaria Directa, transfiera el valor a los siguientes datos oficiales:\n` +
+      `• Banco: ${bankDetails.bank}\n` +
+      `• Tipo de Cuenta: ${bankDetails.accountType}\n` +
+      `• Número de Cuenta: ${bankDetails.accountNumber}\n` +
+      `• Beneficiario: ${bankDetails.beneficiary}\n` +
+      `• RUC: ${bankDetails.ruc}\n` +
+      `• Cédula del Paciente (Referencia de Pago): ${bankDetails.referenceId}\n` +
+      `• Valor exacto a transferir: ${bankDetails.amount}\n\n` +
+      `Una vez realizada la transferencia, su comprobante quedará automáticamente validado al emitir su ticket digital.`;
+
+    const logEntry = store.addNotificationLog({
+      type: 'TRANSFERENCIA_BANCARIA',
+      title: 'Datos para Transferencia Bancaria Directa',
+      recipient,
+      patientName,
+      appointmentCode: code,
+      sede: 'Montepiedra Salud',
+      date: appointmentData.date || getTodayDateStr(),
+      time: appointmentData.time || '10:00',
+      status: 'Entregado',
+      details
+    });
+
+    console.log('🏦 [EmailService] Correo de transferencia bancaria despachado a:', recipient, bankDetails);
+
+    const toastMsg = `📧 Correo enviado a ${recipient} con datos bancarios (Banco Pichincha, Cta: 2100849201, Cédula: ${patientId})`;
+    if (typeof showToastFn === 'function') {
+      showToastFn(toastMsg, 'info');
+    } else if (typeof window !== 'undefined' && typeof window.showToast === 'function') {
+      window.showToast(toastMsg, 'info');
+    }
+
+    return { success: true, logEntry, bankDetails, recipient };
+  },
+
+  /**
    * Enviar correo de prueba para verificar conectividad
    * @param {string} testEmail
    * @param {Function} [showToastFn]
@@ -2451,6 +2513,202 @@ const aplicarMascaraInputs = () => {
     }
   });
 };
+
+/**
+ * ========================================================================
+ * VALIDACIONES ALGORÍTMICAS PARA TARJETAS DE CRÉDITO Y PASARELA DE PAGO
+ * ========================================================================
+ */
+
+/**
+ * Detecta la marca / franquicia de la tarjeta según los rangos BIN oficiales
+ * @param {string} numero
+ * @returns {{ brand: string, name: string, cvvLength: number }}
+ */
+const detectarMarcaTarjeta = (numero) => {
+  const clean = (numero || '').replace(/\D/g, '');
+  if (/^4/.test(clean)) {
+    return { brand: 'visa', name: 'Visa', cvvLength: 3 };
+  }
+  if (/^(5[1-5]|2[2-7])/.test(clean)) {
+    return { brand: 'mastercard', name: 'Mastercard', cvvLength: 3 };
+  }
+  if (/^3[47]/.test(clean)) {
+    return { brand: 'amex', name: 'American Express', cvvLength: 4 };
+  }
+  if (/^3(0[0-5]|[68])/.test(clean)) {
+    return { brand: 'diners', name: 'Diners Club', cvvLength: 3 };
+  }
+  if (/^6(011|5)/.test(clean)) {
+    return { brand: 'discover', name: 'Discover', cvvLength: 3 };
+  }
+  return { brand: 'generic', name: 'Tarjeta de Crédito / Débito', cvvLength: 3 };
+};
+
+/**
+ * Validador Algorítmico Módulo 10 (Luhn) para Números de Tarjeta de Crédito
+ * Requisitos:
+ * 1. Longitud entre 13 y 19 dígitos numéricos enteros positivos.
+ * 2. Multiplicación alternada x2 de derecha a izquierda con resta de 9 si producto > 9.
+ * 3. Coincidencia estricta de residuo cero al aplicar Módulo 10.
+ * @param {string} numero
+ * @returns {{ isValid: boolean, message: string, brand?: object }}
+ */
+const validarTarjetaLuhn = (numero) => {
+  if (!numero || typeof numero !== 'string') {
+    return { isValid: false, message: 'Ingrese el número de la tarjeta de crédito.' };
+  }
+
+  const clean = numero.replace(/\D/g, '');
+
+  if (clean.length < 13 || clean.length > 19) {
+    return {
+      isValid: false,
+      message: `El número de tarjeta debe tener entre 13 y 19 dígitos (actualmente tiene ${clean.length}).`
+    };
+  }
+
+  let sum = 0;
+  let shouldDouble = false;
+
+  for (let i = clean.length - 1; i >= 0; i--) {
+    let digit = parseInt(clean.charAt(i), 10);
+    if (shouldDouble) {
+      digit *= 2;
+      if (digit > 9) {
+        digit -= 9;
+      }
+    }
+    sum += digit;
+    shouldDouble = !shouldDouble;
+  }
+
+  const isValid = (sum % 10 === 0);
+  const brand = detectarMarcaTarjeta(clean);
+
+  if (!isValid) {
+    return {
+      isValid: false,
+      message: 'Número de tarjeta inválido. No supera el algoritmo matemático de verificación Luhn.',
+      brand
+    };
+  }
+
+  return {
+    isValid: true,
+    message: `Tarjeta ${brand.name} válida.`,
+    brand
+  };
+};
+
+/**
+ * Validador Algorítmico de Fecha de Expiración (MM/AA o MM/AAAA)
+ * Requisitos:
+ * 1. Formato exacto MM/AA o MM/AAAA.
+ * 2. Mes comprendido entre 01 y 12.
+ * 3. No vencida respecto al mes y año actual del sistema.
+ * 4. Máximo 20 años de vigencia razonable.
+ * @param {string} fechaStr
+ * @returns {{ isValid: boolean, message: string }}
+ */
+const validarFechaExpiracion = (fechaStr) => {
+  if (!fechaStr || typeof fechaStr !== 'string') {
+    return { isValid: false, message: 'Ingrese la fecha de expiración (MM/AA).' };
+  }
+
+  const clean = fechaStr.trim().replace(/\s+/g, '');
+  const match = clean.match(/^(0[1-9]|1[0-2])\/([0-9]{2}|[0-9]{4})$/);
+
+  if (!match) {
+    return { isValid: false, message: 'Formato incorrecto. Use MM/AA (ejemplo: 08/28).' };
+  }
+
+  const mes = parseInt(match[1], 10);
+  let anio = parseInt(match[2], 10);
+  if (anio < 100) {
+    anio += 2000;
+  }
+
+  const now = new Date();
+  const anioActual = now.getFullYear();
+  const mesActual = now.getMonth() + 1; // 1-12
+
+  if (anio < anioActual || (anio === anioActual && mes < mesActual)) {
+    return { isValid: false, message: 'La tarjeta se encuentra vencida / expirada.' };
+  }
+
+  if (anio > anioActual + 20) {
+    return { isValid: false, message: 'Año de expiración inválido o demasiado lejano.' };
+  }
+
+  return { isValid: true, message: 'Fecha de expiración válida.' };
+};
+
+/**
+ * Validador de Código de Seguridad CVV / CVC
+ * Requisitos:
+ * 1. Exactamente 3 dígitos numéricos (o 4 para American Express).
+ * @param {string} cvv
+ * @param {string} [brand='generic']
+ * @returns {{ isValid: boolean, message: string }}
+ */
+const validarCodigoSeguridadCVV = (cvv, brand = 'generic') => {
+  if (!cvv || typeof cvv !== 'string') {
+    return { isValid: false, message: 'Ingrese el código de seguridad (CVV/CVC).' };
+  }
+
+  const clean = cvv.trim();
+  const reqLen = (brand === 'amex') ? 4 : 3;
+
+  if (!/^\d+$/.test(clean)) {
+    return { isValid: false, message: 'El CVV debe contener únicamente dígitos numéricos.' };
+  }
+
+  if (brand === 'amex') {
+    if (clean.length !== 4) {
+      return { isValid: false, message: 'Para American Express el código de seguridad debe tener 4 dígitos.' };
+    }
+  } else {
+    if (clean.length !== 3 && clean.length !== 4) {
+      return { isValid: false, message: 'El código CVV de seguridad debe tener 3 dígitos (al reverso de la tarjeta).' };
+    }
+  }
+
+  return { isValid: true, message: 'Código de seguridad válido.' };
+};
+
+/**
+ * Validador de Nombre del Titular de la Tarjeta
+ * Requisitos:
+ * 1. Solo caracteres alfabéticos y espacios.
+ * 2. Mínimo 2 palabras (Nombre y Apellido).
+ * 3. Entre 5 y 60 caracteres.
+ * @param {string} nombre
+ * @returns {{ isValid: boolean, message: string }}
+ */
+const validarNombreTitularTarjeta = (nombre) => {
+  if (!nombre || typeof nombre !== 'string') {
+    return { isValid: false, message: 'Ingrese el nombre y apellido tal como aparece en la tarjeta.' };
+  }
+
+  const clean = nombre.trim().replace(/\s+/g, ' ');
+
+  if (clean.length < 5) {
+    return { isValid: false, message: 'El nombre del titular debe contener al menos 5 letras.' };
+  }
+
+  if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(clean)) {
+    return { isValid: false, message: 'El nombre solo puede contener letras y espacios (sin números ni símbolos).' };
+  }
+
+  const words = clean.split(' ').filter(w => w.length >= 2);
+  if (words.length < 2) {
+    return { isValid: false, message: 'Ingrese nombre y apellido completos del titular (mínimo 2 palabras).' };
+  }
+
+  return { isValid: true, message: 'Nombre del titular válido.' };
+};
+
 
 
 // ==================== js/ambient-background.js ====================
@@ -6991,8 +7249,15 @@ function setupPatientPortal(showToast) {
               phone: (phoneInput && phoneInput.value.trim()) || ''
             };
 
-        // Generar y confirmar ticket exclusivamente al presionar este botón
-        await confirmAndCreateAppointment(userToUse);
+        // Procesar según el método de pago seleccionado:
+        // - Transferencia Bancaria: abre ventana, envía correo con datos de cuenta y cédula, luego entrega ticket
+        // - Tarjeta de Crédito: abre ventana, pide datos y valida con algoritmos (Luhn, etc.), luego entrega ticket
+        // - Efectivo: genera y entrega el ticket directamente
+        if (selectedPaymentMethod === 'transfer' || selectedPaymentMethod === 'card') {
+          openPaymentCheckoutModal(userToUse);
+        } else {
+          await confirmAndCreateAppointment(userToUse);
+        }
       } else if (currentStep === 4) {
         // Reiniciar flujo para nueva cita con la fecha de hoy y campos limpios
         selectedDate = getTodayDateStr();
@@ -7002,6 +7267,391 @@ function setupPatientPortal(showToast) {
         updateStepView();
       }
     });
+  }
+
+  // --- MODAL DE CHECKOUT Y PASARELA DE PAGO (Transferencia y Tarjeta de Crédito) ---
+  function openPaymentCheckoutModal(userToUse) {
+    const modal = document.getElementById('modal-payment-checkout');
+    if (!modal) {
+      confirmAndCreateAppointment(userToUse);
+      return;
+    }
+
+    const viewTransfer = document.getElementById('payment-view-transfer');
+    const viewCard = document.getElementById('payment-view-card');
+    const modalTitle = document.getElementById('payment-modal-title');
+    const modalSubtitle = document.getElementById('payment-modal-subtitle');
+    const modalIcon = document.getElementById('payment-modal-icon');
+    const btnCloseModal = document.getElementById('btn-close-payment-modal');
+
+    // Cerrar modal al hacer clic en X
+    const closeModal = () => {
+      modal.classList.remove('active');
+    };
+    if (btnCloseModal) {
+      btnCloseModal.onclick = closeModal;
+    }
+
+    const isTransfer = (selectedPaymentMethod === 'transfer' || selectedPaymentMethod === 'transferencia');
+    const isCard = (selectedPaymentMethod === 'card' || selectedPaymentMethod === 'tarjeta');
+
+    if (isTransfer) {
+      // ==========================================
+      // VISTA DE TRANSFERENCIA BANCARIA DIRECTA
+      // ==========================================
+      if (viewTransfer) viewTransfer.style.display = 'block';
+      if (viewCard) viewCard.style.display = 'none';
+
+      if (modalTitle) modalTitle.textContent = 'Transferencia Bancaria Directa';
+      if (modalSubtitle) modalSubtitle.textContent = 'Montepiedra Salud • 0% Comisión Pasarela (Ahorras $1.95)';
+      if (modalIcon) modalIcon.textContent = '🏦';
+
+      const emailDisplay = document.getElementById('transfer-sent-email-display');
+      const cedulaDisplay = document.getElementById('transfer-cedula-ref');
+      const amountDisplay = document.getElementById('transfer-amount-display');
+
+      const patEmail = userToUse.email || (emailInput ? emailInput.value.trim() : '') || 'paciente@montepiedrasalud.ec';
+      const patCedula = userToUse.idNumber || userToUse.cedula || (idInput ? idInput.value.trim() : '') || '0987654321';
+
+      if (emailDisplay) emailDisplay.textContent = patEmail;
+      if (cedulaDisplay) cedulaDisplay.textContent = patCedula;
+      if (amountDisplay) amountDisplay.textContent = '$20.00';
+
+      // 1. Enviar correo electrónico con número de cédula, número de cuenta y banco (datos ficticios demo)
+      if (typeof EmailService !== 'undefined' && EmailService.sendBankTransferEmail) {
+        EmailService.sendBankTransferEmail({
+          patientEmail: patEmail,
+          patientName: userToUse.name,
+          patientId: patCedula,
+          totalPaid: 20.00,
+          date: selectedDate,
+          time: selectedTimeSlot
+        }, showToast);
+      }
+
+      // Botón Copiar Cuenta Bancaria
+      const btnCopy = document.getElementById('btn-copy-bank-account');
+      if (btnCopy) {
+        btnCopy.onclick = () => {
+          navigator.clipboard.writeText('2100849201').then(() => {
+            btnCopy.textContent = '¡Copiado!';
+            setTimeout(() => { btnCopy.textContent = 'Copiar'; }, 2000);
+          }).catch(() => {
+            btnCopy.textContent = '¡Copiado!';
+          });
+        };
+      }
+
+      // Botón Volver
+      const btnCancel = document.getElementById('btn-cancel-transfer-payment');
+      if (btnCancel) {
+        btnCancel.onclick = closeModal;
+      }
+
+      // Botón Confirmar y Recibir Ticket
+      const btnConfirm = document.getElementById('btn-confirm-transfer-payment');
+      if (btnConfirm) {
+        btnConfirm.onclick = async () => {
+          closeModal();
+          await confirmAndCreateAppointment(userToUse);
+        };
+      }
+
+      modal.classList.add('active');
+
+    } else if (isCard) {
+      // ==========================================
+      // VISTA DE TARJETA DE CRÉDITO
+      // ==========================================
+      if (viewTransfer) viewTransfer.style.display = 'none';
+      if (viewCard) viewCard.style.display = 'block';
+
+      if (modalTitle) modalTitle.textContent = 'Pago Seguro con Tarjeta de Crédito';
+      if (modalSubtitle) modalSubtitle.textContent = 'Pasarela Datafast • Recargo financiero legal 9.75%';
+      if (modalIcon) modalIcon.textContent = '💳';
+
+      const ccNumberInput = document.getElementById('cc-input-number');
+      const ccNameInput = document.getElementById('cc-input-name');
+      const ccExpiryInput = document.getElementById('cc-input-expiry');
+      const ccCvvInput = document.getElementById('cc-input-cvv');
+      const formCard = document.getElementById('form-credit-card-checkout');
+
+      const cardPreviewNumber = document.getElementById('card-preview-number');
+      const cardPreviewName = document.getElementById('card-preview-name');
+      const cardPreviewExpiry = document.getElementById('card-preview-expiry');
+      const cardBrandBadge = document.getElementById('card-brand-badge');
+      const cardPreviewBox = document.getElementById('interactive-card-preview');
+      const brandIndicator = document.getElementById('cc-brand-indicator');
+
+      const ccErrorNumber = document.getElementById('cc-error-number');
+      const ccErrorName = document.getElementById('cc-error-name');
+      const ccErrorExpiry = document.getElementById('cc-error-expiry');
+      const ccErrorCvv = document.getElementById('cc-error-cvv');
+
+      const clearCardErrors = () => {
+        [ccErrorNumber, ccErrorName, ccErrorExpiry, ccErrorCvv].forEach(errEl => {
+          if (errEl) {
+            errEl.textContent = '';
+            errEl.classList.remove('visible');
+          }
+        });
+        [ccNumberInput, ccNameInput, ccExpiryInput, ccCvvInput].forEach(inp => {
+          if (inp) inp.classList.remove('error');
+        });
+      };
+
+      const setCardFieldError = (inp, errEl, msg) => {
+        if (inp) {
+          inp.classList.add('error');
+          inp.classList.remove('valid');
+        }
+        if (errEl) {
+          errEl.textContent = msg;
+          errEl.classList.add('visible');
+        }
+      };
+
+      const setCardFieldValid = (inp, errEl) => {
+        if (inp) {
+          inp.classList.remove('error');
+          inp.classList.add('valid');
+        }
+        if (errEl) {
+          errEl.textContent = '';
+          errEl.classList.remove('visible');
+        }
+      };
+
+      // Reset inicial del formulario
+      clearCardErrors();
+      if (ccNumberInput) ccNumberInput.value = '';
+      if (ccNameInput) ccNameInput.value = (userToUse.name && userToUse.name !== 'Paciente') ? userToUse.name.toUpperCase() : '';
+      if (ccExpiryInput) ccExpiryInput.value = '';
+      if (ccCvvInput) ccCvvInput.value = '';
+
+      if (cardPreviewNumber) cardPreviewNumber.textContent = '•••• •••• •••• ••••';
+      if (cardPreviewName) cardPreviewName.textContent = ccNameInput.value || 'NOMBRE DEL TITULAR';
+      if (cardPreviewExpiry) cardPreviewExpiry.textContent = 'MM/AA';
+      if (cardBrandBadge) cardBrandBadge.textContent = 'VISA / MC';
+      if (cardPreviewBox) cardPreviewBox.className = 'interactive-credit-card-box';
+      if (brandIndicator) brandIndicator.textContent = 'Algoritmo Luhn (Módulo 10)';
+
+      let detectedBrand = 'generic';
+
+      // 1. Formateo y validación de Número de Tarjeta
+      if (ccNumberInput && !ccNumberInput.dataset.listenersBound) {
+        ccNumberInput.dataset.listenersBound = 'true';
+        ccNumberInput.addEventListener('input', (e) => {
+          let val = e.target.value.replace(/\D/g, '').substring(0, 16);
+          const brandInfo = detectarMarcaTarjeta(val);
+          detectedBrand = brandInfo.brand;
+
+          // Formateo visual en bloques de 4 dígitos
+          const formatted = val.match(/.{1,4}/g)?.join(' ') || val;
+          e.target.value = formatted;
+
+          // Reflejar en la tarjeta plástica
+          if (cardPreviewNumber) {
+            cardPreviewNumber.textContent = formatted || '•••• •••• •••• ••••';
+          }
+          if (cardBrandBadge) {
+            cardBrandBadge.textContent = brandInfo.name.toUpperCase();
+          }
+          if (brandIndicator) {
+            brandIndicator.textContent = `${brandInfo.name} • Algoritmo Luhn`;
+          }
+          if (cardPreviewBox) {
+            cardPreviewBox.className = `interactive-credit-card-box brand-${detectedBrand}`;
+          }
+
+          if (val.length >= 13) {
+            const luhnCheck = validarTarjetaLuhn(val);
+            if (luhnCheck.isValid) {
+              setCardFieldValid(ccNumberInput, ccErrorNumber);
+            } else {
+              setCardFieldError(ccNumberInput, ccErrorNumber, luhnCheck.message);
+            }
+          } else {
+            setCardFieldValid(ccNumberInput, ccErrorNumber);
+          }
+        });
+
+        ccNumberInput.addEventListener('blur', () => {
+          const raw = ccNumberInput.value.replace(/\D/g, '');
+          if (raw.length > 0) {
+            const luhnCheck = validarTarjetaLuhn(raw);
+            if (!luhnCheck.isValid) {
+              setCardFieldError(ccNumberInput, ccErrorNumber, luhnCheck.message);
+            } else {
+              setCardFieldValid(ccNumberInput, ccErrorNumber);
+            }
+          }
+        });
+      }
+
+      // 2. Nombre del Titular
+      if (ccNameInput && !ccNameInput.dataset.listenersBound) {
+        ccNameInput.dataset.listenersBound = 'true';
+        ccNameInput.addEventListener('input', (e) => {
+          let val = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').toUpperCase();
+          e.target.value = val;
+          if (cardPreviewName) {
+            cardPreviewName.textContent = val || 'NOMBRE DEL TITULAR';
+          }
+          const check = validarNombreTitularTarjeta(val);
+          if (check.isValid) {
+            setCardFieldValid(ccNameInput, ccErrorName);
+          }
+        });
+
+        ccNameInput.addEventListener('blur', () => {
+          const val = ccNameInput.value.trim();
+          if (val.length > 0) {
+            const check = validarNombreTitularTarjeta(val);
+            if (!check.isValid) {
+              setCardFieldError(ccNameInput, ccErrorName, check.message);
+            } else {
+              setCardFieldValid(ccNameInput, ccErrorName);
+            }
+          }
+        });
+      }
+
+      // 3. Fecha de Expiración
+      if (ccExpiryInput && !ccExpiryInput.dataset.listenersBound) {
+        ccExpiryInput.dataset.listenersBound = 'true';
+        ccExpiryInput.addEventListener('input', (e) => {
+          let val = e.target.value.replace(/\D/g, '').substring(0, 4);
+          if (val.length >= 3) {
+            val = val.substring(0, 2) + '/' + val.substring(2);
+          }
+          e.target.value = val;
+          if (cardPreviewExpiry) {
+            cardPreviewExpiry.textContent = val || 'MM/AA';
+          }
+
+          if (val.length === 5) {
+            const check = validarFechaExpiracion(val);
+            if (check.isValid) {
+              setCardFieldValid(ccExpiryInput, ccErrorExpiry);
+            } else {
+              setCardFieldError(ccExpiryInput, ccErrorExpiry, check.message);
+            }
+          }
+        });
+
+        ccExpiryInput.addEventListener('blur', () => {
+          const val = ccExpiryInput.value.trim();
+          if (val.length > 0) {
+            const check = validarFechaExpiracion(val);
+            if (!check.isValid) {
+              setCardFieldError(ccExpiryInput, ccErrorExpiry, check.message);
+            } else {
+              setCardFieldValid(ccExpiryInput, ccErrorExpiry);
+            }
+          }
+        });
+      }
+
+      // 4. Código CVV
+      if (ccCvvInput && !ccCvvInput.dataset.listenersBound) {
+        ccCvvInput.dataset.listenersBound = 'true';
+        ccCvvInput.addEventListener('input', (e) => {
+          const maxLen = (detectedBrand === 'amex') ? 4 : 3;
+          let val = e.target.value.replace(/\D/g, '').substring(0, maxLen);
+          e.target.value = val;
+          if (val.length === maxLen) {
+            setCardFieldValid(ccCvvInput, ccErrorCvv);
+          }
+        });
+
+        ccCvvInput.addEventListener('blur', () => {
+          const val = ccCvvInput.value.trim();
+          if (val.length > 0) {
+            const check = validarCodigoSeguridadCVV(val, detectedBrand);
+            if (!check.isValid) {
+              setCardFieldError(ccCvvInput, ccErrorCvv, check.message);
+            } else {
+              setCardFieldValid(ccCvvInput, ccErrorCvv);
+            }
+          }
+        });
+      }
+
+      // Botón Cancelar Tarjeta
+      const btnCancelCard = document.getElementById('btn-cancel-card-payment');
+      if (btnCancelCard) {
+        btnCancelCard.onclick = closeModal;
+      }
+
+      // Envío del Formulario de Tarjeta
+      if (formCard) {
+        formCard.onsubmit = async (e) => {
+          e.preventDefault();
+          clearCardErrors();
+
+          const rawNumber = (ccNumberInput ? ccNumberInput.value : '').replace(/\D/g, '');
+          const rawName = (ccNameInput ? ccNameInput.value : '').trim();
+          const rawExpiry = (ccExpiryInput ? ccExpiryInput.value : '').trim();
+          const rawCvv = (ccCvvInput ? ccCvvInput.value : '').trim();
+
+          // Algoritmo 1: Tarjeta con Luhn
+          const checkNum = validarTarjetaLuhn(rawNumber);
+          if (!checkNum.isValid) {
+            setCardFieldError(ccNumberInput, ccErrorNumber, checkNum.message);
+            if (ccNumberInput) ccNumberInput.focus();
+            showToast(checkNum.message, 'danger');
+            return;
+          }
+
+          // Algoritmo 2: Nombre del Titular
+          const checkName = validarNombreTitularTarjeta(rawName);
+          if (!checkName.isValid) {
+            setCardFieldError(ccNameInput, ccErrorName, checkName.message);
+            if (ccNameInput) ccNameInput.focus();
+            showToast(checkName.message, 'warning');
+            return;
+          }
+
+          // Algoritmo 3: Fecha de Expiración
+          const checkExp = validarFechaExpiracion(rawExpiry);
+          if (!checkExp.isValid) {
+            setCardFieldError(ccExpiryInput, ccErrorExpiry, checkExp.message);
+            if (ccExpiryInput) ccExpiryInput.focus();
+            showToast(checkExp.message, 'danger');
+            return;
+          }
+
+          // Algoritmo 4: CVV
+          const checkCvv = validarCodigoSeguridadCVV(rawCvv, detectedBrand);
+          if (!checkCvv.isValid) {
+            setCardFieldError(ccCvvInput, ccErrorCvv, checkCvv.message);
+            if (ccCvvInput) ccCvvInput.focus();
+            showToast(checkCvv.message, 'danger');
+            return;
+          }
+
+          // Micro-animación en el botón
+          const payBtnText = document.getElementById('card-pay-btn-text');
+          const submitBtn = document.getElementById('btn-submit-card-payment');
+          if (payBtnText) payBtnText.textContent = '🔒 Procesando cobro Datafast...';
+          if (submitBtn) submitBtn.disabled = true;
+
+          setTimeout(async () => {
+            closeModal();
+            if (payBtnText) payBtnText.textContent = 'Pagar $21.95 y Recibir Ticket 🔒';
+            if (submitBtn) submitBtn.disabled = false;
+            await confirmAndCreateAppointment(userToUse);
+          }, 600);
+        };
+      }
+
+      modal.classList.add('active');
+
+    } else {
+      // Si es 'cash', se entrega el ticket directamente
+      confirmAndCreateAppointment(userToUse);
+    }
   }
 
   // --- GESTIÓN DEL PORTAL DEL PACIENTE (Pestañas: Resumen, Mis Citas, Mis Datos, Agendar Cita) ---

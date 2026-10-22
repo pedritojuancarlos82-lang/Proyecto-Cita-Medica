@@ -16,8 +16,14 @@ import {
   validarEmailDetallado,
   validarEmail,
   validarNombreCompletoDetallado,
-  validarNombreCompleto
+  validarNombreCompleto,
+  validarTarjetaLuhn,
+  detectarMarcaTarjeta,
+  validarFechaExpiracion,
+  validarCodigoSeguridadCVV,
+  validarNombreTitularTarjeta
 } from './validaciones-globales.js';
+import { EmailService } from './services/email-service.js';
 import { MedicalService } from './services/medical-service.js';
 import { CollisionEngine } from './services/collision-engine.js';
 import { QRTokenService, SlotHoldManager, PatientReconciliator } from './services/qr-token-service.js';
@@ -1483,8 +1489,15 @@ export function setupPatientPortal(showToast) {
               phone: (phoneInput && phoneInput.value.trim()) || ''
             };
 
-        // Generar y confirmar ticket exclusivamente al presionar este botón
-        await confirmAndCreateAppointment(userToUse);
+        // Procesar según el método de pago seleccionado:
+        // - Transferencia Bancaria: abre ventana, envía correo con datos de cuenta y cédula, luego entrega ticket
+        // - Tarjeta de Crédito: abre ventana, pide datos y valida con algoritmos (Luhn, etc.), luego entrega ticket
+        // - Efectivo: genera y entrega el ticket directamente
+        if (selectedPaymentMethod === 'transfer' || selectedPaymentMethod === 'card') {
+          openPaymentCheckoutModal(userToUse);
+        } else {
+          await confirmAndCreateAppointment(userToUse);
+        }
       } else if (currentStep === 4) {
         // Reiniciar flujo para nueva cita con la fecha de hoy y campos limpios
         selectedDate = getTodayDateStr();
@@ -1494,6 +1507,391 @@ export function setupPatientPortal(showToast) {
         updateStepView();
       }
     });
+  }
+
+  // --- MODAL DE CHECKOUT Y PASARELA DE PAGO (Transferencia y Tarjeta de Crédito) ---
+  function openPaymentCheckoutModal(userToUse) {
+    const modal = document.getElementById('modal-payment-checkout');
+    if (!modal) {
+      confirmAndCreateAppointment(userToUse);
+      return;
+    }
+
+    const viewTransfer = document.getElementById('payment-view-transfer');
+    const viewCard = document.getElementById('payment-view-card');
+    const modalTitle = document.getElementById('payment-modal-title');
+    const modalSubtitle = document.getElementById('payment-modal-subtitle');
+    const modalIcon = document.getElementById('payment-modal-icon');
+    const btnCloseModal = document.getElementById('btn-close-payment-modal');
+
+    // Cerrar modal al hacer clic en X
+    const closeModal = () => {
+      modal.classList.remove('active');
+    };
+    if (btnCloseModal) {
+      btnCloseModal.onclick = closeModal;
+    }
+
+    const isTransfer = (selectedPaymentMethod === 'transfer' || selectedPaymentMethod === 'transferencia');
+    const isCard = (selectedPaymentMethod === 'card' || selectedPaymentMethod === 'tarjeta');
+
+    if (isTransfer) {
+      // ==========================================
+      // VISTA DE TRANSFERENCIA BANCARIA DIRECTA
+      // ==========================================
+      if (viewTransfer) viewTransfer.style.display = 'block';
+      if (viewCard) viewCard.style.display = 'none';
+
+      if (modalTitle) modalTitle.textContent = 'Transferencia Bancaria Directa';
+      if (modalSubtitle) modalSubtitle.textContent = 'Montepiedra Salud • 0% Comisión Pasarela (Ahorras $1.95)';
+      if (modalIcon) modalIcon.textContent = '🏦';
+
+      const emailDisplay = document.getElementById('transfer-sent-email-display');
+      const cedulaDisplay = document.getElementById('transfer-cedula-ref');
+      const amountDisplay = document.getElementById('transfer-amount-display');
+
+      const patEmail = userToUse.email || (emailInput ? emailInput.value.trim() : '') || 'paciente@montepiedrasalud.ec';
+      const patCedula = userToUse.idNumber || userToUse.cedula || (idInput ? idInput.value.trim() : '') || '0987654321';
+
+      if (emailDisplay) emailDisplay.textContent = patEmail;
+      if (cedulaDisplay) cedulaDisplay.textContent = patCedula;
+      if (amountDisplay) amountDisplay.textContent = '$20.00';
+
+      // 1. Enviar correo electrónico con número de cédula, número de cuenta y banco (datos ficticios demo)
+      if (typeof EmailService !== 'undefined' && EmailService.sendBankTransferEmail) {
+        EmailService.sendBankTransferEmail({
+          patientEmail: patEmail,
+          patientName: userToUse.name,
+          patientId: patCedula,
+          totalPaid: 20.00,
+          date: selectedDate,
+          time: selectedTimeSlot
+        }, showToast);
+      }
+
+      // Botón Copiar Cuenta Bancaria
+      const btnCopy = document.getElementById('btn-copy-bank-account');
+      if (btnCopy) {
+        btnCopy.onclick = () => {
+          navigator.clipboard.writeText('2100849201').then(() => {
+            btnCopy.textContent = '¡Copiado!';
+            setTimeout(() => { btnCopy.textContent = 'Copiar'; }, 2000);
+          }).catch(() => {
+            btnCopy.textContent = '¡Copiado!';
+          });
+        };
+      }
+
+      // Botón Volver
+      const btnCancel = document.getElementById('btn-cancel-transfer-payment');
+      if (btnCancel) {
+        btnCancel.onclick = closeModal;
+      }
+
+      // Botón Confirmar y Recibir Ticket
+      const btnConfirm = document.getElementById('btn-confirm-transfer-payment');
+      if (btnConfirm) {
+        btnConfirm.onclick = async () => {
+          closeModal();
+          await confirmAndCreateAppointment(userToUse);
+        };
+      }
+
+      modal.classList.add('active');
+
+    } else if (isCard) {
+      // ==========================================
+      // VISTA DE TARJETA DE CRÉDITO
+      // ==========================================
+      if (viewTransfer) viewTransfer.style.display = 'none';
+      if (viewCard) viewCard.style.display = 'block';
+
+      if (modalTitle) modalTitle.textContent = 'Pago Seguro con Tarjeta de Crédito';
+      if (modalSubtitle) modalSubtitle.textContent = 'Pasarela Datafast • Recargo financiero legal 9.75%';
+      if (modalIcon) modalIcon.textContent = '💳';
+
+      const ccNumberInput = document.getElementById('cc-input-number');
+      const ccNameInput = document.getElementById('cc-input-name');
+      const ccExpiryInput = document.getElementById('cc-input-expiry');
+      const ccCvvInput = document.getElementById('cc-input-cvv');
+      const formCard = document.getElementById('form-credit-card-checkout');
+
+      const cardPreviewNumber = document.getElementById('card-preview-number');
+      const cardPreviewName = document.getElementById('card-preview-name');
+      const cardPreviewExpiry = document.getElementById('card-preview-expiry');
+      const cardBrandBadge = document.getElementById('card-brand-badge');
+      const cardPreviewBox = document.getElementById('interactive-card-preview');
+      const brandIndicator = document.getElementById('cc-brand-indicator');
+
+      const ccErrorNumber = document.getElementById('cc-error-number');
+      const ccErrorName = document.getElementById('cc-error-name');
+      const ccErrorExpiry = document.getElementById('cc-error-expiry');
+      const ccErrorCvv = document.getElementById('cc-error-cvv');
+
+      const clearCardErrors = () => {
+        [ccErrorNumber, ccErrorName, ccErrorExpiry, ccErrorCvv].forEach(errEl => {
+          if (errEl) {
+            errEl.textContent = '';
+            errEl.classList.remove('visible');
+          }
+        });
+        [ccNumberInput, ccNameInput, ccExpiryInput, ccCvvInput].forEach(inp => {
+          if (inp) inp.classList.remove('error');
+        });
+      };
+
+      const setCardFieldError = (inp, errEl, msg) => {
+        if (inp) {
+          inp.classList.add('error');
+          inp.classList.remove('valid');
+        }
+        if (errEl) {
+          errEl.textContent = msg;
+          errEl.classList.add('visible');
+        }
+      };
+
+      const setCardFieldValid = (inp, errEl) => {
+        if (inp) {
+          inp.classList.remove('error');
+          inp.classList.add('valid');
+        }
+        if (errEl) {
+          errEl.textContent = '';
+          errEl.classList.remove('visible');
+        }
+      };
+
+      // Reset inicial del formulario
+      clearCardErrors();
+      if (ccNumberInput) ccNumberInput.value = '';
+      if (ccNameInput) ccNameInput.value = (userToUse.name && userToUse.name !== 'Paciente') ? userToUse.name.toUpperCase() : '';
+      if (ccExpiryInput) ccExpiryInput.value = '';
+      if (ccCvvInput) ccCvvInput.value = '';
+
+      if (cardPreviewNumber) cardPreviewNumber.textContent = '•••• •••• •••• ••••';
+      if (cardPreviewName) cardPreviewName.textContent = ccNameInput.value || 'NOMBRE DEL TITULAR';
+      if (cardPreviewExpiry) cardPreviewExpiry.textContent = 'MM/AA';
+      if (cardBrandBadge) cardBrandBadge.textContent = 'VISA / MC';
+      if (cardPreviewBox) cardPreviewBox.className = 'interactive-credit-card-box';
+      if (brandIndicator) brandIndicator.textContent = 'Algoritmo Luhn (Módulo 10)';
+
+      let detectedBrand = 'generic';
+
+      // 1. Formateo y validación de Número de Tarjeta
+      if (ccNumberInput && !ccNumberInput.dataset.listenersBound) {
+        ccNumberInput.dataset.listenersBound = 'true';
+        ccNumberInput.addEventListener('input', (e) => {
+          let val = e.target.value.replace(/\D/g, '').substring(0, 16);
+          const brandInfo = detectarMarcaTarjeta(val);
+          detectedBrand = brandInfo.brand;
+
+          // Formateo visual en bloques de 4 dígitos
+          const formatted = val.match(/.{1,4}/g)?.join(' ') || val;
+          e.target.value = formatted;
+
+          // Reflejar en la tarjeta plástica
+          if (cardPreviewNumber) {
+            cardPreviewNumber.textContent = formatted || '•••• •••• •••• ••••';
+          }
+          if (cardBrandBadge) {
+            cardBrandBadge.textContent = brandInfo.name.toUpperCase();
+          }
+          if (brandIndicator) {
+            brandIndicator.textContent = `${brandInfo.name} • Algoritmo Luhn`;
+          }
+          if (cardPreviewBox) {
+            cardPreviewBox.className = `interactive-credit-card-box brand-${detectedBrand}`;
+          }
+
+          if (val.length >= 13) {
+            const luhnCheck = validarTarjetaLuhn(val);
+            if (luhnCheck.isValid) {
+              setCardFieldValid(ccNumberInput, ccErrorNumber);
+            } else {
+              setCardFieldError(ccNumberInput, ccErrorNumber, luhnCheck.message);
+            }
+          } else {
+            setCardFieldValid(ccNumberInput, ccErrorNumber);
+          }
+        });
+
+        ccNumberInput.addEventListener('blur', () => {
+          const raw = ccNumberInput.value.replace(/\D/g, '');
+          if (raw.length > 0) {
+            const luhnCheck = validarTarjetaLuhn(raw);
+            if (!luhnCheck.isValid) {
+              setCardFieldError(ccNumberInput, ccErrorNumber, luhnCheck.message);
+            } else {
+              setCardFieldValid(ccNumberInput, ccErrorNumber);
+            }
+          }
+        });
+      }
+
+      // 2. Nombre del Titular
+      if (ccNameInput && !ccNameInput.dataset.listenersBound) {
+        ccNameInput.dataset.listenersBound = 'true';
+        ccNameInput.addEventListener('input', (e) => {
+          let val = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').toUpperCase();
+          e.target.value = val;
+          if (cardPreviewName) {
+            cardPreviewName.textContent = val || 'NOMBRE DEL TITULAR';
+          }
+          const check = validarNombreTitularTarjeta(val);
+          if (check.isValid) {
+            setCardFieldValid(ccNameInput, ccErrorName);
+          }
+        });
+
+        ccNameInput.addEventListener('blur', () => {
+          const val = ccNameInput.value.trim();
+          if (val.length > 0) {
+            const check = validarNombreTitularTarjeta(val);
+            if (!check.isValid) {
+              setCardFieldError(ccNameInput, ccErrorName, check.message);
+            } else {
+              setCardFieldValid(ccNameInput, ccErrorName);
+            }
+          }
+        });
+      }
+
+      // 3. Fecha de Expiración
+      if (ccExpiryInput && !ccExpiryInput.dataset.listenersBound) {
+        ccExpiryInput.dataset.listenersBound = 'true';
+        ccExpiryInput.addEventListener('input', (e) => {
+          let val = e.target.value.replace(/\D/g, '').substring(0, 4);
+          if (val.length >= 3) {
+            val = val.substring(0, 2) + '/' + val.substring(2);
+          }
+          e.target.value = val;
+          if (cardPreviewExpiry) {
+            cardPreviewExpiry.textContent = val || 'MM/AA';
+          }
+
+          if (val.length === 5) {
+            const check = validarFechaExpiracion(val);
+            if (check.isValid) {
+              setCardFieldValid(ccExpiryInput, ccErrorExpiry);
+            } else {
+              setCardFieldError(ccExpiryInput, ccErrorExpiry, check.message);
+            }
+          }
+        });
+
+        ccExpiryInput.addEventListener('blur', () => {
+          const val = ccExpiryInput.value.trim();
+          if (val.length > 0) {
+            const check = validarFechaExpiracion(val);
+            if (!check.isValid) {
+              setCardFieldError(ccExpiryInput, ccErrorExpiry, check.message);
+            } else {
+              setCardFieldValid(ccExpiryInput, ccErrorExpiry);
+            }
+          }
+        });
+      }
+
+      // 4. Código CVV
+      if (ccCvvInput && !ccCvvInput.dataset.listenersBound) {
+        ccCvvInput.dataset.listenersBound = 'true';
+        ccCvvInput.addEventListener('input', (e) => {
+          const maxLen = (detectedBrand === 'amex') ? 4 : 3;
+          let val = e.target.value.replace(/\D/g, '').substring(0, maxLen);
+          e.target.value = val;
+          if (val.length === maxLen) {
+            setCardFieldValid(ccCvvInput, ccErrorCvv);
+          }
+        });
+
+        ccCvvInput.addEventListener('blur', () => {
+          const val = ccCvvInput.value.trim();
+          if (val.length > 0) {
+            const check = validarCodigoSeguridadCVV(val, detectedBrand);
+            if (!check.isValid) {
+              setCardFieldError(ccCvvInput, ccErrorCvv, check.message);
+            } else {
+              setCardFieldValid(ccCvvInput, ccErrorCvv);
+            }
+          }
+        });
+      }
+
+      // Botón Cancelar Tarjeta
+      const btnCancelCard = document.getElementById('btn-cancel-card-payment');
+      if (btnCancelCard) {
+        btnCancelCard.onclick = closeModal;
+      }
+
+      // Envío del Formulario de Tarjeta
+      if (formCard) {
+        formCard.onsubmit = async (e) => {
+          e.preventDefault();
+          clearCardErrors();
+
+          const rawNumber = (ccNumberInput ? ccNumberInput.value : '').replace(/\D/g, '');
+          const rawName = (ccNameInput ? ccNameInput.value : '').trim();
+          const rawExpiry = (ccExpiryInput ? ccExpiryInput.value : '').trim();
+          const rawCvv = (ccCvvInput ? ccCvvInput.value : '').trim();
+
+          // Algoritmo 1: Tarjeta con Luhn
+          const checkNum = validarTarjetaLuhn(rawNumber);
+          if (!checkNum.isValid) {
+            setCardFieldError(ccNumberInput, ccErrorNumber, checkNum.message);
+            if (ccNumberInput) ccNumberInput.focus();
+            showToast(checkNum.message, 'danger');
+            return;
+          }
+
+          // Algoritmo 2: Nombre del Titular
+          const checkName = validarNombreTitularTarjeta(rawName);
+          if (!checkName.isValid) {
+            setCardFieldError(ccNameInput, ccErrorName, checkName.message);
+            if (ccNameInput) ccNameInput.focus();
+            showToast(checkName.message, 'warning');
+            return;
+          }
+
+          // Algoritmo 3: Fecha de Expiración
+          const checkExp = validarFechaExpiracion(rawExpiry);
+          if (!checkExp.isValid) {
+            setCardFieldError(ccExpiryInput, ccErrorExpiry, checkExp.message);
+            if (ccExpiryInput) ccExpiryInput.focus();
+            showToast(checkExp.message, 'danger');
+            return;
+          }
+
+          // Algoritmo 4: CVV
+          const checkCvv = validarCodigoSeguridadCVV(rawCvv, detectedBrand);
+          if (!checkCvv.isValid) {
+            setCardFieldError(ccCvvInput, ccErrorCvv, checkCvv.message);
+            if (ccCvvInput) ccCvvInput.focus();
+            showToast(checkCvv.message, 'danger');
+            return;
+          }
+
+          // Micro-animación en el botón
+          const payBtnText = document.getElementById('card-pay-btn-text');
+          const submitBtn = document.getElementById('btn-submit-card-payment');
+          if (payBtnText) payBtnText.textContent = '🔒 Procesando cobro Datafast...';
+          if (submitBtn) submitBtn.disabled = true;
+
+          setTimeout(async () => {
+            closeModal();
+            if (payBtnText) payBtnText.textContent = 'Pagar $21.95 y Recibir Ticket 🔒';
+            if (submitBtn) submitBtn.disabled = false;
+            await confirmAndCreateAppointment(userToUse);
+          }, 600);
+        };
+      }
+
+      modal.classList.add('active');
+
+    } else {
+      // Si es 'cash', se entrega el ticket directamente
+      confirmAndCreateAppointment(userToUse);
+    }
   }
 
   // --- GESTIÓN DEL PORTAL DEL PACIENTE (Pestañas: Resumen, Mis Citas, Mis Datos, Agendar Cita) ---

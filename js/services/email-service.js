@@ -150,6 +150,68 @@ export const EmailService = {
   },
 
   /**
+   * Envía correo con los datos de cuenta bancaria e instrucciones de transferencia
+   * para confirmar la cita médica por Transferencia Bancaria Directa
+   * @param {Object} appointmentData
+   * @param {Function} [showToastFn]
+   */
+  sendBankTransferEmail(appointmentData, showToastFn) {
+    if (!appointmentData) return null;
+
+    const recipient = appointmentData.patientEmail || `${appointmentData.patientId || 'paciente'}@montepiedrasalud.ec`;
+    const patientName = appointmentData.patientName || 'Estimado Paciente';
+    const patientId = appointmentData.patientId || appointmentData.patientCedula || '0999999999';
+    const amountVal = (appointmentData.totalPaid !== undefined ? appointmentData.totalPaid : 20.00);
+    const amountStr = typeof amountVal === 'number' ? amountVal.toFixed(2) : parseFloat(amountVal || 20).toFixed(2);
+    const code = appointmentData.code || appointmentData.id || 'TRANS-PENDING';
+
+    const bankDetails = {
+      bank: 'Banco Pichincha',
+      accountType: 'Cuenta Corriente',
+      accountNumber: '2100849201',
+      beneficiary: 'Montepiedra Salud S.A.',
+      ruc: '0992384751001',
+      referenceId: patientId,
+      amount: `$${amountStr}`
+    };
+
+    const details = `Estimado/a ${patientName},\n\n` +
+      `Para completar su reserva médica (#${code}) mediante Transferencia Bancaria Directa, transfiera el valor a los siguientes datos oficiales:\n` +
+      `• Banco: ${bankDetails.bank}\n` +
+      `• Tipo de Cuenta: ${bankDetails.accountType}\n` +
+      `• Número de Cuenta: ${bankDetails.accountNumber}\n` +
+      `• Beneficiario: ${bankDetails.beneficiary}\n` +
+      `• RUC: ${bankDetails.ruc}\n` +
+      `• Cédula del Paciente (Referencia de Pago): ${bankDetails.referenceId}\n` +
+      `• Valor exacto a transferir: ${bankDetails.amount}\n\n` +
+      `Una vez realizada la transferencia, su comprobante quedará automáticamente validado al emitir su ticket digital.`;
+
+    const logEntry = store.addNotificationLog({
+      type: 'TRANSFERENCIA_BANCARIA',
+      title: 'Datos para Transferencia Bancaria Directa',
+      recipient,
+      patientName,
+      appointmentCode: code,
+      sede: 'Montepiedra Salud',
+      date: appointmentData.date || getTodayDateStr(),
+      time: appointmentData.time || '10:00',
+      status: 'Entregado',
+      details
+    });
+
+    console.log('🏦 [EmailService] Correo de transferencia bancaria despachado a:', recipient, bankDetails);
+
+    const toastMsg = `📧 Correo enviado a ${recipient} con datos bancarios (Banco Pichincha, Cta: 2100849201, Cédula: ${patientId})`;
+    if (typeof showToastFn === 'function') {
+      showToastFn(toastMsg, 'info');
+    } else if (typeof window !== 'undefined' && typeof window.showToast === 'function') {
+      window.showToast(toastMsg, 'info');
+    }
+
+    return { success: true, logEntry, bankDetails, recipient };
+  },
+
+  /**
    * Enviar correo de prueba para verificar conectividad
    * @param {string} testEmail
    * @param {Function} [showToastFn]

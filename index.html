@@ -4294,6 +4294,214 @@
     </div>
   </div>
 
+  <!-- Modal de Pasarela y Checkout de Pago (Transferencia Bancaria y Tarjeta de Crédito) -->
+  <div class="modal-overlay" id="modal-payment-checkout">
+    <div class="modal-card modal-payment-card" style="max-width: 520px; width: 92%; padding: 0; overflow: hidden; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);">
+      
+      <!-- Encabezado del Modal con Gradiente Premium -->
+      <div class="payment-modal-header" style="background: linear-gradient(135deg, #0284c7 0%, #1e3a8a 100%); color: #ffffff; padding: 20px 24px; position: relative;">
+        <button type="button" class="modal-close-btn" id="btn-close-payment-modal" title="Cerrar ventana" style="position: absolute; top: 16px; right: 18px; color: #ffffff; opacity: 0.85; font-size: 1.25rem; background: rgba(255,255,255,0.18); border-radius: 9999px; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; transition: all 0.2s;">✕</button>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="font-size: 1.8rem;" id="payment-modal-icon">💳</div>
+          <div>
+            <h3 id="payment-modal-title" style="margin: 0; font-size: 1.2rem; font-weight: 800; color: #ffffff; letter-spacing: -0.01em;">Pasarela de Pago Segura</h3>
+            <p id="payment-modal-subtitle" style="margin: 3px 0 0; font-size: 0.8rem; color: rgba(255,255,255,0.85);">Montepiedra Salud • Transacción Encriptada 256-bit</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cuerpo del Modal -->
+      <div class="payment-modal-body" style="padding: 24px; max-height: 80vh; overflow-y: auto;">
+        
+        <!-- VISTA A: TRANSFERENCIA BANCARIA DIRECTA -->
+        <div id="payment-view-transfer" style="display: none;">
+          <!-- Banner de Correo Electrónico Enviado -->
+          <div class="transfer-email-notice" style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 14px 16px; margin-bottom: 20px; display: flex; gap: 12px; align-items: flex-start;">
+            <div style="font-size: 1.5rem; line-height: 1;">📧</div>
+            <div style="flex: 1;">
+              <div style="font-weight: 700; color: #1e40af; font-size: 0.9rem; margin-bottom: 2px;">
+                ¡Instrucciones enviadas a tu correo!
+              </div>
+              <div style="font-size: 0.82rem; color: #1e3a8a; line-height: 1.4;">
+                Hemos enviado automáticamente a <strong id="transfer-sent-email-display">tu correo</strong> los datos bancarios y el número de cédula para tu transferencia.
+              </div>
+            </div>
+          </div>
+
+          <!-- Cuadro de Datos Bancarios Oficiales -->
+          <div class="bank-details-box" style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 16px 18px; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 10px;">
+              <span style="font-size: 0.76rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;">Cuenta Jurídica Oficial</span>
+              <span style="background: #ecfdf5; color: #047857; font-size: 0.72rem; font-weight: 800; padding: 3px 8px; border-radius: 6px; border: 1px solid #a7f3d0;">0% Recargo</span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 10px; font-size: 0.86rem;">
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: #64748b;">Institución Bancaria:</span>
+                <strong style="color: #0f172a;" id="transfer-bank-name">Banco Pichincha</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: #64748b;">Tipo de Cuenta:</span>
+                <strong style="color: #0f172a;">Cuenta Corriente</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: #64748b;">Número de Cuenta:</span>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <strong style="color: #0284c7; font-family: monospace; font-size: 0.95rem; font-weight: 800;" id="transfer-account-number">2100849201</strong>
+                  <button type="button" class="btn-copy-account" id="btn-copy-bank-account" title="Copiar número de cuenta" style="background: #e0f2fe; border: 1px solid #bae6fd; color: #0284c7; border-radius: 4px; padding: 2px 6px; font-size: 0.7rem; cursor: pointer; font-weight: 600;">Copiar</button>
+                </div>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: #64748b;">Beneficiario / Razón Social:</span>
+                <strong style="color: #0f172a;">Montepiedra Salud S.A.</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: #64748b;">RUC:</span>
+                <strong style="color: #0f172a; font-family: monospace;">0992384751001</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; background: #e0f2fe; padding: 6px 10px; border-radius: 6px;">
+                <span style="color: #0369a1; font-weight: 600;">Cédula Registrada (Referencia):</span>
+                <strong style="color: #0369a1; font-family: monospace; font-weight: 800;" id="transfer-cedula-ref">0987654321</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 8px; margin-top: 4px;">
+                <span style="font-weight: 700; color: #0f172a;">Monto Exacto a Transferir:</span>
+                <strong style="font-size: 1.15rem; color: #059669; font-weight: 800;" id="transfer-amount-display">$20.00</strong>
+              </div>
+            </div>
+          </div>
+
+          <p style="font-size: 0.76rem; color: #64748b; line-height: 1.4; margin-bottom: 20px; text-align: center;">
+            💡 Al confirmar la transferencia, el sistema registrará tu cita médica y te entregará tu ticket digital con código QR al instante.
+          </p>
+
+          <!-- Botón de Confirmación -->
+          <div style="display: flex; gap: 10px;">
+            <button type="button" class="btn-secondary" id="btn-cancel-transfer-payment" style="flex: 1; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer;">
+              Volver
+            </button>
+            <button type="button" class="btn-primary" id="btn-confirm-transfer-payment" style="flex: 2; padding: 12px; border-radius: 8px; font-weight: 700; font-size: 0.92rem; background: linear-gradient(135deg, #059669, #10b981); display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;">
+              <span>Confirmar y Recibir Ticket</span>
+              <span>→</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- VISTA B: TARJETA DE CRÉDITO / DÉBITO -->
+        <div id="payment-view-card" style="display: none;">
+          
+          <!-- Tarjeta Gráfica Interactiva -->
+          <div class="interactive-credit-card-box" id="interactive-card-preview" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #1e3a8a 100%); border-radius: 14px; padding: 18px 22px; color: #ffffff; box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.4); margin-bottom: 20px; position: relative; overflow: hidden; border: 1px solid rgba(255,255,255,0.15);">
+            <div style="position: absolute; right: -20px; bottom: -20px; width: 120px; height: 120px; background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%); border-radius: 50%; pointer-events: none;"></div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <!-- Chip Dorado -->
+              <div style="width: 38px; height: 28px; background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%); border-radius: 5px; border: 1px solid #b45309; box-shadow: inset 0 1px 2px rgba(255,255,255,0.4);"></div>
+              <!-- Franquicia Badge -->
+              <div id="card-brand-badge" style="font-weight: 800; font-size: 0.95rem; letter-spacing: 0.05em; background: rgba(255,255,255,0.12); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2);">
+                VISA / MC
+              </div>
+            </div>
+
+            <!-- Número de Tarjeta Formateado -->
+            <div id="card-preview-number" style="font-family: monospace; font-size: 1.15rem; letter-spacing: 0.18em; font-weight: 700; margin-bottom: 16px; text-shadow: 0 2px 4px rgba(0,0,0,0.4);">
+              •••• •••• •••• ••••
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+              <div>
+                <div style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.75; margin-bottom: 2px;">Titular de la Tarjeta</div>
+                <div id="card-preview-name" style="font-size: 0.88rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                  NOMBRE APELLIDO
+                </div>
+              </div>
+              <div style="text-align: right;">
+                <div style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.75; margin-bottom: 2px;">Expira</div>
+                <div id="card-preview-expiry" style="font-family: monospace; font-size: 0.88rem; font-weight: 700;">
+                  MM/AA
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Formulario de Tarjeta -->
+          <form id="form-credit-card-checkout" novalidate>
+            <!-- 1. Número de Tarjeta -->
+            <div class="form-group" style="margin-bottom: 14px;">
+              <label class="form-label" for="cc-input-number" style="font-size: 0.82rem; font-weight: 700; color: #1e293b; margin-bottom: 4px; display: flex; justify-content: space-between;">
+                <span>Número de Tarjeta de Crédito</span>
+                <span id="cc-brand-indicator" style="font-size: 0.75rem; color: #0284c7; font-weight: 600;">Algoritmo Luhn (Módulo 10)</span>
+              </label>
+              <div style="position: relative;">
+                <input type="text" class="form-input" id="cc-input-number" placeholder="4123 4567 8901 2345" maxlength="19" inputmode="numeric" autocomplete="cc-number" style="font-family: monospace; font-size: 0.95rem; padding-left: 38px; width: 100%;" />
+                <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 1.1rem; pointer-events: none;">💳</span>
+              </div>
+              <div class="input-error-msg" id="cc-error-number"></div>
+            </div>
+
+            <!-- 2. Nombre del Titular -->
+            <div class="form-group" style="margin-bottom: 14px;">
+              <label class="form-label" for="cc-input-name" style="font-size: 0.82rem; font-weight: 700; color: #1e293b; margin-bottom: 4px;">
+                Nombre del Titular (tal como figura en la tarjeta)
+              </label>
+              <input type="text" class="form-input" id="cc-input-name" placeholder="ej. CARLOS MENDOZA" maxlength="60" autocomplete="cc-name" style="text-transform: uppercase; font-size: 0.9rem; width: 100%;" />
+              <div class="input-error-msg" id="cc-error-name"></div>
+            </div>
+
+            <!-- Fila: Fecha de Expiración y Dígitos de Atrás (CVV) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+              <!-- 3. Fecha de Expiración -->
+              <div class="form-group">
+                <label class="form-label" for="cc-input-expiry" style="font-size: 0.82rem; font-weight: 700; color: #1e293b; margin-bottom: 4px;">
+                  Fecha (MM/AA)
+                </label>
+                <input type="text" class="form-input" id="cc-input-expiry" placeholder="MM/AA" maxlength="5" inputmode="numeric" autocomplete="cc-exp" style="font-family: monospace; text-align: center; font-size: 0.95rem; width: 100%;" />
+                <div class="input-error-msg" id="cc-error-expiry"></div>
+              </div>
+
+              <!-- 4. Dígitos de Atrás (CVV) -->
+              <div class="form-group">
+                <label class="form-label" for="cc-input-cvv" style="font-size: 0.82rem; font-weight: 700; color: #1e293b; margin-bottom: 4px; display: flex; justify-content: space-between;">
+                  <span>Dígitos de Atrás</span>
+                  <span style="font-size: 0.72rem; color: #64748b; font-weight: normal;">(CVV/CVC)</span>
+                </label>
+                <input type="password" class="form-input" id="cc-input-cvv" placeholder="123" maxlength="4" inputmode="numeric" autocomplete="cc-csc" style="font-family: monospace; text-align: center; font-size: 0.95rem; width: 100%;" />
+                <div class="input-error-msg" id="cc-error-cvv"></div>
+              </div>
+            </div>
+
+            <!-- Resumen de Cargo Financiero -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; margin-bottom: 20px; font-size: 0.82rem;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #64748b;">
+                <span>Subtotal consulta médica:</span>
+                <span>$20.00</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #ef4444;">
+                <span>Recargo pasarela Datafast (9.75%):</span>
+                <span>+$1.95</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 6px; font-weight: 800; font-size: 0.96rem; color: #0f172a;">
+                <span>Total a Debitar:</span>
+                <span style="color: #0284c7;">$21.95</span>
+              </div>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div style="display: flex; gap: 10px;">
+              <button type="button" class="btn-secondary" id="btn-cancel-card-payment" style="flex: 1; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                Volver
+              </button>
+              <button type="submit" class="btn-primary" id="btn-submit-card-payment" style="flex: 2; padding: 12px; border-radius: 8px; font-weight: 700; font-size: 0.92rem; background: linear-gradient(135deg, #0284c7, #1e40af); display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;">
+                <span id="card-pay-btn-text">Pagar $21.95 y Recibir Ticket 🔒</span>
+              </button>
+            </div>
+          </form>
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+
   <!-- Raíz de Notificaciones Toast -->
   <div class="toast-container" id="toast-notifications-root"></div>
 

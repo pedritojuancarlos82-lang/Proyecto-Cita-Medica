@@ -1949,3 +1949,90 @@
   border-color: var(--neutral-900);
   color: var(--neutral-950);
 }
+
+/* ==========================================================================
+   Checkout de Pago y Pasarela Digital (Transferencia y Tarjeta de Crédito)
+   ========================================================================== */
+
+.modal-payment-card {
+  animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.interactive-credit-card-box {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  user-select: none;
+}
+
+.interactive-credit-card-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 32px -8px rgba(15, 23, 42, 0.5) !important;
+}
+
+.interactive-credit-card-box.brand-visa {
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #0284c7 100%) !important;
+}
+
+.interactive-credit-card-box.brand-mastercard {
+  background: linear-gradient(135deg, #18181b 0%, #b91c1c 50%, #ea580c 100%) !important;
+}
+
+.interactive-credit-card-box.brand-amex {
+  background: linear-gradient(135deg, #042f2e 0%, #0f766e 50%, #14b8a6 100%) !important;
+}
+
+.interactive-credit-card-box.brand-diners {
+  background: linear-gradient(135deg, #1e1b4b 0%, #4338ca 60%, #6366f1 100%) !important;
+}
+
+.btn-copy-account {
+  transition: all 0.2s ease;
+}
+
+.btn-copy-account:hover {
+  background: #0284c7 !important;
+  color: #ffffff !important;
+}
+
+.btn-copy-account:active {
+  transform: scale(0.95);
+}
+
+#form-credit-card-checkout .form-input:focus {
+  border-color: #0284c7;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.18);
+  outline: none;
+}
+
+#form-credit-card-checkout .form-input.error {
+  border-color: #ef4444 !important;
+  background-color: #fef2f2 !important;
+}
+
+#form-credit-card-checkout .form-input.valid {
+  border-color: #10b981 !important;
+  background-color: #f0fdf4 !important;
+}
+
+#form-credit-card-checkout .input-error-msg {
+  font-size: 0.74rem;
+  color: #ef4444;
+  margin-top: 4px;
+  display: none;
+  font-weight: 600;
+}
+
+#form-credit-card-checkout .input-error-msg.visible {
+  display: block;
+}
+
