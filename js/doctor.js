@@ -176,9 +176,11 @@ export function setupDoctorPortal(showToast) {
               <button type="button" class="btn-secondary" id="btn-doc-date-prev" style="padding: 6px 12px; font-size: 0.78rem; font-weight: 700;">
                 ◀ Anterior
               </button>
-              <button type="button" class="${isToday ? 'btn-primary' : 'btn-secondary'}" id="btn-doc-date-today" style="padding: 6px 14px; font-size: 0.78rem; font-weight: 700;">
+              ${isToday ? '' : `
+              <button type="button" class="btn-secondary" id="btn-doc-date-today" style="padding: 6px 14px; font-size: 0.78rem; font-weight: 700; background: #e0f2fe; color: #0284c7; border: 1px solid #7dd3fc; border-radius: 6px; cursor: pointer;">
                 📅 Hoy
               </button>
+              `}
               <button type="button" class="btn-secondary" id="btn-doc-date-next" style="padding: 6px 12px; font-size: 0.78rem; font-weight: 700;">
                 Siguiente ▶
               </button>

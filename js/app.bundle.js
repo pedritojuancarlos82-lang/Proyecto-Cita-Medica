@@ -7471,6 +7471,15 @@ function setupPatientPortal(showToast) {
     });
   }
 
+  // Conexión del botón "➕ Nueva Cita" en la sección de Mis Citas
+  const btnCitasBookNew = document.getElementById('btn-citas-book-new');
+  if (btnCitasBookNew) {
+    btnCitasBookNew.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchPatientTab('agendar');
+    });
+  }
+
   // Conexión del logo/brand del paciente y botón volver para regresar a la landing
   const patientBrandBtn = document.getElementById('patient-nav-brand-btn');
   const patientBackBtn = document.getElementById('btn-patient-back-to-web');
@@ -7702,9 +7711,11 @@ function setupDoctorPortal(showToast) {
               <button type="button" class="btn-secondary" id="btn-doc-date-prev" style="padding: 6px 12px; font-size: 0.78rem; font-weight: 700;">
                 ◀ Anterior
               </button>
-              <button type="button" class="${isToday ? 'btn-primary' : 'btn-secondary'}" id="btn-doc-date-today" style="padding: 6px 14px; font-size: 0.78rem; font-weight: 700;">
+              ${isToday ? '' : `
+              <button type="button" class="btn-secondary" id="btn-doc-date-today" style="padding: 6px 14px; font-size: 0.78rem; font-weight: 700; background: #e0f2fe; color: #0284c7; border: 1px solid #7dd3fc; border-radius: 6px; cursor: pointer;">
                 📅 Hoy
               </button>
+              `}
               <button type="button" class="btn-secondary" id="btn-doc-date-next" style="padding: 6px 12px; font-size: 0.78rem; font-weight: 700;">
                 Siguiente ▶
               </button>
@@ -12480,7 +12491,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (navMenuDoctor) navMenuDoctor.style.display = 'flex';
       if (navActionsDoctor) navActionsDoctor.style.display = 'flex';
-      if (navbarBrandSubtitle) navbarBrandSubtitle.textContent = 'Portal Médico • Dr. Carlos Campoverde';
+      if (navbarBrandSubtitle) navbarBrandSubtitle.textContent = 'Portal Médico';
 
     } else if (activeView === 'contador' || activeView === 'accountant') {
       if (viewAccountant) {
@@ -12735,6 +12746,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'btn-nav-book-appointment',
     'btn-hero-booking',
     'nav-btn-pat-agendar',
+    'btn-citas-book-new',
     'btn-dash-quick-book',
     'footer-btn-book'
   ];

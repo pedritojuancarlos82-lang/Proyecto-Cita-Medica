@@ -1963,6 +1963,15 @@ export function setupPatientPortal(showToast) {
     });
   }
 
+  // Conexión del botón "➕ Nueva Cita" en la sección de Mis Citas
+  const btnCitasBookNew = document.getElementById('btn-citas-book-new');
+  if (btnCitasBookNew) {
+    btnCitasBookNew.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchPatientTab('agendar');
+    });
+  }
+
   // Conexión del logo/brand del paciente y botón volver para regresar a la landing
   const patientBrandBtn = document.getElementById('patient-nav-brand-btn');
   const patientBackBtn = document.getElementById('btn-patient-back-to-web');

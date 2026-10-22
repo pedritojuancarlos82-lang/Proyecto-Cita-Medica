@@ -245,7 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (navMenuDoctor) navMenuDoctor.style.display = 'flex';
       if (navActionsDoctor) navActionsDoctor.style.display = 'flex';
-      if (navbarBrandSubtitle) navbarBrandSubtitle.textContent = 'Portal Médico • Dr. Carlos Campoverde';
+      if (navbarBrandSubtitle) navbarBrandSubtitle.textContent = 'Portal Médico';
 
     } else if (activeView === 'contador' || activeView === 'accountant') {
       if (viewAccountant) {
@@ -500,6 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'btn-nav-book-appointment',
     'btn-hero-booking',
     'nav-btn-pat-agendar',
+    'btn-citas-book-new',
     'btn-dash-quick-book',
     'footer-btn-book'
   ];
